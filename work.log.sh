@@ -13,8 +13,7 @@ git submodule add git@github.com:samtools/htslib.git
 # 即可将子模块内容下载下来后工程才不会缺少相应的文件。
 git submodule update --init --recursive
 
-# 更新子模块（两种方式）
-
+# 更新子模块（二选一）
 ## 方法 1：进入子模块目录执行 `git pull`; 
 ## 方法 2：直接在父目录下执行 `git submodule update --remote` 即可
 git submodule update --remote --recursive

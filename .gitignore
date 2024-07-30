@@ -5,6 +5,7 @@
 *.egg
 *.html
 *.o
+*.fai
 
 CMakeCache.txt
 cmake_install.cmake
