@@ -2,6 +2,7 @@
 // Date: 2021-08-25
 #include <iostream>
 #include <string>
+#include <time.h>
 
 #include "bam.h"
 #include "bam_record.h"
@@ -21,8 +22,12 @@ void ret_br(ngslib::Bam &b) {
 }
 
 int main() {
+    clock_t start, end;  // time recorder
+    
     using ngslib::Bam;
     using ngslib::BamRecord;
+
+    start = clock();  
 
     const char *fn1 = "../data/range.cram";
     std::string fn2 = "../data/range.bam";
@@ -83,6 +88,9 @@ int main() {
     good = b1.fetch("CHROMOSOME_I:914-914");
     ret_br(b1);
     std::cout << "End loop status: " << good << "\n\n";
+
+    std::cerr << "** Process done, " << (double)(clock() - start) / CLOCKS_PER_SEC
+              << " seconds elapsed **\n";
 
     return 0;
 }
