@@ -1,29 +1,27 @@
+*.swp
 *.py[cod]
 *.log
 *.so
 *.egg
 *.html
+*.o
 
 CMakeCache.txt
-Makefile
 cmake_install.cmake
 
 build/
 CMakeFiles/
-dist/
 *.egg-info/
 
-venv/
+.vscode/
 .idea/
-.ipynb_checkpoints/
 .DS_Store
+venv/
+.ipynb_checkpoints/
 
 learn_from/
-basevar/caller/backup/
 tests/data/Homo_sapiens_assembly38.*
-tests/data/140k_thalassemia_brca_bam/test*
 tests/data/hg19.NC_012920.fasta
 tests/data/hg19.NC_012920.fasta.fai
-tests/data/1Million_bam/
 trash/
 
