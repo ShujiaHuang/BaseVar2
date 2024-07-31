@@ -38,8 +38,8 @@ namespace ngslib {
         Fasta &operator=(const std::string &s) { return *this = s.c_str(); }  // inline definition
         Fasta &operator=(const Fasta &s) { return *this = s.fname; }  // inline definition
 
-        // Return the sequence string of seq_id
-        std::string &operator[](std::string seq_id);
+        // Return the sequence string of reg in format "chr2:2-10"
+        std::string &operator[](const std::string reg);
 
         friend std::ostream &operator<<(std::ostream &os, const Fasta &fa);
 
@@ -57,7 +57,7 @@ namespace ngslib {
         /** 
          * @brief fetch fasta sequence in a region.
          * 
-         * @param reg Region in the format "chr2:20,000-30,000"
+         * @param reg Region in the format "chr2:20,000-30,000", "chr2:20,000" or "chr2"
          * @return std::string 
          * 
          * Note: The start position in `reg` must be 1-base, and real fetch is [start-1, end).

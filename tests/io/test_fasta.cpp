@@ -28,18 +28,18 @@ int main() {
     std::cout << "The path of FASTA file3: " << fa3 << std::endl;
     std::cout << "fetch(\"ref1\", 0, 10) : " << fa.fetch("ref1", 0, 10)   << std::endl;
     std::cout << "fetch(\"ref1:1-10\"):    " << fa.fetch("ref1:1-10")     << std::endl;
+    std::cout << "fa[\"ref1:1-10\"]:       " << fa["ref1:1-10"]           << std::endl;
     std::cout << "fetch(\"ref1:5\"):       " << fa.fetch("ref1:5")        << std::endl;
-    std::cout << "fetch(\"ref3\") :        " << fa.fetch("ref3")          << std::endl;
-    std::cout << "fetch(\"ref1\", 10) :    " << fa.fetch("ref1", 10)      << std::endl;
-    std::cout << "fetch(\"ref1\", 0, 10):  " << fa1.fetch("ref1", 0, 10)  << std::endl;
     std::cout << "fetch(\"ref1\", 0, 1):   " << fa1.fetch("ref1", 0, 1)   << std::endl;
+    std::cout << "fa[\"ref1:1-2\"]:        " << fa1["ref1:1-2"]           << std::endl;
     std::cout << "fetch(\"ref1\", 1, 12):  " << fa2.fetch("ref1", 1, 12)  << std::endl;
     std::cout << "fetch(\"ref1\", 1, 12):  " << fa3.fetch("ref1", 1, 12)  << std::endl;
     std::cout << "fetch(\"ref1\", 1, 100): " << fa4.fetch("ref1", 1, 100) << std::endl;
     std::cout << "sequence_length(\"ref1\"): " << fa.seq_length("ref1") << std::endl;
     std::cout << "fa.has_seq(\"ref2\"): " << fa.has_seq("ref2") << std::endl;
     std::cout << "fa.has_seq(\"ref5\"): " << fa.has_seq("ref5") << std::endl;
-    std::cout << "fa[\"ref2\"]: " << fa["ref2"] << std::endl;
+    std::cout << "fa[\"ref2\"]:   " << fa["ref2"] << std::endl;
+    std::cout << "fa[\"ref2:1\"]: " << fa["ref2:1"] << std::endl;
 //    std::cout << "The sequence: " << fa.fetch("ref1", 12, 10) << std::endl;
 
     return 0;

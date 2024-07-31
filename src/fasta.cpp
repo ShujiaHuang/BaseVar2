@@ -35,16 +35,16 @@ namespace ngslib {
     }
 
     // return the sequence string of seq_id
-    std::string &Fasta::operator[](std::string seq_id) {
+    std::string &Fasta::operator[](const std::string reg) {
 
         std::map<std::string, std::string>::iterator it;
-        it = _seq.find(seq_id);
+        it = _seq.find(reg);
         if (it == _seq.end()) {
             // record the seq into _seq if not 
-            _seq[seq_id] = fetch(seq_id);
+            _seq[reg] = fetch(reg);
         }
 
-        return _seq[seq_id];
+        return _seq[reg];
     }
 
     std::string Fasta::fetch(const char *reg) const {
