@@ -1,9 +1,9 @@
 /*
- *  A simple C++11 thread Pool implementation.
- *  Thanks the author: Jakob Progsch. 
- *  Github link of this lib: https://github.com/progschj/ThreadPool
+ *  A simple C++11 Thread Pool implementation.
+ *  Created by the author: Jakob Progsch. 
+ *  Github link of this code: https://github.com/progschj/ThreadPool
  *
- */ 
+ */
 #ifndef THREAD_POOL_H
 #define THREAD_POOL_H
 
@@ -17,6 +17,7 @@
 #include <functional>
 #include <stdexcept>
 
+
 class ThreadPool {
 public:
     ThreadPool(size_t);
@@ -24,6 +25,7 @@ public:
     auto enqueue(F&& f, Args&&... args) 
         -> std::future<typename std::result_of<F(Args...)>::type>;
     ~ThreadPool();
+
 private:
     // need to keep track of threads so we can join them
     std::vector< std::thread > workers;
@@ -35,11 +37,10 @@ private:
     std::condition_variable condition;
     bool stop;
 };
- 
+
+
 // the constructor just launches some amount of workers
-inline ThreadPool::ThreadPool(size_t threads)
-    :   stop(false)
-{
+inline ThreadPool::ThreadPool(size_t threads): stop(false) {
     for(size_t i = 0;i<threads;++i)
         workers.emplace_back(
             [this]
@@ -90,8 +91,7 @@ auto ThreadPool::enqueue(F&& f, Args&&... args)
 }
 
 // the destructor joins all threads
-inline ThreadPool::~ThreadPool()
-{
+inline ThreadPool::~ThreadPool() {
     {
         std::unique_lock<std::mutex> lock(queue_mutex);
         stop = true;
