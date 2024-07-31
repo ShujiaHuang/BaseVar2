@@ -4,7 +4,10 @@ g++ -O3 -fPIC test_bamheader.cpp ../../src/bam_header.cpp ../../src/utils.cpp ..
 
 g++ -O3 -fPIC test_bamrecord.cpp ../../src/bam_record.cpp ../../src/bam_header.cpp ../../src/utils.cpp ../../htslib/libhts.a -I ../../src -I ../../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -o test_bamrecord && ./test_bamrecord
 
-
 g++ -O3 -fPIC test_bam.cpp ../../src/bam.cpp ../../src/bam_header.cpp ../../src/bam_record.cpp ../../src/utils.cpp ../../htslib/libhts.a -I ../../src -I ../../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -o test_bam && ./test_bam
 
-make
+g++ -O3 -fPIC test_cmdline.cpp -I ../../src -lz -lbz2 -lm -llzma -lpthread -lcurl -o test_cmdline && ./test_cmdline
+
+g++ -O3 -fPIC test_threadpool.cpp -I ../../src -o test_threadpool
+
+
