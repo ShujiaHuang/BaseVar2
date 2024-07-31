@@ -27,8 +27,10 @@ int main() {
     std::cout << "The path of FASTA file2: " << fa2 << std::endl;
     std::cout << "The path of FASTA file3: " << fa3 << std::endl;
     std::cout << "fetch(\"ref1\", 0, 10) : " << fa.fetch("ref1", 0, 10)   << std::endl;
-    std::cout << "fetch(\"ref1\", 10) :    " << fa.fetch("ref1", 10)      << std::endl;
+    std::cout << "fetch(\"ref1:1-10\"):    " << fa.fetch("ref1:1-10")     << std::endl;
+    std::cout << "fetch(\"ref1:5\"):       " << fa.fetch("ref1:5")        << std::endl;
     std::cout << "fetch(\"ref3\") :        " << fa.fetch("ref3")          << std::endl;
+    std::cout << "fetch(\"ref1\", 10) :    " << fa.fetch("ref1", 10)      << std::endl;
     std::cout << "fetch(\"ref1\", 0, 10):  " << fa1.fetch("ref1", 0, 10)  << std::endl;
     std::cout << "fetch(\"ref1\", 0, 1):   " << fa1.fetch("ref1", 0, 1)   << std::endl;
     std::cout << "fetch(\"ref1\", 1, 12):  " << fa2.fetch("ref1", 1, 12)  << std::endl;

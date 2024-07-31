@@ -14,34 +14,27 @@ namespace ngslib {
 
     // Identify the FASTA format
     class Fasta {
-
     private:
         std::string fname;
         faidx_t *fai;
-
         std::map<std::string, std::string> _seq;
 
         // Load the FASTA indexed of reference sequence. The index file (.fai) will be build if
         // the reference file doesn't have one. The input file could be bgzip-compressed.
         void _load_data(const char *name);
-
         std::ostream &len_out(std::ostream &os) const;
 
     public:
         // default constructor
         Fasta() : fai(NULL) {}
-
         Fasta(const char *file_name) { this->_load_data(file_name); }
-
         Fasta(const std::string &file_name) { this->_load_data(file_name.c_str()); }
-
         Fasta(const Fasta &);  // copy constructor
 
         // Destroy the malloc'ed faidx_t index inside object
         ~Fasta() { if (fai) fai_destroy(fai); }
 
         Fasta &operator=(const char *s);
-
         Fasta &operator=(const std::string &s) { return *this = s.c_str(); }  // inline definition
         Fasta &operator=(const Fasta &s) { return *this = s.fname; }  // inline definition
 
@@ -59,8 +52,19 @@ namespace ngslib {
 
         // Return sequence length, -1 if not present
         int seq_length(const char *seq_id) const { return faidx_seq_len(fai, seq_id); }
-
         int seq_length(const std::string seq_id) const { return seq_length(seq_id.c_str()); }
+
+        /** 
+         * @brief fetch fasta sequence in a region.
+         * 
+         * @param reg Region in the format "chr2:20,000-30,000"
+         * @return std::string 
+         * 
+         * Note: The start position in `reg` must be 1-base, and real fetch is [start-1, end).
+         * 
+         */
+        std::string fetch(const char *reg) const;
+        std::string fetch(const std::string &reg) const { return fetch(reg.c_str()); }
 
         /** fetch a string from the fasta sequence
          * @param chromosome name of the reference to query
@@ -71,17 +75,11 @@ namespace ngslib {
          * @note This is currently NOT thread safe
          */
         std::string fetch(const char *chromosome, const uint32_t start, const uint32_t end) const;
-
         std::string fetch(const std::string &chromosome, const uint32_t start, const uint32_t end) const {
             return fetch(chromosome.c_str(), start, end);
         }
-
         std::string fetch(const std::string &chromosome, const uint32_t start) const {
             return fetch(chromosome, start, seq_length(chromosome));
-        }
-
-        std::string fetch(const std::string &chromosome) const {
-            return fetch(chromosome, 0, seq_length(chromosome));
         }
     };  // class Fasta
 

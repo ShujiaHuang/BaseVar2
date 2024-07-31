@@ -40,10 +40,32 @@ namespace ngslib {
         std::map<std::string, std::string>::iterator it;
         it = _seq.find(seq_id);
         if (it == _seq.end()) {
+            // record the seq into _seq if not 
             _seq[seq_id] = fetch(seq_id);
         }
 
         return _seq[seq_id];
+    }
+
+    std::string Fasta::fetch(const char *reg) const {
+        // check if we have loaded the fasta index
+        if (!fai) throw std::invalid_argument("Fasta::fetch index not loaded");
+
+        int length;
+        char *f = fai_fetch(fai, reg, &length);
+
+        if (!f) {
+            throw std::invalid_argument("Fasta::fetch - Fail to fetch sequence.");
+        }
+
+        std::string sub_seq(f);
+        free(f);
+        
+        if (sub_seq.empty()) {
+            throw std::invalid_argument("Fasta::fetch - Fetch empty sequence on " + tostring(reg));
+        }
+
+        return sub_seq;
     }
 
     std::string Fasta::fetch(const char *chromosome,
