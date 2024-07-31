@@ -2,7 +2,7 @@
 // Date: 2021-08-25
 #include <iostream>
 #include <string>
-#include <time.h>
+#include <ctime>
 
 #include "bam.h"
 #include "bam_record.h"
@@ -89,7 +89,8 @@ int main() {
     ret_br(b1);
     std::cout << "End loop status: " << good << "\n\n";
 
-    std::cerr << "** Process done, " << (double)(clock() - start) / CLOCKS_PER_SEC
+    time_t now = time(0);
+    std::cerr << ctime(&now) << "** Process done, " << (double)(clock() - start) / CLOCKS_PER_SEC
               << " seconds elapsed **\n";
 
     return 0;
