@@ -24,6 +24,7 @@ namespace ngslib {
         BamHeader _hdr;      // The sam/bam/cram header.
         hts_idx_t *_idx;     // BAM or CRAM index pointer.
         hts_itr_t *_itr;     // A SAM/BAM/CRAM iterator for a specify region
+
         // call `hts_open` function to open file.
         /*!
           @abstract       Open a sequence data (SAM/BAM/CRAM) or variant data (VCF/BCF)
@@ -64,7 +65,6 @@ namespace ngslib {
 
     public:
         Bam() : _fp(NULL), _itr(NULL), _idx(NULL), _io_status(-1) {}
-
         Bam(const std::string &fn, const std::string mode = "r") : _fp(NULL), _itr(NULL), _idx(NULL),
                                                                    _io_status(-1) {
             // @mode matching: [rwa]
@@ -75,9 +75,7 @@ namespace ngslib {
 
         // return the read-only BAM header
         samFile *fp() const;
-
         hts_idx_t *idx();
-
         BamHeader &header();
 
         /// Generate and save an index file
@@ -114,7 +112,6 @@ namespace ngslib {
          Note that SAM files must be bgzf-compressed for iterators to work.
         **/
         bool fetch(const std::string &region);
-
         bool fetch(const std::string &seq_id, hts_pos_t beg, hts_pos_t end);
 
         /// Read a record from a file
@@ -124,7 +121,6 @@ namespace ngslib {
          *  @return >= 0 on successfully reading a new record, -1 on end of stream, < -1 on error
          **/
         int read(BamRecord &b);
-
         int next(BamRecord &b) { return read(b); }
 
         // For reading: >= 0 on successfully reading a new record,
@@ -133,10 +129,8 @@ namespace ngslib {
         int io_status() { return _io_status; }
 
         operator bool() const { return _io_status >= 0; }
-
         friend std::ostream &operator<<(std::ostream &os, const Bam &b);
     };
-
-}  // namespace ngslib
+};  // namespace ngslib
 
 #endif
