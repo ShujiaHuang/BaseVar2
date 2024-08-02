@@ -3,11 +3,11 @@
 #ifndef __INCLUDE_NGSLIB_UTILS_H__
 #define __INCLUDE_NGSLIB_UTILS_H__
 
+#include <vector>
 #include <string>
 #include <sstream>
 
 namespace ngslib {
-
     // Template function can only be defined in C++ header file
     template<typename T>
     std::string tostring(T d) {
@@ -17,12 +17,17 @@ namespace ngslib {
     }
 
     /** Check if a file is readable and exists.
+     * 
      * @param name Name of a file to test
      * @return a bool type for file is readable and exists or not.
+     * 
      */
     bool is_readable(const char *name);
     inline bool is_readable(const std::string &name) { return is_readable(name.c_str()); }
 
+    std::string join(std::vector<std::string> &goven, const std::string delim="\t");
+    void split(std::string line, std::vector<std::string> &token, const char *delim, 
+               bool is_append=false);
 }  // namespace ngslib
 
 #endif  // #ifndef __INCLUDE_NGSLIB_UTILS_H__
