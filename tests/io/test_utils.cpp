@@ -22,6 +22,7 @@ int main(int argc, char *argv[]) {
     ngslib::split("hello::world", b, ":");
     std::cout << ngslib::join(b, " -- ") << std::endl;
 
+    ngslib::split("hello::world", b, ">>", true);
     ngslib::split("hello::world", b, ">>h", true);
     std::cout << ngslib::join(b, " -- ") << std::endl;
 

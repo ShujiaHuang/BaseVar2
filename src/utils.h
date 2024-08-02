@@ -4,10 +4,15 @@
 #define __INCLUDE_NGSLIB_UTILS_H__
 
 #include <vector>
+#include <tuple>
 #include <string>
 #include <sstream>
 
+
 namespace ngslib {
+    // define a genome region data style
+    typedef std::tuple<std::string, uint32_t, uint32_t> GenomeRegionTuple;
+
     // Template function can only be defined in C++ header file
     template<typename T>
     std::string tostring(T d) {
@@ -28,6 +33,7 @@ namespace ngslib {
     std::string join(std::vector<std::string> &goven, const std::string delim="\t");
     void split(std::string line, std::vector<std::string> &token, const char *delim, 
                bool is_append=false);
+
 }  // namespace ngslib
 
 #endif  // #ifndef __INCLUDE_NGSLIB_UTILS_H__

@@ -9,6 +9,7 @@
  * 
  */
 #include <sstream>
+
 #include "basetype.h"
 #include "utils.h"
 
@@ -23,8 +24,12 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
     
     char c;
     int opt_idx;
+    /**
+     * @brief Parsing the commandline options 
+     * 
+     */
     while((c = getopt_long(cmdline_argc, cmdline_argv, "I:L:R:m:q:B:t:r:p:G:h", BASETYPE_CMDLINE_LOPTS, &opt_idx)) >= 0) {
-        std::stringstream ss(optarg ? optarg: "");  // 用于解决字符串转浮点等其他类型的转换问题
+        std::stringstream ss(optarg ? optarg: "");  // 字符流解决命令行参数转浮点等类型的问题
         switch (c) {
             case 'I': args->input_bf.push_back(optarg);         break;
             case 'L': args->in_bamfilelist = optarg;            break;
@@ -66,8 +71,50 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
         "   -p " + args->in_pos_file          + " \\ \n") << (args->pop_group_file.empty() ? "": 
         "   -p " + args->pop_group_file       + " \\ \n") <<
         "   --output-vcf " + args->output_vcf + " \\ \n"
-        "   --output-vcg " + args->output_cvg <<
-        (args->filename_has_samplename ? "\\ \n--filename-has-samplename": "") << 
-        (args->smart_rerun ? "\\ \n--smart-rerun": "") << "\n" << std::endl;
+        "   --output-vcg " + args->output_cvg << (args->filename_has_samplename ? " \\ \n"
+        "   --filename-has-samplename": "")   << (args->smart_rerun ? " \\ \n"
+        "   --smart-rerun": "") << "\n" << std::endl;
+    
+    reference = args->reference;  // load fasta
+    _load_calling_interval();
 }
 
+void BaseTypeRunner::_load_calling_interval() {
+
+    if (!args->regions.empty()) {
+        std::vector<std::string> region_vector;
+        ngslib::split(args->regions, region_vector, ",");
+
+        for (size_t i(0); i < region_vector.size(); ++i) {
+            std::cerr << "  --i:" << i << " - " << region_vector[i] << "\n";
+
+        }
+    }
+
+    if (!args->in_pos_file.empty()) {
+
+    }
+
+    return;
+}
+
+ngslib::GenomeRegionTuple BaseTypeRunner::_make_gregiontuple(std::string gregion) {
+
+    std::string ref_id;
+    uint32_t pos_start, pos_end;  // All be 1-based
+
+    std::vector<std::string> gr1, gr2;
+    ngslib::split(gregion, gr1, ":");
+
+    ref_id = gr1[0];
+    if (gr1.size() == 2) {  // 'start-end' or start
+        ngslib::split(gr1[1], gr2, "-");
+        pos_start = std::stoi(gr2[0]);
+        pos_end = (gr2.size() == 2) ? std::stoi(gr2[1]) : pos_start;
+    } else {
+        pos_start = 1;
+        pos_end = reference.seq_length(ref_id);
+    }
+
+    std::make_tuple(ref_id, pos_start, pos_end);  // 1-based
+}

@@ -29,12 +29,12 @@ namespace ngslib {
         while(1) {
             //erase delimiter
             int i = line.find_first_not_of(delim);
-            if(i == -1) break;
+            if(i == std::string::npos) break;
 
             line.erase(0, i);
 
             i = line.find_first_of(delim);
-            if(i == -1) {
+            if(i == std::string::npos) {
                 token.push_back(line);
                 break;
             } else {

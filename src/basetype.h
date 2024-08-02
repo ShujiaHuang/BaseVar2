@@ -16,6 +16,9 @@
 #include <vector>
 #include <getopt.h>
 
+#include "Fasta.h"
+#include "utils.h"
+
 static const std::string __BASETYPE_USAGE = 
     "About: Calling variants by BaseVar.\n" 
     "Usage: basevar basetype [options] <-R reference.fa>|<-R reference.fa.gz> <--output-vcf> <--output-cvg> " 
@@ -70,10 +73,9 @@ static const struct option BASETYPE_CMDLINE_LOPTS[] = {
     {"output-cvg", required_argument, NULL, '2'},
 
     // {"output-batch-file", required_argument, NULL, 0},  // not use
-
     {"filename-has-samplename", no_argument, NULL, '3'},
-    {"smart-rerun",               no_argument, NULL, '4'},
-    {"help", no_argument, NULL, 'h'},
+    {"smart-rerun",             no_argument, NULL, '4'},
+    {"help",                    no_argument, NULL, 'h'},
     {0, 0, 0, 0}
 };
 
@@ -98,18 +100,27 @@ struct BaseTypeArgs {
     bool filename_has_samplename;       // sample name in file name
 
     // set default value
-    BaseTypeArgs() : min_af(0.01), mapq(10), batchcount(200), thread_num(4), 
-                     smart_rerun(false), filename_has_samplename(false) {}
+    BaseTypeArgs(): min_af(0.01), mapq(10), batchcount(200), thread_num(4), 
+                    smart_rerun(false), filename_has_samplename(false) {}
 };
 
 /**
- * @brief BaseTypeRunner
- * 
+ * @brief BaseTypeRunner class
  */
 class BaseTypeRunner {
 
 private:
     BaseTypeArgs *args;
+    ngslib::Fasta reference;
+    std::vector<ngslib::GenomeRegionTuple> regions;  // vector of calling regions
+
+    /**
+     * @brief load the calling region from input
+     * 
+     */
+    void _load_calling_interval();
+    ngslib::GenomeRegionTuple _make_gregiontuple(std::string gregion);
+
     BaseTypeRunner(const BaseTypeRunner &b) = delete;             // reject using copy constructor (C++11 style).
     BaseTypeRunner &operator=(const BaseTypeRunner &b) = delete;  // reject using copy/assignment operator (C++11 style).
 
