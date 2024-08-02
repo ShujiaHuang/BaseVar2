@@ -16,14 +16,15 @@
 void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
 
     if (!args) {
-        throw std::invalid_argument("[basetype.cpp::BaseTypeRunner:args] muse be a NULL pointer.");
+        throw std::invalid_argument("[basetype.cpp::BaseTypeRunner:args] 'args' must be a "
+                                    "NULL pointer before it can be assigned a value.");
     }
-    args = new BaseTypeArgs;
+    args = new BaseTypeArgs;  // set it to be a new BasTypeArgs stucture type.
     
     char c;
     int opt_idx;
-    while((c = getopt_long(cmdline_argc, cmdline_argv, "I:L:R:m:q:B:t:r:p:G", BASETYPE_CMDLINE_LOPTS, &opt_idx)) >= 0) {
-        std::stringstream ss(optarg ? optarg: "");  // 用于解决非字符串类型输入的类型转换问题
+    while((c = getopt_long(cmdline_argc, cmdline_argv, "I:L:R:m:q:B:t:r:p:G:h", BASETYPE_CMDLINE_LOPTS, &opt_idx)) >= 0) {
+        std::stringstream ss(optarg ? optarg: "");  // 用于解决字符串转浮点等其他类型的转换问题
         switch (c) {
             case 'I': args->input_bf.push_back(optarg);         break;
             case 'L': args->in_bamfilelist = optarg;            break;
@@ -40,17 +41,33 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
             case '1': args->output_vcf = optarg;                break;
             case '2': args->output_cvg = optarg;                break;
 
-            case '3': ss >> args->filename_has_samplename;      break;
-            case '4': ss >> args->smart_rerun;                  break;
-            case '?': std::cerr << BASETYPE_USAGE << std::endl; break;
+            case '3': args->filename_has_samplename = true;     break;
+            case '4': args->smart_rerun = true;                 break;
+            case 'h': 
+                std::cerr << usage() << std::endl;
+                exit(1);
 
             default: 
                 std::cerr << "Unknown argument: " << c << std::endl; 
                 exit(1);
         }
     }
-
-    std::cerr << args->input_bf.size() << ", " << args->input_bf[0] << "\n" 
-              << args->min_af << ", " << args->mapq << ", " << args->batchcount << "\n";
+    // Output the commandline options
+    std::cerr << 
+        "[INFO] BaseVar commandline:\n"
+        "basevar basetype " + (args->input_bf.empty() ? "" : "-I " + ngslib::join(args->input_bf, " -I ")) +
+        (args->in_bamfilelist.empty() ? "": " -L " + args->in_bamfilelist) + " \\ \n"
+        "   -R " + args->reference            + " \\ \n"
+        "   -q " << args->mapq               << " \\ \n"
+        "   -m " << args->min_af             << " \\ \n"
+        "   -B " << args->batchcount         << " \\ \n"
+        "   -t " << args->thread_num         << " \\ \n"  << (args->regions.empty() ? "": 
+        "   -r " + args->regions              + " \\ \n") << (args->in_pos_file.empty() ? "": 
+        "   -p " + args->in_pos_file          + " \\ \n") << (args->pop_group_file.empty() ? "": 
+        "   -p " + args->pop_group_file       + " \\ \n") <<
+        "   --output-vcf " + args->output_vcf + " \\ \n"
+        "   --output-vcg " + args->output_cvg <<
+        (args->filename_has_samplename ? "\\ \n--filename-has-samplename": "") << 
+        (args->smart_rerun ? "\\ \n--smart-rerun": "") << "\n" << std::endl;
 }
 

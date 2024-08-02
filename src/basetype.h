@@ -16,7 +16,7 @@
 #include <vector>
 #include <getopt.h>
 
-static const std::string BASETYPE_USAGE = 
+static const std::string __BASETYPE_USAGE = 
     "About: Calling variants by BaseVar.\n" 
     "Usage: basevar basetype [options] <-R reference.fa>|<-R reference.fa.gz> <--output-vcf> <--output-cvg> " 
     "[-I input] ...\n\n" 
@@ -71,7 +71,7 @@ static const struct option BASETYPE_CMDLINE_LOPTS[] = {
 
     // {"output-batch-file", required_argument, NULL, 0},  // not use
 
-    {"--filename-has-samplename", no_argument, NULL, '3'},
+    {"filename-has-samplename", no_argument, NULL, '3'},
     {"smart-rerun",               no_argument, NULL, '4'},
     {"help", no_argument, NULL, 'h'},
     {0, 0, 0, 0}
@@ -95,13 +95,17 @@ struct BaseTypeArgs {
     std::string output_cvg;             // Output coverage file
 
     bool smart_rerun;                   // Smart rerun by checking batchfiles
-    bool filename_has_samplename;       // Smart rerun by checking batchfiles
+    bool filename_has_samplename;       // sample name in file name
 
     // set default value
-    BaseTypeArgs() : min_af(0.01), mapq(10), batchcount(200), thread_num(4) {}
+    BaseTypeArgs() : min_af(0.01), mapq(10), batchcount(200), thread_num(4), 
+                     smart_rerun(false), filename_has_samplename(false) {}
 };
 
-
+/**
+ * @brief BaseTypeRunner
+ * 
+ */
 class BaseTypeRunner {
 
 private:
@@ -115,7 +119,7 @@ public:
     BaseTypeRunner(int cmdline_argc, char *cmdline_argv[]) { set_arguments(cmdline_argc, cmdline_argv); }
 
     void set_arguments(int cmdline_argc, char *cmdline_argv[]);
-    std::string usage() const {return BASETYPE_USAGE;}
+    std::string usage() const {return __BASETYPE_USAGE;}
 
     // Destroy the malloc'ed BasTypeArgs structure
     ~BaseTypeRunner(){ if(args){delete args; args = NULL;} }
