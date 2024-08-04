@@ -30,9 +30,9 @@ namespace ngslib {
     bool is_readable(const char *name);
     inline bool is_readable(const std::string &name) { return is_readable(name.c_str()); }
 
-    std::string join(std::vector<std::string> &goven, const std::string delim="\t");
-    void split(std::string line, std::vector<std::string> &token, const char *delim, 
-               bool is_append=false);
+    std::string join(std::vector<std::string> &input, const std::string delim="\t");
+    void split(std::string in_str, std::vector<std::string> &out, const char *delim, bool is_append=false);
+    void split(std::string in_str, std::vector<uint32_t> &out, const char *delim, bool is_append=false);
 
 }  // namespace ngslib
 

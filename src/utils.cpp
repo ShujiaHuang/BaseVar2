@@ -8,39 +8,64 @@ namespace ngslib {
         return (access(name, R_OK) == 0);
     }
 
-    std::string join(std::vector<std::string> &goven, const std::string delim) {
+    std::string join(std::vector<std::string> &input, const std::string delim) {
 
-        if(goven.empty()) return "";
+        if(input.empty()) return "";
 
-        std::string line = goven[0];
-        for (size_t i(1); i < goven.size(); ++i) {
-            line += (delim + goven[i]);
+        std::string out_str = input[0];
+        for (size_t i(1); i < input.size(); ++i) {
+            out_str += (delim + input[i]);
         }
 
-        return line;
+        return out_str;
     }
 
-    void split(std::string line, std::vector<std::string> &token, const char *delim, bool is_append) {
+    void split(std::string in_str, std::vector<std::string> &out, const char *delim, bool is_append) {
 
         if (!is_append) {
-            token.clear();
+            out.clear();
         }
 
         while(1) {
             //erase delimiter
-            int i = line.find_first_not_of(delim);
+            int i = in_str.find_first_not_of(delim);
             if(i == std::string::npos) break;
 
-            line.erase(0, i);
+            in_str.erase(0, i);
 
-            i = line.find_first_of(delim);
+            i = in_str.find_first_of(delim);
             if(i == std::string::npos) {
-                token.push_back(line);
+                out.push_back(in_str);
                 break;
             } else {
-                std::string tok = line.substr(0, i);
-                token.push_back(tok);
-                line.erase(0, i);
+                std::string tok = in_str.substr(0, i);
+                out.push_back(tok);
+                in_str.erase(0, i);
+            }
+        }
+    }
+
+    void split(std::string in_str, std::vector<uint32_t> &out, const char *delim, bool is_append) {
+
+        if (!is_append) {
+            out.clear();
+        }
+
+        while(1) {
+            //erase delimiter
+            int i = in_str.find_first_not_of(delim);
+            if(i == std::string::npos) break;
+
+            in_str.erase(0, i);
+
+            i = in_str.find_first_of(delim);
+            if(i == std::string::npos) {
+                out.push_back(std::stoi(in_str));
+                break;
+            } else {
+                std::string tok = in_str.substr(0, i);
+                out.push_back(std::stoi(tok));
+                in_str.erase(0, i);
             }
         }
     }
