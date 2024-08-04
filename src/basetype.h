@@ -110,15 +110,12 @@ struct BaseTypeArgs {
 class BaseTypeRunner {
 
 private:
-    BaseTypeArgs *args;
-    ngslib::Fasta reference;
-    std::vector<ngslib::GenomeRegionTuple> regions;  // vector of calling regions
+    BaseTypeArgs *_args;
+    ngslib::Fasta _reference;
+    std::vector<ngslib::GenomeRegionTuple> _calling_intervals;  // vector of calling regions
 
-    /**
-     * @brief load the calling region from input
-     * 
-     */
-    void _load_calling_interval();
+    void _load_bamfile_list();
+    void _load_calling_interval();  // load the calling region from input
     ngslib::GenomeRegionTuple _make_gregiontuple(std::string gregion);
 
     BaseTypeRunner(const BaseTypeRunner &b) = delete;             // reject using copy constructor (C++11 style).
@@ -126,14 +123,23 @@ private:
 
 public:
     // default constructor
-    BaseTypeRunner() : args(NULL) {}
-    BaseTypeRunner(int cmdline_argc, char *cmdline_argv[]) { set_arguments(cmdline_argc, cmdline_argv); }
+    BaseTypeRunner() : _args(NULL) {}
+    BaseTypeRunner(int cmdline_argc, char *cmdline_argv[]) {
+        if (cmdline_argc < 2) {
+            std::cerr << usage() << std::endl;
+            exit(1);
+        }
+        set_arguments(cmdline_argc, cmdline_argv); 
+    }
 
-    void set_arguments(int cmdline_argc, char *cmdline_argv[]);
     std::string usage() const {return __BASETYPE_USAGE;}
+    void set_arguments(int cmdline_argc, char *cmdline_argv[]);
 
     // Destroy the malloc'ed BasTypeArgs structure
-    ~BaseTypeRunner(){ if(args){delete args; args = NULL;} }
+    ~BaseTypeRunner(){ 
+        // _calling_intervals.clear();
+        if(_args){delete _args; _args = NULL;}
+    }
 
 };  // BaseTypeRunner class
 
