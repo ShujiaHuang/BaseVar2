@@ -111,11 +111,13 @@ class BaseTypeRunner {
 
 private:
     BaseTypeArgs *_args;
+    std::vector<std::string> _samples_id;  // sample ID from input alignment files (BAM/CRAM/SAM)
     ngslib::Fasta _reference;
     std::vector<ngslib::GenomeRegionTuple> _calling_intervals;  // vector of calling regions
 
     void _load_bamfile_list();
     void _load_calling_interval();  // load the calling region from input
+    void _load_sample_id_from_bam();
     ngslib::GenomeRegionTuple _make_gregiontuple(std::string gregion);
 
     BaseTypeRunner(const BaseTypeRunner &b) = delete;             // reject using copy constructor (C++11 style).

@@ -39,7 +39,6 @@ namespace ngslib {
          header text should use the sam_hdr_str() and sam_hdr_length() functions
          instead of these fields.
          */
-
         sam_hdr_t *_h;   // `bam_hdr_t` is an old name of `sam_hdr_t`, do not use it.
 
     public:
@@ -61,9 +60,7 @@ namespace ngslib {
 
         // Copy constructor.
         BamHeader(const BamHeader &bh) { _h = sam_hdr_dup(bh._h); }
-
         BamHeader &operator=(const sam_hdr_t *hdr);
-
         BamHeader &operator=(const BamHeader &bh);
 
         friend std::ostream &operator<<(std::ostream &os, const BamHeader &hd);
@@ -103,11 +100,19 @@ namespace ngslib {
          * Looks up a reference sequence by name in the reference hash table
          * and returns the numerical target id.
          */
-        int name2id(const std::string &name);
+        int name2id(const std::string &name) const;
 
         // Return a length of the reference sequences by the index of chromosome
         // in header.
-        int64_t seq_length(int i) const { return _h->target_len[i]; }
+        uint32_t seq_length(int i) const { return _h->target_len[i]; }
+
+        // Returns the text representation of the header.
+        std::string header_txt() {
+            return std::string(sam_hdr_str(_h));
+        }
+
+        // Get sample ID from SM tag in @RG field.
+        std::string get_sample_name();
     };
 }
 

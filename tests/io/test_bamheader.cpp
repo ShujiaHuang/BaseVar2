@@ -15,7 +15,7 @@ int main() {
     BamHeader bh0;
     BamHeader bh1(fn1);
     // BamHeader bh2 = fn2; // Not allow
-    BamHeader bh2 = BamHeader(fn2); // Not allow
+    BamHeader bh2 = BamHeader(fn2);
 
     // sam_hdr_t assign to BamHeader.
     BamHeader bh3(bh2.h());
@@ -59,6 +59,10 @@ int main() {
     std::string ss = bh9.seq_name(0);
     std::cout << "ss = bh9.seq_name(0): " << ss << "\n";
     std::cout << "bh9.name2id(CHROMOSOME_III): " << bh9.name2id("CHROMOSOME_III") << "\n";
+    std::cout << "bh9 Header: \n" << bh9.header_txt() << "\n";
+    
+    std::cout << "bh9.get_sample_name: " << bh9.get_sample_name() << "\n";
+    std::cout << "fn3.get_sample_name: " << bh7.get_sample_name() << "\n";
 
     sam_close(fp);
     return 0;

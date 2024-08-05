@@ -16,7 +16,7 @@ namespace ngslib {
             throw std::invalid_argument("[bam.cpp::Bam:_open] file not found - " + _fname);
         }
 
-        _fp = sam_open(fn.c_str(), mode.c_str()); // Open a Sam/Bam/Cram file
+        _fp = sam_open(fn.c_str(), mode.c_str()); // Open a SAM/BAM/CRAM file
         if (!_fp) {
             throw std::invalid_argument("[bam.cpp::Bam:_open] file open failure.");
         }

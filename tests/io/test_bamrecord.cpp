@@ -55,6 +55,7 @@ int main() {
                   << "; get_tag(NM): " << br3.get_tag("NM")
                   << "; get_tag(MD): " << br3.get_tag("MD")
                   << "; get_tag(XT): " << br3.get_tag("XT")
+                  << "; get_tag(RG): " << br3.get_tag("RG")
 
                   << "; FLAG: " << br3.flag()
                   << "; is_paired: " << br3.is_paired()

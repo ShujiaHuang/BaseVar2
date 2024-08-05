@@ -12,7 +12,7 @@
 #include <fstream>
 
 #include "basetype.h"
-#include "utils.h"
+#include "bam_header.h"
 
 
 void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
@@ -78,13 +78,26 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
         "   -p " + _args->pop_group_file       + " \\ \n") <<
         "   --output-vcf " + _args->output_vcf + " \\ \n"
         "   --output-vcg " + _args->output_cvg << (_args->filename_has_samplename ? " \\ \n"
-        "   --filename-has-samplename": "")   << (_args->smart_rerun ? " \\ \n"
+        "   --filename-has-samplename": "")    << (_args->smart_rerun ? " \\ \n"
         "   --smart-rerun": "") << "\n" << std::endl;
     
-    // 
     if (!_args->in_bamfilelist.empty()) _load_bamfile_list();
+
+    // Setting the resolution of AF
+    if (_args->min_af > 100.0/_args->input_bf.size()) {
+        _args->min_af = 100.0/_args->input_bf.size();
+    }
     _reference = _args->reference;  // load fasta
     _load_calling_interval();
+
+    std::cerr << "[INFO] Finish loading arguments and we have " << _args->input_bf.size()
+              << " BAM/CRAM files for variants calling.\n";
+
+    // loading all the sample id from aligne_files 
+    // `samples_id`` has the same size and order as ``aligne_files``
+    _load_sample_id_from_bam();
+std::cerr << "Sample ID: " << ngslib::join(_samples_id, ",") << "\n";
+
 }
 
 void BaseTypeRunner::_load_bamfile_list() {
@@ -99,11 +112,47 @@ void BaseTypeRunner::_load_bamfile_list() {
         i_fn >> fn;
         if (i_fn.eof()) break;
         _args->input_bf.push_back(fn);
-
         std::getline(i_fn, tmp, '\n');
     }
     i_fn.close();
-    std::cerr << ngslib::join(_args->input_bf, ",") << std::endl;
+
+    return;
+}
+
+void BaseTypeRunner::_load_sample_id_from_bam() {
+    // Loading sample id in BAM/CRMA files from RG tag.
+    std::cerr << "[INFO]Start loading all samples' id from alignment files\n";
+    if (_args->filename_has_samplename)
+        std::cerr << "[INFO] loading samples' id from filename becuase you set "
+                     "--filname-has-samplename\n";
+
+    std::string samplename, filename;
+    size_t si;
+    for (size_t i(0); i < _args->input_bf.size(); ++i) {
+
+        if (i % 1000 == 0)
+            std::cerr << "[INFO] loading " << i+1 << "/" << _args->input_bf.size() 
+                      << " alignment files.\n";
+        
+        if (_args->filename_has_samplename) {
+            filename = ngslib::basename(_args->input_bf[i]);
+            si = filename.find_first_of('.');
+            samplename = si > 0 && si != std::string::npos ? filename.substr(0, si) : filename;
+        } else {
+            // Get sampleID from BAM header, maybe time-consuming.
+            ngslib::BamHeader bh(_args->input_bf[i]);
+            samplename = bh.get_sample_name();
+        }
+
+        if (!samplename.empty()) {
+            _samples_id.push_back(samplename);
+        } else {
+            throw std::invalid_argument("[BaseTypeRunner::_load_sample_id_from_bam] " + 
+                                        _args->input_bf[i] + " sample ID not found.");
+        }
+    }
+
+    return;
 }
 
 void BaseTypeRunner::_load_calling_interval() {
@@ -116,9 +165,7 @@ void BaseTypeRunner::_load_calling_interval() {
             _calling_intervals.push_back(_make_gregiontuple(region_vector[i]));
         }
     }
-
     if (!_args->in_pos_file.empty()) {
-
     }
 
     return;
