@@ -26,6 +26,11 @@ int main(int argc, char *argv[]) {
     ngslib::split("hello::world", b, ">>h", true);
     std::cout << ngslib::join(b, " -- ") << std::endl;
 
+    std::cout << "Get filename from Linux path: " << ngslib::basename("some/path/file.ext") << "\t" 
+              << ngslib::remove_filename_extension(ngslib::basename("some/path/file.ext")) << "\n";
+    std::cout << "Get filename from window path " << ngslib::basename("C:\\MyDirectory\\MyFile.bat") << "\t" 
+              << ngslib::remove_filename_extension(ngslib::basename("C:\\MyDirectory\\MyFile.bat")) << "\n";
+
     return 0;
 
 }

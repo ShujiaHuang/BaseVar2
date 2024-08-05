@@ -8,6 +8,15 @@ namespace ngslib {
         return (access(name, R_OK) == 0);
     }
 
+    std::string basename(const std::string &path, const std::string &delims) {
+        return path.substr(path.find_last_of(delims) + 1);
+    }
+    
+    std::string remove_filename_extension(const std::string &filename) {
+        size_t p(filename.find_last_of('.'));
+        return p > 0 && p != std::string::npos ? filename.substr(0, p) : filename;
+    }
+
     std::string join(std::vector<std::string> &input, const std::string delim) {
 
         if(input.empty()) return "";

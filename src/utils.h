@@ -13,6 +13,11 @@ namespace ngslib {
     // define a genome region data style
     typedef std::tuple<std::string, uint32_t, uint32_t> GenomeRegionTuple;
 
+    // Get file name from a path
+    std::string basename(const std::string &path, const std::string &delims = "/\\");
+    // remove the filename extension
+    std::string remove_filename_extension(const std::string &filename);
+
     // Template function can only be defined in C++ header file
     template<typename T>
     std::string tostring(T d) {
