@@ -41,8 +41,8 @@ int main() {
     std::cout << ">>> 2. The header of file: " + fn2 << "\n" << bh2 << "\n";
     std::cout << ">>> 3. The header of file: bh3\n" << bh3 << "\n";
     std::cout << ">>> 4. The header of file: bh4\n" << bh4 << "\n";
-    std::cout << ">>> 5. The header of file: bh5" << bh5 << " ; bool: " << bool(bh5) << "\n";
-    std::cout << ">>> 6. The header of file: bh6" << bh6 << " ; bool: " << bool(bh6) << "\n";
+    std::cout << ">>> 5. The header of file: bh5" << bh5 << "; bool: " << bool(bh5) << "\n";
+    std::cout << ">>> 6. The header of file: bh6" << bh6 << "; bool: " << bool(bh6) << "\n";
     std::cout << ">>> 7. The header of file: bh7\n" << bh7 << "\n";
     std::cout << ">>> 8. The header of file: bh8\n" << bh8 << "\n";
 
@@ -60,9 +60,11 @@ int main() {
     std::cout << "ss = bh9.seq_name(0): " << ss << "\n";
     std::cout << "bh9.name2id(CHROMOSOME_III): " << bh9.name2id("CHROMOSOME_III") << "\n";
     std::cout << "bh9 Header: \n" << bh9.header_txt() << "\n";
+    int d1 = 5 / 3;
+    std::cout << "HHHH: " << d1 << " -- " << 5%3 << "\n";
     
     std::cout << "bh9.get_sample_name: " << bh9.get_sample_name() << "\n";
-    std::cout << "fn3.get_sample_name: " << bh7.get_sample_name() << "\n";
+    std::cout << "bh7.get_sample_name: " << bh7.get_sample_name() << "\n";
 
     sam_close(fp);
     return 0;

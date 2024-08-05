@@ -24,12 +24,8 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
     _args = new BaseTypeArgs;  // set it to be a new BasTypeArgs stucture type.
     
     char c;
-    int opt_idx;
-    /**
-     * @brief Parsing the commandline options 
-     * 
-     */
-    while((c = getopt_long(cmdline_argc, cmdline_argv, "I:L:R:m:q:B:t:r:p:G:h", BASETYPE_CMDLINE_LOPTS, &opt_idx)) >= 0) {
+    // Parsing the commandline options. 
+    while((c = getopt_long(cmdline_argc, cmdline_argv, "I:L:R:m:q:B:t:r:G:h", BASETYPE_CMDLINE_LOPTS, NULL)) >= 0) {
         std::stringstream ss(optarg ? optarg: "");  // 字符流解决命令行参数转浮点等类型的问题
         switch (c) {
             case 'I': _args->input_bf.push_back(optarg);         break;
@@ -42,7 +38,6 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
             case 't': ss >> _args->thread_num;                   break;
 
             case 'r': _args->regions = optarg;                   break;
-            case 'p': _args->in_pos_file = optarg;               break;
             case 'G': _args->pop_group_file = optarg;            break;
             case '1': _args->output_vcf = optarg;                break;
             case '2': _args->output_cvg = optarg;                break;
@@ -59,6 +54,7 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
         }
     }
 
+    // check the requirement argument.
     if (_args->input_bf.empty() && _args->in_bamfilelist.empty()) {
         throw std::invalid_argument("[ERROR] Missing argument '-I/--input' or '-L/--align-file-list'");
     }
@@ -73,34 +69,32 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
         "   -m " << _args->min_af             << " \\ \n"
         "   -B " << _args->batchcount         << " \\ \n"
         "   -t " << _args->thread_num         << " \\ \n"  << (_args->regions.empty() ? "": 
-        "   -r " + _args->regions              + " \\ \n") << (_args->in_pos_file.empty() ? "": 
-        "   -p " + _args->in_pos_file          + " \\ \n") << (_args->pop_group_file.empty() ? "": 
+        "   -r " + _args->regions              + " \\ \n") << (_args->pop_group_file.empty() ? "": 
         "   -p " + _args->pop_group_file       + " \\ \n") <<
         "   --output-vcf " + _args->output_vcf + " \\ \n"
         "   --output-vcg " + _args->output_cvg << (_args->filename_has_samplename ? " \\ \n"
         "   --filename-has-samplename": "")    << (_args->smart_rerun ? " \\ \n"
         "   --smart-rerun": "") << "\n" << std::endl;
-    
-    if (!_args->in_bamfilelist.empty()) _load_bamfile_list();
+
+    if (!_args->in_bamfilelist.empty()) _get_bamfile_list();
 
     // Setting the resolution of AF
     if (_args->min_af > 100.0/_args->input_bf.size()) {
         _args->min_af = 100.0/_args->input_bf.size();
     }
     _reference = _args->reference;  // load fasta
-    _load_calling_interval();
+    _get_calling_interval();
 
     std::cerr << "[INFO] Finish loading arguments and we have " << _args->input_bf.size()
               << " BAM/CRAM files for variants calling.\n";
 
-    // loading all the sample id from aligne_files 
-    // `samples_id`` has the same size and order as ``aligne_files``
-    _load_sample_id_from_bam();
-std::cerr << "Sample ID: " << ngslib::join(_samples_id, ",") << "\n";
+    // loading all the sample id from aligne_files and record into `_samples_id`
+    _get_sample_id_from_bam();
 
+    return;
 }
 
-void BaseTypeRunner::_load_bamfile_list() {
+void BaseTypeRunner::_get_bamfile_list() {
     std::ifstream i_fn(_args->in_bamfilelist.c_str());
     if (!i_fn) {
         std::cerr << "[ERROR] Cannot open file: " + _args->in_bamfilelist << std::endl;
@@ -111,6 +105,7 @@ void BaseTypeRunner::_load_bamfile_list() {
     while (1) {
         i_fn >> fn;
         if (i_fn.eof()) break;
+
         _args->input_bf.push_back(fn);
         std::getline(i_fn, tmp, '\n');
     }
@@ -119,18 +114,18 @@ void BaseTypeRunner::_load_bamfile_list() {
     return;
 }
 
-void BaseTypeRunner::_load_sample_id_from_bam() {
+void BaseTypeRunner::_get_sample_id_from_bam() {
     // Loading sample id in BAM/CRMA files from RG tag.
-    std::cerr << "[INFO]Start loading all samples' id from alignment files\n";
+    std::cerr << "[INFO] Start loading all samples' id from alignment files.\n";
     if (_args->filename_has_samplename)
         std::cerr << "[INFO] loading samples' id from filename becuase you set "
-                     "--filname-has-samplename\n";
+                     "--filname-has-samplename.\n";
 
     std::string samplename, filename;
     size_t si;
     for (size_t i(0); i < _args->input_bf.size(); ++i) {
 
-        if (i % 1000 == 0)
+        if ((i+1) % 1000 == 0)
             std::cerr << "[INFO] loading " << i+1 << "/" << _args->input_bf.size() 
                       << " alignment files.\n";
         
@@ -148,44 +143,41 @@ void BaseTypeRunner::_load_sample_id_from_bam() {
             _samples_id.push_back(samplename);
         } else {
             throw std::invalid_argument("[BaseTypeRunner::_load_sample_id_from_bam] " + 
-                                        _args->input_bf[i] + " sample ID not found.");
+                                        _args->input_bf[i] + " sample ID not found.\n");
         }
     }
 
     return;
 }
 
-void BaseTypeRunner::_load_calling_interval() {
+void BaseTypeRunner::_get_calling_interval() {
 
     if (!_args->regions.empty()) {
-        std::vector<std::string> region_vector;
-        ngslib::split(_args->regions, region_vector, ",");
+        std::vector<std::string> rg_v;
+        ngslib::split(_args->regions, rg_v, ",");
 
-        for (size_t i(0); i < region_vector.size(); ++i) {
-            _calling_intervals.push_back(_make_gregiontuple(region_vector[i]));
+        for (size_t i(0); i < rg_v.size(); ++i) {
+            _calling_intervals.push_back(_make_gregiontuple(rg_v[i]));
         }
     }
-    if (!_args->in_pos_file.empty()) {
-    }
-
+    
     return;
 }
 
 ngslib::GenomeRegionTuple BaseTypeRunner::_make_gregiontuple(std::string gregion) {
 
     std::string ref_id;
-    uint32_t pos_start, pos_end;  // All be 1-based
+    uint32_t pos_start, pos_end;         // All be 1-based
 
-    std::vector<std::string> gr1;
-    std::vector<uint32_t> gr2;
+    std::vector<std::string> gr;
+    ngslib::split(gregion, gr, ":");     // get reference id
+    ref_id = gr[0];
 
-    ngslib::split(gregion, gr1, ":");     // get reference id
-    ref_id = gr1[0];
-
-    if (gr1.size() == 2) {                // 'start-end' or start
-        ngslib::split(gr1[1], gr2, "-");  // get position coordinate
-        pos_start = gr2[0];
-        pos_end = (gr2.size() == 2) ? gr2[1] : _reference.seq_length(ref_id);
+    if (gr.size() == 2) {                // 'start-end' or start
+        std::vector<uint32_t> gs;
+        ngslib::split(gr[1], gs, "-");   // get position coordinate
+        pos_start = gs[0];
+        pos_end = (gs.size() == 2) ? gs[1] : _reference.seq_length(ref_id);
     } else {
         pos_start = 1;
         pos_end = _reference.seq_length(ref_id);  // the whole ``ref_id`` length

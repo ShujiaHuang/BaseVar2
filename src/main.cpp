@@ -39,11 +39,14 @@ static int usage() {
 
 int basetype(int argc, char *argv[]) {
 
-    BaseTypeRunner bt(argc, argv);
+    // BaseTypeRunner bt(argc, argv);
+    BaseTypeRunner bt;
     if (argc < 2) {
         std::cerr << bt.usage() << "\n" << std::endl;
         exit(1);
     }
+
+    bt.set_arguments(argc, argv);
 
     return 0;
 }
@@ -65,15 +68,13 @@ int main(int argc, char *argv[]) {
         return usage();
     }
 
-
     time_t now = time(0);
-    std::cerr << "Program start on " << ctime(&now) << "\n";
+    std::cerr << "\nProgram start on " << ctime(&now) << "\n";
 
     /* Coding here */
 
     now = time(0);
-    std::cerr << "** Processing done on " << ctime(&now) << ", " 
-              << (double)(clock() - start_time) / CLOCKS_PER_SEC
-              << " seconds elapsed **\n" << std::endl;
+    std::cerr << "** Processing done, "   << (double)(clock() - start_time) / CLOCKS_PER_SEC
+              << " seconds elapsed **\n"  << ctime(&now) << std::endl;
     return 0;
 }

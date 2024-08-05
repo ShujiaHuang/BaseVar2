@@ -38,11 +38,7 @@ static const std::string __BASETYPE_USAGE =
 
     "  -r, --regions=chr:start-end  Skip positions which not in these regions. This parameter could be a\n"
     "                               list of comma deleimited genome regions(e.g.: chr:start-end) or a\n"
-    "                               file contain the list of regions. This parameter could be used with\n"
-    "                               --positions simultaneously.\n"
-    "  -p, --positions=FILE         Skip unlisted positions one per row. The position format in the file\n"
-    "                               could be (chrid pos) and (chrid start end) in mix. This parameter\n"
-    "                               could be used with --regions simultaneously.\n"
+    "                               file contain the list of regions.\n"
     "  -G, --pop-group=FILE         Calculating the allele frequency for specific population.\n" 
     "  --output-vcf FILE            Output VCF file. If not provide will skip variants discovery and just\n"
     "                               output position coverage file which filename is provided by --output-cvg.\n"
@@ -66,13 +62,13 @@ static const struct option BASETYPE_CMDLINE_LOPTS[] = {
     {"batch-count", optional_argument, NULL, 'B'},
     {"thread",      optional_argument, NULL, 't'},
 
-    {"regions",    optional_argument, NULL, 'r'},
-    {"positions",  optional_argument, NULL, 'p'},
-    {"pop-group",  optional_argument, NULL, 'G'},  // Special parameter for calculating specific population allele frequence
-    {"output-vcf", required_argument, NULL, '1'},
-    {"output-cvg", required_argument, NULL, '2'},
+    {"regions",     optional_argument, NULL, 'r'},
+    {"positions",   optional_argument, NULL, 'p'},
+    {"pop-group",   optional_argument, NULL, 'G'},  // Special parameter for calculating specific population allele frequence
+    {"output-vcf",  required_argument, NULL, '1'},
+    {"output-cvg",  required_argument, NULL, '2'},
 
-    // {"output-batch-file", required_argument, NULL, 0},  // not use
+    // {"output-batch-file", required_argument, NULL, 0},  // not use?
     {"filename-has-samplename", no_argument, NULL, '3'},
     {"smart-rerun",             no_argument, NULL, '4'},
     {"help",                    no_argument, NULL, 'h'},
@@ -90,7 +86,6 @@ struct BaseTypeArgs {
     int batchcount;                     // INT simples per batchfile
     int thread_num;                     // number of threads
 
-    std::string in_pos_file;            // position file
     std::string regions;                // Interval regions
     std::string pop_group_file;         // Specific population
     std::string output_vcf;             // Output VCF file
@@ -99,7 +94,7 @@ struct BaseTypeArgs {
     bool smart_rerun;                   // Smart rerun by checking batchfiles
     bool filename_has_samplename;       // sample name in file name
 
-    // set default value
+    // Set default value
     BaseTypeArgs(): min_af(0.01), mapq(10), batchcount(200), thread_num(4), 
                     smart_rerun(false), filename_has_samplename(false) {}
 };
@@ -111,13 +106,13 @@ class BaseTypeRunner {
 
 private:
     BaseTypeArgs *_args;
-    std::vector<std::string> _samples_id;  // sample ID from input alignment files (BAM/CRAM/SAM)
     ngslib::Fasta _reference;
+    std::vector<std::string> _samples_id;  // sample ID from input alignment files (BAM/CRAM/SAM)
     std::vector<ngslib::GenomeRegionTuple> _calling_intervals;  // vector of calling regions
 
-    void _load_bamfile_list();
-    void _load_calling_interval();  // load the calling region from input
-    void _load_sample_id_from_bam();
+    void _get_bamfile_list();
+    void _get_calling_interval();  // load the calling region from input
+    void _get_sample_id_from_bam();
     ngslib::GenomeRegionTuple _make_gregiontuple(std::string gregion);
 
     BaseTypeRunner(const BaseTypeRunner &b) = delete;             // reject using copy constructor (C++11 style).
@@ -138,10 +133,7 @@ public:
     void set_arguments(int cmdline_argc, char *cmdline_argv[]);
 
     // Destroy the malloc'ed BasTypeArgs structure
-    ~BaseTypeRunner(){ 
-        // _calling_intervals.clear();
-        if(_args){delete _args; _args = NULL;}
-    }
+    ~BaseTypeRunner(){ if(_args){delete _args; _args = NULL;} }
 
 };  // BaseTypeRunner class
 
