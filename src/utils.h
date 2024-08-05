@@ -14,7 +14,8 @@ namespace ngslib {
     typedef std::tuple<std::string, uint32_t, uint32_t> GenomeRegionTuple;
 
     // Get file name from a path
-    std::string basename(const std::string &path, const std::string &delims = "/\\");
+    std::string basename(const std::string &path, const std::string delims = "/\\");
+    
     // remove the filename extension
     std::string remove_filename_extension(const std::string &filename);
 
