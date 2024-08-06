@@ -33,9 +33,9 @@ int main(int argc, char *argv[]) {
     
     std::cout << "is_readable: " << ngslib::is_readable("some") << "\n";
 
-    ngslib::safe_mkdir("a/b/");
-    ngslib::safe_remove("a/b/c");
-    ngslib::safe_remove("test_fasta");
+    std::cout << ngslib::safe_mkdir("a/b/c") << "\n";
+    std::cout << ngslib::safe_remove("a/b/c") << "\n";
+    std::cout << ngslib::safe_remove("test_fasta") << "\n";
 
     return 0;
 
