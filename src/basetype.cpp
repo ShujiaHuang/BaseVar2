@@ -45,7 +45,7 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
             case '3': _args->filename_has_samplename = true;     break;  // 恒定参数
             case '4': _args->smart_rerun = true;                 break;  // 恒定参数
             case 'h': 
-                std::cerr << usage() << std::endl;
+                std::cout << usage() << std::endl;
                 exit(1);
 
             default: 
@@ -60,7 +60,7 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
     }
 
     // Output the commandline options
-    std::cerr << 
+    std::cout << 
         "[INFO] BaseVar commandline:\n"
         "basevar basetype " + (_args->input_bf.empty() ? "" : "-I " + ngslib::join(_args->input_bf, " -I ")) +
         (_args->in_bamfilelist.empty() ? "": " -L " + _args->in_bamfilelist) + " \\ \n"
@@ -84,9 +84,9 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
     }
     reference = _args->reference;  // load fasta
     _get_calling_interval();
-print_calling_interval();
+    print_calling_interval();
 
-    std::cerr << "[INFO] Finish loading arguments and we have " << _args->input_bf.size()
+    std::cout << "[INFO] Finish loading arguments and we have " << _args->input_bf.size()
               << " BAM/CRAM files for variants calling.\n";
 
     // loading all the sample id from aligne_files and record into `_samples_id`
@@ -117,9 +117,9 @@ void BaseTypeRunner::_get_bamfile_list() {
 
 void BaseTypeRunner::_get_sample_id_from_bam() {
     // Loading sample id in BAM/CRMA files from RG tag.
-    std::cerr << "[INFO] Start loading all samples' id from alignment files.\n";
+    std::cout << "[INFO] Start loading all samples' id from alignment files.\n";
     if (_args->filename_has_samplename)
-        std::cerr << "[INFO] loading samples' id from filename becuase you set "
+        std::cout << "[INFO] loading samples' id from filename becuase you set "
                      "--filname-has-samplename.\n";
 
     std::string samplename, filename;
@@ -127,7 +127,7 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
     for (size_t i(0); i < _args->input_bf.size(); ++i) {
 
         if ((i+1) % 1000 == 0)
-            std::cerr << "[INFO] loading " << i+1 << "/" << _args->input_bf.size() 
+            std::cout << "[INFO] loading " << i+1 << "/" << _args->input_bf.size() 
                       << " alignment files.\n";
         
         if (_args->filename_has_samplename) {
@@ -181,6 +181,7 @@ void BaseTypeRunner::print_calling_interval() {
                   << std::get<1>(_calling_intervals[i]) << "-" 
                   << std::get<2>(_calling_intervals[i]) << "\n";
     }
+    std::cout << "\n";
     return;
 }
 
