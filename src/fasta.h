@@ -50,17 +50,23 @@ namespace ngslib {
          */
         bool has_seq(const std::string seq_id) const { return faidx_has_seq(fai, seq_id.c_str()); }
 
+        // Return number of sequences in fa index
+        int nseq() { return faidx_nseq(fai); }
+
+        // Return name of i-th sequence
+        std::string iseq_name(int i) { return std::string(faidx_iseq(fai, i)); } 
+
         // Return sequence length, -1 if not present
-        int seq_length(const char *seq_id) const { return faidx_seq_len(fai, seq_id); }
-        int seq_length(const std::string seq_id) const { return seq_length(seq_id.c_str()); }
+        uint32_t seq_length(const char *seq_id) const { return faidx_seq_len64(fai, seq_id); }
+        uint32_t seq_length(const std::string seq_id) const { return seq_length(seq_id.c_str()); }
 
         /** 
          * @brief fetch fasta sequence in a region.
          * 
-         * @param reg Region in the format "chr2:20,000-30,000", "chr2:20,000" or "chr2"
+         * @param reg Region in the format "chr2:20,000-30,000", "chr2:20,000" or "chr2"  (1-based)
          * @return std::string 
          * 
-         * Note: The start position in `reg` must be 1-base, and real fetch is [start-1, end).
+         * Note: The start position in `reg` must be 1-based, and the real fetch is [start-1, end).
          * 
          */
         std::string fetch(const char *reg) const;

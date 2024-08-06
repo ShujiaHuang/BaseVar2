@@ -38,9 +38,10 @@ int main() {
     std::cout << "sequence_length(\"ref1\"): " << fa.seq_length("ref1") << std::endl;
     std::cout << "fa.has_seq(\"ref2\"): " << fa.has_seq("ref2") << std::endl;
     std::cout << "fa.has_seq(\"ref5\"): " << fa.has_seq("ref5") << std::endl;
-    std::cout << "fa[\"ref2\"]:   " << fa["ref2"] << std::endl;
-    std::cout << "fa[\"ref2:1\"]: " << fa["ref2:1"] << std::endl;
-//    std::cout << "The sequence: " << fa.fetch("ref1", 12, 10) << std::endl;
+    std::cout << "fa[\"ref2\"]:   "  << fa["ref2"] << std::endl;
+    std::cout << "fa[\"ref2:1\"]: "  << fa["ref2:1"] << std::endl;
+    std::cout << "fa.nseq(): "       << fa.nseq() << std::endl;
+    std::cout << "fa.iseq_name(1): " << fa.iseq_name(1) << " - length: " << fa.seq_length(fa.iseq_name(1)) << std::endl;
 
     return 0;
 }
