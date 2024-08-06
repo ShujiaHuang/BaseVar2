@@ -5,8 +5,6 @@
  * @author Shujia Huang
  * @date 2018-08-01
  * 
- * @copyright Copyright (c) 2024
- * 
  */
 #ifndef __INCLUDE_BASETYPE_H__
 #define __INCLUDE_BASETYPE_H__
@@ -105,8 +103,8 @@ struct BaseTypeARGS {
 class BaseTypeRunner {
 
 private:
-    BaseTypeARGS *_args;
-    std::vector<std::string> _samples_id;  // sample ID from input alignment files (BAM/CRAM/SAM)
+    BaseTypeARGS *_args;                   // all the commandline options
+    std::vector<std::string> _samples_id;  // sample ID of alignment files (BAM/CRAM/SAM)
     std::vector<ngslib::GenomeRegionTuple> _calling_intervals;  // vector of calling regions
 
     void _get_bamfile_list();
@@ -118,7 +116,7 @@ private:
     BaseTypeRunner &operator=(const BaseTypeRunner &b) = delete;  // reject using copy/assignment operator (C++11 style).
 
 public:
-    ngslib::Fasta reference;
+    ngslib::Fasta reference;  // public variable
 
     // default constructor
     BaseTypeRunner() : _args(NULL) {}
@@ -132,10 +130,12 @@ public:
     // Destroy the malloc'ed BasTypeArgs structure
     ~BaseTypeRunner(){ if(_args){delete _args; _args = NULL;} }
 
-    void print_calling_interval();
-
+    // Common functions
     std::string usage() const {return __BASETYPE_USAGE;}
     void set_arguments(int cmdline_argc, char *cmdline_argv[]);
+    void print_calling_interval();
+
+    // run variant calling process
 
 };  // BaseTypeRunner class
 

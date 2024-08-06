@@ -5,8 +5,6 @@
  * @author Shujia Huang
  * @date 2018-08-01
  * 
- * @copyright Copyright (c) 2024
- * 
  */
 #include <sstream>
 #include <fstream>
@@ -21,29 +19,31 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
         throw std::invalid_argument("[basetype.cpp::BaseTypeRunner:args] 'args' must be "
                                     "a NULL pointer before it can be assigned a value.");
     }
-    _args = new BaseTypeARGS;  // init a new BasTypeARGS stucture.
+    // Inital a new BasTypeARGS and set defaut argument.
+    _args = new BaseTypeARGS;
     
     // Parsing the commandline options. 
     char c;
-    while((c = getopt_long(cmdline_argc, cmdline_argv, "I:L:R:m:q:B:t:r:G:h", BASETYPE_CMDLINE_LOPTS, NULL)) >= 0) {
+    while((c = getopt_long(cmdline_argc, cmdline_argv, "I:L:R:m:q:B:t:r:G:h", BASETYPE_CMDLINE_LOPTS, NULL)) >= 0)
+    {
         std::stringstream ss(optarg ? optarg: "");  // 字符流解决命令行参数转浮点等类型的问题
         switch (c) {
-            case 'I': _args->input_bf.push_back(optarg);         break;  // 恒定参数，一直用
-            case 'L': _args->in_bamfilelist = optarg;            break;  /* 临时参数 */
-            case 'R': _args->reference      = optarg;            break;  /* 临时参数 */
+            case 'I': _args->input_bf.push_back(optarg);         break;  // 恒参，一直用
+            case 'L': _args->in_bamfilelist = optarg;            break;  /* 临参 */
+            case 'R': _args->reference      = optarg;            break;  /* 临参 */
 
-            case 'm': ss >> _args->min_af;                       break;  // 恒定参数
-            case 'q': ss >> _args->mapq;                         break;  // 恒定参数
-            case 'B': ss >> _args->batchcount;                   break;  // 恒定参数
-            case 't': ss >> _args->thread_num;                   break;  // 恒定参数
+            case 'm': ss >> _args->min_af;                       break;  // 恒参
+            case 'q': ss >> _args->mapq;                         break;  // 恒参
+            case 'B': ss >> _args->batchcount;                   break;  // 恒参
+            case 't': ss >> _args->thread_num;                   break;  // 恒参
 
-            case 'r': _args->regions = optarg;                   break;  /* 临时参数 */
+            case 'r': _args->regions = optarg;                   break;  /* 临参 */
             case 'G': _args->pop_group_file = optarg;            break;  // 
-            case '1': _args->output_vcf = optarg;                break;  // 恒定参数
-            case '2': _args->output_cvg = optarg;                break;  // 恒定参数
+            case '1': _args->output_vcf = optarg;                break;  // 恒参
+            case '2': _args->output_cvg = optarg;                break;  // 恒参
 
-            case '3': _args->filename_has_samplename = true;     break;  // 恒定参数
-            case '4': _args->smart_rerun = true;                 break;  // 恒定参数
+            case '3': _args->filename_has_samplename = true;     break;  // 恒参
+            case '4': _args->smart_rerun = true;                 break;  // 恒参
             case 'h': 
                 std::cout << usage() << std::endl;
                 exit(1);
@@ -53,17 +53,23 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
                 exit(1);
         }
     }
-
     // check the requirement argument.
-    if (_args->input_bf.empty() && _args->in_bamfilelist.empty()) {
+    /* Make sure you have set at least one bamfile. */
+    if (_args->input_bf.empty() && _args->in_bamfilelist.empty())
         throw std::invalid_argument("[ERROR] Missing argument '-I/--input' or '-L/--align-file-list'");
-    }
+    if (_args->reference.empty())
+        throw std::invalid_argument("[ERROR] Missing argument '-R/--reference'");
+
+    if (_args->output_vcf.empty())
+        throw std::invalid_argument("[ERROR] Missing argument '--output-vcf'");
+    if (_args->output_cvg.empty())
+        throw std::invalid_argument("[ERROR] Missing argument '--output-cvg'");
 
     // Output the commandline options
     std::cout << 
         "[INFO] BaseVar commandline:\n"
         "basevar basetype " + (_args->input_bf.empty() ? "" : "-I " + ngslib::join(_args->input_bf, " -I ")) +
-        (_args->in_bamfilelist.empty() ? "": " -L " + _args->in_bamfilelist) + " \\ \n"
+        (_args->in_bamfilelist.empty() ? "": "-L " + _args->in_bamfilelist) + " \\ \n"
         "   -R " + _args->reference            + " \\ \n"
         "   -q " << _args->mapq               << " \\ \n"
         "   -m " << _args->min_af             << " \\ \n"
@@ -75,22 +81,30 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
         "   --output-vcg " + _args->output_cvg << (_args->filename_has_samplename ? " \\ \n"
         "   --filename-has-samplename": "")    << (_args->smart_rerun ? " \\ \n"
         "   --smart-rerun": "") << "\n" << std::endl;
+    
+    if (_args->smart_rerun) {
+        std::cout << "************************************************\n"
+                     "******************* WARNING ********************\n"
+                     "************************************************\n"
+                     ">>>>>>>> You have setted `smart rerun` <<<<<<<<<\n"
+                     "Please make sure all the parameters are the same\n"
+                     "with your previous commands.\n"
+                     "************************************************\n"
+                     "************************************************\n\n";
+    }
 
     if (!_args->in_bamfilelist.empty()) _get_bamfile_list();
-
-    // Setting the resolution of AF
-    if (_args->min_af > 100.0/_args->input_bf.size()) {
-        _args->min_af = 100.0/_args->input_bf.size();
-    }
-    reference = _args->reference;  // load fasta
-    _get_calling_interval();
-    print_calling_interval();
-
     std::cout << "[INFO] Finish loading arguments and we have " << _args->input_bf.size()
               << " BAM/CRAM files for variants calling.\n";
 
-    // loading all the sample id from aligne_files and record into `_samples_id`
-    _get_sample_id_from_bam();
+    // Setting the resolution of AF
+    if (_args->min_af > 100.0/_args->input_bf.size())
+        _args->min_af = 100.0/_args->input_bf.size();
+
+    reference = _args->reference;  // load fasta
+    _get_calling_interval();
+    print_calling_interval();
+    _get_sample_id_from_bam();     // get sample id from aligne_files and record into `_samples_id`
 
     return;
 }
@@ -116,7 +130,7 @@ void BaseTypeRunner::_get_bamfile_list() {
 }
 
 void BaseTypeRunner::_get_sample_id_from_bam() {
-    // Loading sample id in BAM/CRMA files from RG tag.
+    // Loading sample ID in BAM/CRMA files from RG tag.
     std::cout << "[INFO] Start loading all samples' id from alignment files.\n";
     if (_args->filename_has_samplename)
         std::cout << "[INFO] loading samples' id from filename becuase you set "
@@ -131,7 +145,7 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
                       << " alignment files.\n";
         
         if (_args->filename_has_samplename) {
-            filename = ngslib::basename(_args->input_bf[i]);
+            filename = ngslib::remove_filename_extension(ngslib::basename(_args->input_bf[i]));
             si = filename.find_first_of('.');
             samplename = si > 0 && si != std::string::npos ? filename.substr(0, si) : filename;
         } else {
@@ -152,6 +166,9 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
 }
 
 void BaseTypeRunner::_get_calling_interval() {
+
+    // clear
+    _calling_intervals.clear();
 
     if (!_args->regions.empty()) {
         std::vector<std::string> rg_v;
