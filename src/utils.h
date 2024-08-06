@@ -42,7 +42,7 @@ namespace ngslib {
      * @param path  The directry path
      * 
      */
-    void safe_mkdir(std::string folder_path);
+    bool safe_mkdir(std::string folder_path);
     bool safe_remove(std::string file_path);
 
     std::string join(std::vector<std::string> &input, const std::string delim="\t");

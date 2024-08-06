@@ -17,15 +17,17 @@ namespace ngslib {
         return p > 0 && p != std::string::npos ? filename.substr(0, p) : filename;
     }
 
-    void safe_mkdir(std::string folder_path) {
+    bool safe_mkdir(std::string folder_path) {
+        bool flag(false);
         // set the folder_path tobe 'filesystem::path'
         std::filesystem::path dir_path(folder_path);
         if (!dir_path.empty()) {
             if (!std::filesystem::exists(dir_path)) {
                 std::filesystem::create_directories(dir_path);
+                flag = true;
             }
         }
-        return;
+        return flag;
     }
 
     bool safe_remove(std::string filepath) {
