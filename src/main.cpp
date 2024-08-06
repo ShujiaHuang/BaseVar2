@@ -58,6 +58,9 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
+    time_t now = time(0);
+    std::cout << "\nProgram start on " << ctime(&now) << "\n";
+
     int run_stat;
     std::string cmd(argv[1]);
     if (cmd == "basetype") {
@@ -65,9 +68,6 @@ int main(int argc, char *argv[]) {
     } else {
         return usage();
     }
-
-    time_t now = time(0);
-    std::cout << "\nProgram start on " << ctime(&now) << "\n";
 
     /* Coding here */
 
