@@ -52,14 +52,13 @@ int basetype(int argc, char *argv[]) {
 int main(int argc, char *argv[]) {
     clock_t start_time = clock();
     std::cout << "BaseVar: A software for calling variants efficiently "
-              << "from low-pass whole genome sequencing data.\n";
+              << "from low-pass whole genome sequencing data.\n\n";
     if (argc < 2) {
         return usage();
-        exit(1);
     }
 
     time_t now = time(0);
-    std::cout << "\nProgram start on " << ctime(&now) << "\n";
+    std::cout << "Program start on " << ctime(&now) << "\n";
 
     int run_stat;
     std::string cmd(argv[1]);
@@ -70,9 +69,8 @@ int main(int argc, char *argv[]) {
     }
 
     /* Coding here */
-
     now = time(0);
-    std::cout << "** Processing done, "   << (double)(clock() - start_time) / CLOCKS_PER_SEC
-              << " seconds elapsed **\n"  << ctime(&now) << std::endl;
+    std::cout << "** Processing done, "  << (double)(clock() - start_time) / CLOCKS_PER_SEC
+              << " seconds elapsed **\n" << ctime(&now) << std::endl;
     return 0;
 }
