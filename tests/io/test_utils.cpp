@@ -33,6 +33,10 @@ int main(int argc, char *argv[]) {
     
     std::cout << "is_readable: " << ngslib::is_readable("some") << "\n";
 
+    ngslib::safe_mkdir("a/b/");
+    ngslib::safe_remove("a/b/c");
+    ngslib::safe_remove("test_fasta");
+
     return 0;
 
 }

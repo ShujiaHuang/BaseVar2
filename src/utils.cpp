@@ -17,6 +17,27 @@ namespace ngslib {
         return p > 0 && p != std::string::npos ? filename.substr(0, p) : filename;
     }
 
+    void safe_mkdir(std::string folder_path) {
+        // set the folder_path tobe 'filesystem::path'
+        std::filesystem::path dir_path(folder_path);
+        if (!dir_path.empty()) {
+            if (!std::filesystem::exists(dir_path)) {
+                std::filesystem::create_directories(dir_path);
+            }
+        }
+        return;
+    }
+
+    bool safe_remove(std::string filepath) {
+        std::filesystem::path fname(filepath);
+        if (std::filesystem::exists(fname)) {
+            std::filesystem::remove(fname);
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     std::string join(std::vector<std::string> &input, const std::string delim) {
 
         if(input.empty()) return "";

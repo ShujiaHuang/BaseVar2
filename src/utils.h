@@ -3,10 +3,11 @@
 #ifndef __INCLUDE_NGSLIB_UTILS_H__
 #define __INCLUDE_NGSLIB_UTILS_H__
 
+#include <sstream>
+#include <string>
 #include <vector>
 #include <tuple>
-#include <string>
-#include <sstream>
+#include <filesystem>  // C++17 library
 
 
 namespace ngslib {
@@ -35,6 +36,14 @@ namespace ngslib {
      */
     bool is_readable(const char *name);
     inline bool is_readable(const std::string &name) { return is_readable(name.c_str()); }
+
+    /**
+     * @brief Make a folder if it doesn't exist, handling concurrent race conditions.
+     * @param path  The directry path
+     * 
+     */
+    void safe_mkdir(std::string folder_path);
+    bool safe_remove(std::string file_path);
 
     std::string join(std::vector<std::string> &input, const std::string delim="\t");
     std::string join(std::vector<size_t> &input, const std::string delim="\t");
