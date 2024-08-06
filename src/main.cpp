@@ -20,7 +20,7 @@ static const std::string VERSION = "version 1.0.0";
 
 static int usage() {
     // Usage discription
-    std::cerr << 
+    std::cout << 
         "Author:  " + AUTHOR  + "\n"
         "Version: " + VERSION + "\n\n"
         "Usage: basevar <command> [options]\n\n" 
@@ -39,21 +39,19 @@ static int usage() {
 
 int basetype(int argc, char *argv[]) {
 
-    // BaseTypeRunner bt(argc, argv);
     BaseTypeRunner bt;
     if (argc < 2) {
-        std::cerr << bt.usage() << "\n" << std::endl;
+        std::cout << bt.usage() << "\n" << std::endl;
         exit(1);
     }
 
     bt.set_arguments(argc, argv);
-
     return 0;
 }
 
 int main(int argc, char *argv[]) {
     clock_t start_time = clock();
-    std::cerr << "BaseVar: A software for calling variants efficiently "
+    std::cout << "BaseVar: A software for calling variants efficiently "
               << "from low-pass whole genome sequencing data.\n";
     if (argc < 2) {
         return usage();
@@ -69,12 +67,12 @@ int main(int argc, char *argv[]) {
     }
 
     time_t now = time(0);
-    std::cerr << "\nProgram start on " << ctime(&now) << "\n";
+    std::cout << "\nProgram start on " << ctime(&now) << "\n";
 
     /* Coding here */
 
     now = time(0);
-    std::cerr << "** Processing done, "   << (double)(clock() - start_time) / CLOCKS_PER_SEC
+    std::cout << "** Processing done, "   << (double)(clock() - start_time) / CLOCKS_PER_SEC
               << " seconds elapsed **\n"  << ctime(&now) << std::endl;
     return 0;
 }
