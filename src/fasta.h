@@ -40,7 +40,6 @@ namespace ngslib {
 
         // Return the sequence string of reg in format "chr2:2-10"
         std::string &operator[](const std::string reg);
-
         friend std::ostream &operator<<(std::ostream &os, const Fasta &fa);
 
         // Query if sequence is present
