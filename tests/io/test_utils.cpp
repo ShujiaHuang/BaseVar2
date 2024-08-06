@@ -30,6 +30,8 @@ int main(int argc, char *argv[]) {
               << ngslib::remove_filename_extension(ngslib::basename("some/path/file.ext")) << "\n";
     std::cout << "Get filename from window path " << ngslib::basename("C:\\MyDirectory\\MyFile.bat") << "\t" 
               << ngslib::remove_filename_extension(ngslib::basename("C:\\MyDirectory\\MyFile.bat")) << "\n";
+    
+    std::cout << "is_readable: " << ngslib::is_readable("some") << "\n";
 
     return 0;
 

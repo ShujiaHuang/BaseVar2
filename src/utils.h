@@ -37,6 +37,7 @@ namespace ngslib {
     inline bool is_readable(const std::string &name) { return is_readable(name.c_str()); }
 
     std::string join(std::vector<std::string> &input, const std::string delim="\t");
+    std::string join(std::vector<size_t> &input, const std::string delim="\t");
     void split(std::string in_str, std::vector<std::string> &out, const char *delim, bool is_append=false);
     void split(std::string in_str, std::vector<uint32_t> &out, const char *delim, bool is_append=false);
 

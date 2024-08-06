@@ -29,6 +29,18 @@ namespace ngslib {
         return out_str;
     }
 
+    std::string join(std::vector<size_t> &input, const std::string delim) {
+
+        if(input.empty()) return "";
+
+        std::string out_str = tostring(input[0]);
+        for (size_t i(1); i < input.size(); ++i) {
+            out_str += (delim + tostring(input[i]));
+        }
+
+        return out_str;
+    }
+
     void split(std::string in_str, std::vector<std::string> &out, const char *delim, bool is_append) {
 
         if (!is_append) {
