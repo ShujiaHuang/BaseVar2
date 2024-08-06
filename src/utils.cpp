@@ -43,10 +43,7 @@ namespace ngslib {
 
     void split(std::string in_str, std::vector<std::string> &out, const char *delim, bool is_append) {
 
-        if (!is_append) {
-            out.clear();
-        }
-
+        if (!is_append) out.clear();
         while(1) {
             //erase delimiter
             int i = in_str.find_first_not_of(delim);
@@ -68,10 +65,7 @@ namespace ngslib {
 
     void split(std::string in_str, std::vector<uint32_t> &out, const char *delim, bool is_append) {
 
-        if (!is_append) {
-            out.clear();
-        }
-
+        if (!is_append) out.clear();
         while(1) {
             //erase delimiter
             int i = in_str.find_first_not_of(delim);
