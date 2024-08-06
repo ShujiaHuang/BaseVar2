@@ -1,5 +1,7 @@
 #include <unistd.h>
+#include <filesystem>  // C++17 library
 #include "utils.h"
+
 
 namespace ngslib {
 
@@ -26,6 +28,28 @@ namespace ngslib {
     bool safe_remove(std::string filepath) {
         std::filesystem::path fname(filepath);
         return std::filesystem::remove(fname);
+    }
+
+    std::string get_last_modification_file(std::string directory_path) {
+        // Find the last modification file in a directory and return it.
+        std::filesystem::path lmf;        
+        std::filesystem::file_time_type lmf_time, cf_time;  
+
+        bool flag(true);
+        for (const auto &fn : std::filesystem::directory_iterator(directory_path)) {
+            cf_time = std::filesystem::last_write_time(fn);
+            if (flag) {
+                flag = false;
+                lmf = fn;
+                lmf_time = cf_time;
+            } else if (cf_time > lmf_time) {
+                // find last modification file.
+                lmf = fn;
+                lmf_time = cf_time;
+            }
+        }
+
+        return lmf.string();
     }
 
     void split(std::string in_str, std::vector<std::string> &out, const char *delim, bool is_append) {

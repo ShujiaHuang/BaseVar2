@@ -40,7 +40,12 @@ int main(int argc, char *argv[]) {
 
     std::cout << ngslib::safe_mkdir("a/b/c") << "\n";
     std::cout << ngslib::safe_remove("a/b/c") << "\n";
-    std::cout << ngslib::safe_remove("test_fasta") << "\n";
+    std::cout << ngslib::safe_remove("t_t_") << "\n";
+
+    std::string lmf = ngslib::get_last_modification_file("../data/");
+    std::cout << "-- LMF: " << lmf << "\n";
+    std::cout << "-- LMF a/b: " << ngslib::get_last_modification_file("a/b") << "\n";
+    std::cout << "-- LMF ../data/bam100: " << ngslib::get_last_modification_file("../data/bam100") << "\n";
 
     return 0;
 

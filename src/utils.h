@@ -7,7 +7,6 @@
 #include <string>
 #include <vector>
 #include <tuple>
-#include <filesystem>  // C++17 library
 
 
 namespace ngslib {
@@ -44,6 +43,14 @@ namespace ngslib {
      */
     bool safe_mkdir(std::string folder_path);
     bool safe_remove(std::string file_path);
+
+    /**
+     * @brief Get the last modification file object
+     * 
+     * @param directory_path 
+     * @return std::string 
+     */
+    std::string get_last_modification_file(std::string directory_path);
 
     template<typename T>
     std::string join(std::vector<T> &input, const std::string delim="\t") {
