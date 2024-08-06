@@ -75,7 +75,7 @@ static const struct option BASETYPE_CMDLINE_LOPTS[] = {
     {0, 0, 0, 0}
 };
 
-struct BaseTypeArgs {
+struct BaseTypeARGS {
     /* Variables for all the commandline options of BaseType */
     std::vector<std::string> input_bf;  // BAM/SAM/CRAM file, a vector
     std::string in_bamfilelist;         // BAM/CRAM files list, one file per row
@@ -94,8 +94,8 @@ struct BaseTypeArgs {
     bool smart_rerun;                   // Smart rerun by checking batchfiles
     bool filename_has_samplename;       // sample name in file name
 
-    // Set default value
-    BaseTypeArgs(): min_af(0.01), mapq(10), batchcount(200), thread_num(4), 
+    // Set default argument
+    BaseTypeARGS(): min_af(0.01), mapq(10), batchcount(200), thread_num(4), 
                     smart_rerun(false), filename_has_samplename(false) {}
 };
 
@@ -105,8 +105,7 @@ struct BaseTypeArgs {
 class BaseTypeRunner {
 
 private:
-    BaseTypeArgs *_args;
-    ngslib::Fasta _reference;
+    BaseTypeARGS *_args;
     std::vector<std::string> _samples_id;  // sample ID from input alignment files (BAM/CRAM/SAM)
     std::vector<ngslib::GenomeRegionTuple> _calling_intervals;  // vector of calling regions
 
@@ -119,6 +118,8 @@ private:
     BaseTypeRunner &operator=(const BaseTypeRunner &b) = delete;  // reject using copy/assignment operator (C++11 style).
 
 public:
+    ngslib::Fasta reference;
+
     // default constructor
     BaseTypeRunner() : _args(NULL) {}
     BaseTypeRunner(int cmdline_argc, char *cmdline_argv[]) {
@@ -128,12 +129,13 @@ public:
         }
         set_arguments(cmdline_argc, cmdline_argv); 
     }
+    // Destroy the malloc'ed BasTypeArgs structure
+    ~BaseTypeRunner(){ if(_args){delete _args; _args = NULL;} }
+
+    void print_calling_interval();
 
     std::string usage() const {return __BASETYPE_USAGE;}
     void set_arguments(int cmdline_argc, char *cmdline_argv[]);
-
-    // Destroy the malloc'ed BasTypeArgs structure
-    ~BaseTypeRunner(){ if(_args){delete _args; _args = NULL;} }
 
 };  // BaseTypeRunner class
 

@@ -21,29 +21,29 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
         throw std::invalid_argument("[basetype.cpp::BaseTypeRunner:args] 'args' must be "
                                     "a NULL pointer before it can be assigned a value.");
     }
-    _args = new BaseTypeArgs;  // set it to be a new BasTypeArgs stucture type.
+    _args = new BaseTypeARGS;  // init a new BasTypeARGS stucture.
     
-    char c;
     // Parsing the commandline options. 
+    char c;
     while((c = getopt_long(cmdline_argc, cmdline_argv, "I:L:R:m:q:B:t:r:G:h", BASETYPE_CMDLINE_LOPTS, NULL)) >= 0) {
         std::stringstream ss(optarg ? optarg: "");  // 字符流解决命令行参数转浮点等类型的问题
         switch (c) {
-            case 'I': _args->input_bf.push_back(optarg);         break;
-            case 'L': _args->in_bamfilelist = optarg;            break;
-            case 'R': _args->reference      = optarg;            break;
+            case 'I': _args->input_bf.push_back(optarg);         break;  // 恒定参数，一直用
+            case 'L': _args->in_bamfilelist = optarg;            break;  /* 临时参数 */
+            case 'R': _args->reference      = optarg;            break;  /* 临时参数 */
 
-            case 'm': ss >> _args->min_af;                       break;
-            case 'q': ss >> _args->mapq;                         break;
-            case 'B': ss >> _args->batchcount;                   break;
-            case 't': ss >> _args->thread_num;                   break;
+            case 'm': ss >> _args->min_af;                       break;  // 恒定参数
+            case 'q': ss >> _args->mapq;                         break;  // 恒定参数
+            case 'B': ss >> _args->batchcount;                   break;  // 恒定参数
+            case 't': ss >> _args->thread_num;                   break;  // 恒定参数
 
-            case 'r': _args->regions = optarg;                   break;
-            case 'G': _args->pop_group_file = optarg;            break;
-            case '1': _args->output_vcf = optarg;                break;
-            case '2': _args->output_cvg = optarg;                break;
+            case 'r': _args->regions = optarg;                   break;  /* 临时参数 */
+            case 'G': _args->pop_group_file = optarg;            break;  // 
+            case '1': _args->output_vcf = optarg;                break;  // 恒定参数
+            case '2': _args->output_cvg = optarg;                break;  // 恒定参数
 
-            case '3': _args->filename_has_samplename = true;     break;
-            case '4': _args->smart_rerun = true;                 break;
+            case '3': _args->filename_has_samplename = true;     break;  // 恒定参数
+            case '4': _args->smart_rerun = true;                 break;  // 恒定参数
             case 'h': 
                 std::cerr << usage() << std::endl;
                 exit(1);
@@ -82,8 +82,9 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
     if (_args->min_af > 100.0/_args->input_bf.size()) {
         _args->min_af = 100.0/_args->input_bf.size();
     }
-    _reference = _args->reference;  // load fasta
+    reference = _args->reference;  // load fasta
     _get_calling_interval();
+print_calling_interval();
 
     std::cerr << "[INFO] Finish loading arguments and we have " << _args->input_bf.size()
               << " BAM/CRAM files for variants calling.\n";
@@ -159,8 +160,27 @@ void BaseTypeRunner::_get_calling_interval() {
         for (size_t i(0); i < rg_v.size(); ++i) {
             _calling_intervals.push_back(_make_gregiontuple(rg_v[i]));
         }
+    } else {
+        // calling the whole genome
+        int n = reference.nseq();
+        for (size_t i(0); i < n; ++i) {
+            std::string ref_id = reference.iseq_name(i);
+            _calling_intervals.push_back(std::make_tuple(ref_id, 1, reference.seq_length(ref_id)));
+        } 
     }
     
+    return;
+}
+
+void BaseTypeRunner::print_calling_interval() {
+
+    std::cout << "---- Calling Intervals ----\n";
+    for (size_t i(0); i < _calling_intervals.size(); ++i) {
+        std::cout << i+1 << " - " 
+                  << std::get<0>(_calling_intervals[i]) << ":" 
+                  << std::get<1>(_calling_intervals[i]) << "-" 
+                  << std::get<2>(_calling_intervals[i]) << "\n";
+    }
     return;
 }
 
@@ -177,10 +197,10 @@ ngslib::GenomeRegionTuple BaseTypeRunner::_make_gregiontuple(std::string gregion
         std::vector<uint32_t> gs;
         ngslib::split(gr[1], gs, "-");   // get position coordinate
         pos_start = gs[0];
-        pos_end = (gs.size() == 2) ? gs[1] : _reference.seq_length(ref_id);
+        pos_end = (gs.size() == 2) ? gs[1] : reference.seq_length(ref_id);
     } else {
         pos_start = 1;
-        pos_end = _reference.seq_length(ref_id);  // the whole ``ref_id`` length
+        pos_end = reference.seq_length(ref_id);  // the whole ``ref_id`` length
     }
 
     return std::make_tuple(ref_id, pos_start, pos_end);  // 1-based
