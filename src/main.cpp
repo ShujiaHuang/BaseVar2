@@ -70,7 +70,10 @@ int main(int argc, char *argv[]) {
 
     /* Coding here */
     now = time(0);
-    std::cout << "** Processing done, "  << (double)(clock() - start_time) / CLOCKS_PER_SEC
-              << " seconds elapsed **\n" << ctime(&now) << std::endl;
+    std::string ct(ctime(&now));
+    ct.pop_back();  // rm the trailing '\n' put by `asctime`
+    std::cout << "** Processing done on: " << ct << ", " 
+              << (double)(clock() - start_time) / CLOCKS_PER_SEC 
+              << " seconds elapsed **\n" << std::endl;
     return 0;
 }
