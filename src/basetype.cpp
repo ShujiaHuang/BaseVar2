@@ -104,7 +104,9 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
     reference = _args->reference;  // load fasta
     _get_calling_interval();
     print_calling_interval();
-    _get_sample_id_from_bam();     // get sample id from aligne_files and record into `_samples_id`
+
+    _get_sample_id_from_bam();     // get sample id from input aligne_files and record into `_samples_id`
+    if (!_args->pop_group_file.empty()) _get_popgroup_info();
 
     return;
 }
@@ -169,13 +171,12 @@ void BaseTypeRunner::_get_calling_interval() {
 
     // clear
     _calling_intervals.clear();
-
     if (!_args->regions.empty()) {
         std::vector<std::string> rg_v;
         ngslib::split(_args->regions, rg_v, ",");
 
         for (size_t i(0); i < rg_v.size(); ++i) {
-            _calling_intervals.push_back(_make_gregiontuple(rg_v[i]));
+            _calling_intervals.push_back(_make_gregion_tuple(rg_v[i]));
         }
     } else {
         // calling the whole genome
@@ -202,7 +203,46 @@ void BaseTypeRunner::print_calling_interval() {
     return;
 }
 
-ngslib::GenomeRegionTuple BaseTypeRunner::_make_gregiontuple(std::string gregion) {
+void BaseTypeRunner::_get_popgroup_info() {
+    // group_id => [index in _samples_id of group_id]
+
+    std::ifstream i_fn(_args->pop_group_file.c_str());
+    if (!i_fn) {
+        std::cerr << "[ERROR] Cannot open file: " + _args->pop_group_file << std::endl;
+        exit(1);
+    }
+
+    std::map<std::string, std::string> sample2group;
+    std::string tmp, sn, gn;
+    while (1) {
+        // Only two columns: sample_id and group_id
+        i_fn >> sn >> gn;
+        if (i_fn.eof()) break;
+        
+        sample2group[sn] = gn;
+        std::getline(i_fn, tmp, '\n');
+    }
+    i_fn.close();
+
+    _groups_idx.clear();
+    std::map<std::string, std::string>::iterator s2g_it;
+    // Keep the order of samples
+    for (size_t i(0); i < _samples_id.size(); ++i) {
+        s2g_it = sample2group.find(_samples_id[i]);
+        if (s2g_it != sample2group.end()) {  // ignore all the samples which not found
+            // record sample index of group groups
+            // group -> index of _samples_id
+            _groups_idx[sample2group[_samples_id[i]]].push_back(i);
+        }
+    }
+    // test
+    for(std::map<std::string, std::vector<size_t>>::iterator it(_groups_idx.begin()); it != _groups_idx.end(); ++it){
+        std::cout << " - " << it->first << " " << it->second.size() << " : " << ngslib::join(it->second, ",") << std::endl;
+    }
+    return;
+}
+
+ngslib::GenomeRegionTuple BaseTypeRunner::_make_gregion_tuple(std::string gregion) {
 
     std::string ref_id;
     uint32_t pos_start, pos_end;         // All be 1-based

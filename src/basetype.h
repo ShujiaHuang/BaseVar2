@@ -9,18 +9,18 @@
 #ifndef __INCLUDE_BASETYPE_H__
 #define __INCLUDE_BASETYPE_H__
 
+#include <getopt.h>
 #include <iostream>
 #include <string>
 #include <vector>
-#include <getopt.h>
+#include <map>
 
 #include "Fasta.h"
 #include "utils.h"
 
 static const std::string __BASETYPE_USAGE = 
     "About: Calling variants by BaseVar.\n" 
-    "Usage: basevar basetype [options] <-R reference.fa>|<-R reference.fa.gz> <--output-vcf> <--output-cvg> " 
-    "[-I input] ...\n\n" 
+    "Usage: basevar basetype [options] <-R Fasta> <--output-vcf> <--output-cvg> [-I input] ...\n\n" 
     "optional arguments:\n" 
     "  -I, --input=FILE             BAM/SAM/CRAM file containing reads.\n"
     "  -L, --align-file-list=FILE   BAM/CRAM files list, one file per row.\n"
@@ -34,17 +34,16 @@ static const std::string __BASETYPE_USAGE =
     "  -B, --batch-count=INT        INT simples per batchfile. [200]\n" 
     "  -t, --thread=INT             Number of threads. [4]\n\n"
 
-    "  -r, --regions=chr:start-end  Skip positions which not in these regions. This parameter could be a\n"
-    "                               list of comma deleimited genome regions(e.g.: chr:start-end) or a\n"
-    "                               file contain the list of regions.\n"
     "  -G, --pop-group=FILE         Calculating the allele frequency for specific population.\n" 
-    "  --output-vcf FILE            Output VCF file. If not provide will skip variants discovery and just\n"
-    "                               output position coverage file which filename is provided by --output-cvg.\n"
+    "  -r, --regions=chr:start-end  Skip positions which not in these regions. This parameter could be a\n"
+    "                               list of comma deleimited genome regions(e.g.: chr:start-end) or a file\n"
+    "                               contain the list of regions.\n"
+    "  --output-vcf FILE            Output VCF file.\n"
     "  --output-cvg FILE            Output position coverage file.\n\n"
 
-    "  --filename-has-samplename    If the name of bamfile is something like 'SampleID.xxxx.bam',\n"
-    "                               you can set this parameter to save a lot of time during get the\n"
-    "                               sample id from BAM header.\n"
+    "  --filename-has-samplename    If the name of bamfile is something like 'SampleID.xxxx.bam', set this\n"
+    "                               argrument could save a lot of time during get the sample id from BAMfile\n"
+    "                               header information.\n"
     "  --smart-rerun                Rerun process by checking batchfiles\n"
     "  -h, --help                   Show this help message and exit"; 
 
@@ -103,14 +102,17 @@ struct BaseTypeARGS {
 class BaseTypeRunner {
 
 private:
-    BaseTypeARGS *_args;                   // all the commandline options
-    std::vector<std::string> _samples_id;  // sample ID of alignment files (BAM/CRAM/SAM)
+    BaseTypeARGS *_args;                                        // Commandline options
+    std::vector<std::string> _samples_id;                       // sample ID of alignment files (BAM/CRAM/SAM)
+                                                                // _samples_id and `input_bf` have the same order 
+    std::map<std::string, std::vector<size_t>> _groups_idx;     // sample group: group => samples index
     std::vector<ngslib::GenomeRegionTuple> _calling_intervals;  // vector of calling regions
 
     void _get_bamfile_list();
     void _get_calling_interval();  // load the calling region from input
     void _get_sample_id_from_bam();
-    ngslib::GenomeRegionTuple _make_gregiontuple(std::string gregion);
+    void _get_popgroup_info();
+    ngslib::GenomeRegionTuple _make_gregion_tuple(std::string gregion);
 
     BaseTypeRunner(const BaseTypeRunner &b) = delete;             // reject using copy constructor (C++11 style).
     BaseTypeRunner &operator=(const BaseTypeRunner &b) = delete;  // reject using copy/assignment operator (C++11 style).
@@ -122,7 +124,7 @@ public:
     BaseTypeRunner() : _args(NULL) {}
     BaseTypeRunner(int cmdline_argc, char *cmdline_argv[]) {
         if (cmdline_argc < 2) {
-            std::cerr << usage() << std::endl;
+            std::cout << usage() << std::endl;
             exit(1);
         }
         set_arguments(cmdline_argc, cmdline_argv); 
