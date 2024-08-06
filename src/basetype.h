@@ -137,7 +137,7 @@ public:
     void set_arguments(int cmdline_argc, char *cmdline_argv[]);
     void print_calling_interval();
 
-    // run variant calling process
+    // Run variant calling process
 
 };  // BaseTypeRunner class
 

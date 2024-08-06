@@ -205,7 +205,6 @@ void BaseTypeRunner::print_calling_interval() {
 
 void BaseTypeRunner::_get_popgroup_info() {
     // group_id => [index in _samples_id of group_id]
-
     std::ifstream i_fn(_args->pop_group_file.c_str());
     if (!i_fn) {
         std::cerr << "[ERROR] Cannot open file: " + _args->pop_group_file << std::endl;
@@ -226,19 +225,22 @@ void BaseTypeRunner::_get_popgroup_info() {
 
     _groups_idx.clear();
     std::map<std::string, std::string>::iterator s2g_it;
-    // Keep the order of samples
+    
+    // follow the order of samples
     for (size_t i(0); i < _samples_id.size(); ++i) {
         s2g_it = sample2group.find(_samples_id[i]);
-        if (s2g_it != sample2group.end()) {  // ignore all the samples which not found
+        
+        // ignore all the samples which not found
+        if (s2g_it != sample2group.end()) {
             // record sample index of group groups
             // group -> index of _samples_id
             _groups_idx[sample2group[_samples_id[i]]].push_back(i);
         }
     }
     // test
-    for(std::map<std::string, std::vector<size_t>>::iterator it(_groups_idx.begin()); it != _groups_idx.end(); ++it){
-        std::cout << " - " << it->first << " " << it->second.size() << " : " << ngslib::join(it->second, ",") << std::endl;
-    }
+    // for(std::map<std::string, std::vector<size_t>>::iterator it(_groups_idx.begin()); it != _groups_idx.end(); ++it){
+    //     std::cout << " - " << it->first << " " << it->second.size() << " : " << ngslib::join(it->second, ",") << std::endl;
+    // }
     return;
 }
 
