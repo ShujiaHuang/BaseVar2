@@ -15,12 +15,17 @@ int main(int argc, char *argv[]) {
     // std::cout << result.get() << std::endl;
 
     std::vector<std::string> a, b;
+    std::vector<int> c = {1,2,3,4};
+    std::vector<float> d = {0.1,2.5,3,4.0};
     a.push_back("Hello");
     a.push_back("World!");
 
     std::cout << ngslib::join(a, ",") << std::endl;
     ngslib::split("hello::world", b, ":");
     std::cout << ngslib::join(b, " -- ") << std::endl;
+    std::cout << ngslib::join(c) << std::endl;
+    std::cout << ngslib::join(c, ":") << std::endl;
+    std::cout << ngslib::join(d, " - ") << std::endl;
 
     ngslib::split("hello::world", b, ">>", true);
     ngslib::split("hello::world", b, ">>h", true);

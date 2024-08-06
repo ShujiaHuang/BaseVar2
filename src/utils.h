@@ -45,8 +45,18 @@ namespace ngslib {
     bool safe_mkdir(std::string folder_path);
     bool safe_remove(std::string file_path);
 
-    std::string join(std::vector<std::string> &input, const std::string delim="\t");
-    std::string join(std::vector<size_t> &input, const std::string delim="\t");
+    template<typename T>
+    std::string join(std::vector<T> &input, const std::string delim="\t") {
+        if(input.empty()) return "";
+
+        std::string out_str = tostring(input[0]);
+        for (size_t i(1); i < input.size(); ++i) {
+            out_str += (delim + tostring(input[i]));
+        }
+
+        return out_str;
+    }
+
     void split(std::string in_str, std::vector<std::string> &out, const char *delim, bool is_append=false);
     void split(std::string in_str, std::vector<uint32_t> &out, const char *delim, bool is_append=false);
 
