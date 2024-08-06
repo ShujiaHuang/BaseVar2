@@ -35,7 +35,6 @@ namespace ngslib {
             //erase delimiter
             int i = in_str.find_first_not_of(delim);
             if(i == std::string::npos) break;
-
             in_str.erase(0, i);
 
             i = in_str.find_first_of(delim);
@@ -57,7 +56,6 @@ namespace ngslib {
             //erase delimiter
             int i = in_str.find_first_not_of(delim);
             if(i == std::string::npos) break;
-
             in_str.erase(0, i);
 
             i = in_str.find_first_of(delim);
