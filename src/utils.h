@@ -95,6 +95,22 @@ namespace ngslib {
         return;
     }
 
+    // Template function to slice a vector from range X to Y
+    template <typename T>
+    std::vector<T> vector_slicing(std::vector<T> const& v, int x, int y) {
+    
+        // Begin and End iterator (C++17), [first, last)
+        auto first = x < v.size() ? v.begin() + x : v.end();
+        auto last  = y < v.size() ? v.begin() + y : v.end();
+    
+        // Copy the element
+        std::vector<T> new_v(first, last);
+
+        // Return the results
+        return new_v;
+    }
+    
+
 }  // namespace ngslib
 
 #endif  // #ifndef __INCLUDE_NGSLIB_UTILS_H__
