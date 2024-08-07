@@ -49,12 +49,14 @@ namespace ngslib {
      * 
      * @param directory_path 
      * @return std::string 
+     * 
      */
     std::string get_last_modification_file(std::string directory_path);
 
     template<typename T>
     std::string join(std::vector<T> &input, const std::string delim="\t") {
-        if(input.empty()) return "";
+        if (input.empty()) 
+            return "";
 
         std::string out_str = tostring(input[0]);
         for (size_t i(1); i < input.size(); ++i) {
@@ -64,8 +66,34 @@ namespace ngslib {
         return out_str;
     }
 
-    void split(std::string in_str, std::vector<std::string> &out, const char *delim, bool is_append=false);
-    void split(std::string in_str, std::vector<uint32_t> &out, const char *delim, bool is_append=false);
+    template<typename T>
+    void split(std::string in_str, std::vector<T> &out, const char *delim, bool is_append=false) {
+        if (!is_append) out.clear();
+
+        std::stringstream ss;
+        T d;
+        while(1) {
+            //erase delimiter
+            int i = in_str.find_first_not_of(delim);
+            if (i == std::string::npos) break;
+            in_str.erase(0, i);
+
+            i = in_str.find_first_of(delim);
+            if (i == std::string::npos) {
+                ss << in_str; ss >> d;  // data type conversion
+                out.push_back(d);
+                break;  // hit the end of input string, break the loop
+            } else {
+                std::string tok = in_str.substr(0, i);
+                ss << tok; ss >> d;  // data type conversion
+                out.push_back(d);
+                in_str.erase(0, i);
+            }
+            ss.clear();  // must clear the stream before next loop!!! 
+        }
+
+        return;
+    }
 
 }  // namespace ngslib
 
