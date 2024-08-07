@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
     std::cout << "-- LMF a/b: " << ngslib::get_last_modification_file("a/b") << "\n";
     std::cout << "-- LMF ../data/bam100: " << ngslib::get_last_modification_file("../data/bam100") << "\n";
 
-    std::vector<int> vc = ngslib::vector_slicing(c, 1, 1);  // [start, end)
+    std::vector<int> vc = ngslib::vector_slicing(c, 1, 3);  // [start, end)
     std::cout << "vector slicing `vc` size: " << vc.size() << "\t" << ngslib::join(vc, "-") << "\n";
 
     return 0;

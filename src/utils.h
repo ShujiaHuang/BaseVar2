@@ -97,11 +97,17 @@ namespace ngslib {
 
     // Template function to slice a vector from range X to Y
     template <typename T>
-    std::vector<T> vector_slicing(std::vector<T> const& v, int x, int y) {
+    std::vector<T> vector_slicing(const std::vector<T> &v, int x, int y) {
     
+        if (x > y) 
+            throw std::invalid_argument(
+                "[ERROR] input value error in 'std::vector<T> vector_slicing"
+                "(const std::vector<T> &v, int x, int y)', start (x) larger "
+                "than end(y)!");
+
         // Begin and End iterator (C++17), [first, last)
-        auto first = x < v.size() ? v.begin() + x : v.end();
-        auto last  = y < v.size() ? v.begin() + y : v.end();
+        auto first = x < v.size() ? v.begin()+x : v.end();
+        auto last  = y < v.size() ? v.begin()+y : v.end();
     
         // Copy the element
         std::vector<T> new_v(first, last);
