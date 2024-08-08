@@ -69,6 +69,8 @@ int main(int argc, char *argv[]) {
     }
 
     /* Coding here */
+
+    
     now = time(0);
     std::string ct(ctime(&now));
     ct.pop_back();  // rm the trailing '\n' put by `asctime`
