@@ -10,4 +10,6 @@ g++ -O3 -fPIC test_cmdline.cpp -I ../../src -lz -lbz2 -lm -llzma -lpthread -lcur
 
 g++ -O3 -fPIC test_threadpool.cpp -I ../../src -o test_threadpool
 
+g++ -O3 -fPIC test_utils.cpp ../../src/utils.cpp -I ../../src -o test_utils
+
 
