@@ -120,11 +120,6 @@ private:
     // For variant calling
     void _variant_caller_process();
     std::vector<std::string> _create_batchfiles(ngslib::GenomeRegionTuple genome_region);
-    // bool _create_single_batchfile(const std::vector<std::string> &batch_align_files, 
-    //                               const std::string &fa_seq,
-    //                               ngslib::GenomeRegionTuple genome_region,
-    //                               std::string out_batch_file,  // output batchfile name
-    //                               uint32_t reg_expand_size=500);
 
     BaseTypeRunner(const BaseTypeRunner &b) = delete;             // reject using copy constructor (C++11 style).
     BaseTypeRunner &operator=(const BaseTypeRunner &b) = delete;  // reject using copy/assignment operator (C++11 style).
