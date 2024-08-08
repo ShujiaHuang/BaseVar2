@@ -10,10 +10,18 @@
 #include <fstream>
 
 #include "basetype.h"
+
 #include "bam_header.h"
+#include "bam.h"
+#include "external/threadpool.h"
 
 
 void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
+
+    if (cmdline_argc < 2) {
+        std::cout << usage() << "\n" << std::endl;
+        exit(1);
+    }
 
     if (_args) {
         throw std::invalid_argument("[basetype.cpp::BaseTypeRunner:args] 'args' must be "
@@ -54,7 +62,7 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
         }
     }
     // check the requirement argument.
-    /* Make sure you have set at least one bamfile. */
+    /* Make sure we have set at least one bamfile. */
     if (_args->input_bf.empty() && _args->in_bamfilelist.empty())
         throw std::invalid_argument("[ERROR] Missing argument '-I/--input' or '-L/--align-file-list'");
     if (_args->reference.empty())
@@ -64,6 +72,19 @@ void BaseTypeRunner::set_arguments(int cmdline_argc, char *cmdline_argv[]) {
         throw std::invalid_argument("[ERROR] Missing argument '--output-vcf'");
     if (_args->output_cvg.empty())
         throw std::invalid_argument("[ERROR] Missing argument '--output-cvg'");
+    
+    if (_args->min_af <= 0)
+        throw std::invalid_argument("[ERROR] '-m/--min-af' argument must be > 0.");
+    if (_args->mapq <= 0)
+        throw std::invalid_argument("[ERROR] '-q/--mapq' argument must be > 0.");
+    if (_args->batchcount <= 0)
+        throw std::invalid_argument("[ERROR] '-B/--batch-count' argument must be > 0.");
+    if (_args->thread_num <= 0)
+        throw std::invalid_argument("[ERROR] '-t/--thread' argument must be > 0.");
+
+    // recovering the absolute paths for output files
+    _args->output_vcf = ngslib::abspath(_args->output_vcf);
+    _args->output_cvg = ngslib::abspath(_args->output_cvg);
 
     // Output the commandline options
     std::cout << 
@@ -179,7 +200,7 @@ void BaseTypeRunner::_get_calling_interval() {
             _calling_intervals.push_back(_make_gregion_tuple(rg_v[i]));
         }
     } else {
-        // calling the whole genome
+        // Calling the whole genome
         int n = reference.nseq();
         for (size_t i(0); i < n; ++i) {
             std::string ref_id = reference.iseq_name(i);
@@ -192,12 +213,12 @@ void BaseTypeRunner::_get_calling_interval() {
 
 void BaseTypeRunner::print_calling_interval() {
 
+    std::string ref_id;
+    uint32_t reg_start, reg_end;
     std::cout << "---- Calling Intervals ----\n";
     for (size_t i(0); i < _calling_intervals.size(); ++i) {
-        std::cout << i+1 << " - " 
-                  << std::get<0>(_calling_intervals[i]) << ":" 
-                  << std::get<1>(_calling_intervals[i]) << "-" 
-                  << std::get<2>(_calling_intervals[i]) << "\n";
+        std::tie(ref_id, reg_start, reg_end) = _calling_intervals[i];
+        std::cout << i+1 << " - " << ref_id << ":" << reg_start << "-" << reg_end << "\n";
     }
     std::cout << "\n";
     return;
@@ -246,8 +267,9 @@ void BaseTypeRunner::_get_popgroup_info() {
 
 ngslib::GenomeRegionTuple BaseTypeRunner::_make_gregion_tuple(std::string gregion) {
 
+    // Genome Region
     std::string ref_id;
-    uint32_t pos_start, pos_end;         // All be 1-based
+    uint32_t reg_start, reg_end;         // All be 1-based
 
     std::vector<std::string> gr;
     ngslib::split(gregion, gr, ":");     // get reference id
@@ -256,12 +278,102 @@ ngslib::GenomeRegionTuple BaseTypeRunner::_make_gregion_tuple(std::string gregio
     if (gr.size() == 2) {                // 'start-end' or start
         std::vector<uint32_t> gs;
         ngslib::split(gr[1], gs, "-");   // get position coordinate
-        pos_start = gs[0];
-        pos_end = (gs.size() == 2) ? gs[1] : reference.seq_length(ref_id);
+        reg_start = gs[0];
+        reg_end = (gs.size() == 2) ? gs[1] : reference.seq_length(ref_id);
     } else {
-        pos_start = 1;
-        pos_end = reference.seq_length(ref_id);  // the whole ``ref_id`` length
+        reg_start = 1;
+        reg_end = reference.seq_length(ref_id);  // the whole ``ref_id`` length
     }
 
-    return std::make_tuple(ref_id, pos_start, pos_end);  // 1-based
+    if (reg_start > reg_end) {
+        throw std::invalid_argument("[ERROR] start postion is larger than end position in "
+                                    "'-r/--regions' " + gregion);
+    }
+
+    return std::make_tuple(ref_id, reg_start, reg_end);  // 1-based
+}
+
+bool __create_single_batchfile(const std::vector<std::string> batch_align_files, 
+                               const std::string &fa_seq,
+                               ngslib::GenomeRegionTuple genome_region,
+                               std::string out_batch_file,  // output batchfile name
+                               uint32_t reg_expand_size=500)
+{
+    std::string ref_id;
+    uint32_t reg_start, reg_end;  // all be 1-based
+    std::tie(ref_id, reg_start, reg_end) = genome_region;
+
+    uint32_t exp_reg_start = reg_start > reg_expand_size ? reg_start - reg_expand_size : 1;
+    uint32_t exp_reg_end   = reg_end + reg_expand_size;
+    std::string exp_regstr = ref_id + ":" + ngslib::tostring(exp_reg_start) + "-" + ngslib::tostring(exp_reg_end);
+
+    return true;
+}
+
+std::vector<std::string> BaseTypeRunner::_create_batchfiles(ngslib::GenomeRegionTuple genome_region) {
+    // multiple thread 
+    std::string outdir = ngslib::dirname(_args->output_vcf) ;
+    std::string stem_bn = ngslib::remove_filename_extension(ngslib::basename(_args->output_vcf));
+    std::string cache_outdir = outdir + "/" + stem_bn + "_cache";
+    ngslib::safe_mkdir(cache_outdir);
+
+    std::string ref_id;
+    uint32_t reg_start, reg_end; 
+    std::tie(ref_id, reg_start, reg_end) = genome_region;
+
+    std::string fa_seq = reference[ref_id];  // the whole sequence of ``ref_id``
+    std::string regstr = ref_id + "_" + ngslib::tostring(reg_start) + "-" + ngslib::tostring(reg_end);
+
+    int bn = _args->input_bf.size() / _args->batchcount;
+    if (_args->input_bf.size() % _args->batchcount > 0) 
+        bn++;
+
+    std::vector<std::string> batchfiles;
+
+    ThreadPool thread_pool(_args->thread_num);
+    std::vector<std::future<bool> > create_batchfile_processes;
+
+    for (size_t i(0), j(1); i < _args->input_bf.size(); i+=_args->batchcount, ++j) {
+        size_t x(i), y(i + _args->batchcount);
+        std::vector<std::string> batch_align_files = ngslib::vector_slicing(_args->input_bf, x, y);
+
+        // Set file path for batchfile
+        std::string batchfile = cache_outdir + "/" + stem_bn + "." + regstr + "." + 
+                                ngslib::tostring(j) + "_" + ngslib::tostring(bn) + ".bf.gz";
+        batchfiles.push_back(batchfile);  // store the name of batchfile into a vector
+
+        // Thread Pool
+        create_batchfile_processes.emplace_back(
+            thread_pool.enqueue(__create_single_batchfile, 
+                                batch_align_files,  // 该值会变，只能拷贝，如果是引用，在多线程中会丢失变量
+                                std::cref(fa_seq),  // 这个值在循环外，值不变，可以传引用
+                                genome_region,
+                                batchfile,
+                                500)
+        );
+    }
+    
+    for (auto && p: create_batchfile_processes) {
+        p.get();  // return the value of `__create_single_batchfile`
+    }
+    create_batchfile_processes.clear();
+
+    return batchfiles;
+}
+
+void BaseTypeRunner::_variant_caller_process() {
+    // 以区间为单位进行变异检测
+    std::vector<std::string> batchfiles;
+    for (size_t i(0); i < _calling_intervals.size(); ++i) {
+        batchfiles = _create_batchfiles(_calling_intervals[i]);
+
+std::cout << ngslib::join(batchfiles, "\n") << "\n\n";
+
+    }
+}
+
+void BaseTypeRunner::run() {
+    std::cout << "\n--- Running ---\n";
+    _variant_caller_process();
+    return;
 }

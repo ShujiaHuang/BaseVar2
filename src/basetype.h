@@ -9,8 +9,8 @@
 #ifndef __INCLUDE_BASETYPE_H__
 #define __INCLUDE_BASETYPE_H__
 
-#include <getopt.h>
 #include <iostream>
+#include <getopt.h>
 #include <string>
 #include <vector>
 #include <map>
@@ -35,17 +35,17 @@ static const std::string __BASETYPE_USAGE =
     "  -t, --thread=INT             Number of threads. [4]\n\n"
 
     "  -G, --pop-group=FILE         Calculating the allele frequency for specific population.\n" 
-    "  -r, --regions=chr:start-end  Skip positions which not in these regions. This parameter could be a\n"
-    "                               list of comma deleimited genome regions(e.g.: chr:start-end) or a file\n"
-    "                               contain the list of regions.\n"
+    "  -r, --regions=chr:start-end  Skip positions which not in these regions. This parameter could be a list\n"
+    "                               of comma deleimited genome regions(e.g.: chr:start-end) or a file contain\n"
+    "                               the list of regions.\n"
     "  --output-vcf FILE            Output VCF file.\n"
     "  --output-cvg FILE            Output position coverage file.\n\n"
 
     "  --filename-has-samplename    If the name of bamfile is something like 'SampleID.xxxx.bam', set this\n"
     "                               argrument could save a lot of time during get the sample id from BAMfile\n"
     "                               header information.\n"
-    "  --smart-rerun                Rerun process by checking batchfiles\n"
-    "  -h, --help                   Show this help message and exit"; 
+    "  --smart-rerun                Rerun process by checking batchfiles.\n"
+    "  -h, --help                   Show this help message and exit."; 
 
 static const struct option BASETYPE_CMDLINE_LOPTS[] = {
     // Optional arguments to long style command line parameters require 'equals sign' (=). 
@@ -88,8 +88,8 @@ struct BaseTypeARGS {
     std::string output_vcf;             // Output VCF file
     std::string output_cvg;             // Output coverage file
 
-    bool smart_rerun;                   // Smart rerun by checking batchfiles
     bool filename_has_samplename;       // sample name in file name
+    bool smart_rerun;                   // Smart rerun by checking batchfiles
 
     // Set default argument
     BaseTypeARGS(): min_af(0.01), mapq(10), batchcount(200), thread_num(4), 
@@ -108,11 +108,23 @@ private:
     std::map<std::string, std::vector<size_t>> _groups_idx;     // sample group: group => samples index
     std::vector<ngslib::GenomeRegionTuple> _calling_intervals;  // vector of calling regions
 
+    // templary output files
+    std::vector<std::string> _sub_out_vcf, _sub_out_cvg;
+
     void _get_bamfile_list();
     void _get_calling_interval();  // load the calling region from input
     void _get_sample_id_from_bam();
     void _get_popgroup_info();
     ngslib::GenomeRegionTuple _make_gregion_tuple(std::string gregion);
+
+    // For variant calling
+    void _variant_caller_process();
+    std::vector<std::string> _create_batchfiles(ngslib::GenomeRegionTuple genome_region);
+    // bool _create_single_batchfile(const std::vector<std::string> &batch_align_files, 
+    //                               const std::string &fa_seq,
+    //                               ngslib::GenomeRegionTuple genome_region,
+    //                               std::string out_batch_file,  // output batchfile name
+    //                               uint32_t reg_expand_size=500);
 
     BaseTypeRunner(const BaseTypeRunner &b) = delete;             // reject using copy constructor (C++11 style).
     BaseTypeRunner &operator=(const BaseTypeRunner &b) = delete;  // reject using copy/assignment operator (C++11 style).
@@ -122,13 +134,7 @@ public:
 
     // default constructor
     BaseTypeRunner() : _args(NULL) {}
-    BaseTypeRunner(int cmdline_argc, char *cmdline_argv[]) {
-        if (cmdline_argc < 2) {
-            std::cout << usage() << std::endl;
-            exit(1);
-        }
-        set_arguments(cmdline_argc, cmdline_argv); 
-    }
+    BaseTypeRunner(int cmdline_argc, char *cmdline_argv[]) { set_arguments(cmdline_argc, cmdline_argv); }
     // Destroy the malloc'ed BasTypeArgs structure
     ~BaseTypeRunner(){ if(_args){delete _args; _args = NULL;} }
 
@@ -137,7 +143,8 @@ public:
     void set_arguments(int cmdline_argc, char *cmdline_argv[]);
     void print_calling_interval();
 
-    // Run variant calling process
+    // Run the variant calling process
+    void run();
 
 };  // BaseTypeRunner class
 
