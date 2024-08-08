@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
               << ngslib::dirname("./a") << "\n";
     std::cout << "Get dirname from window path " << ngslib::dirname("C:\\\\MyDirectory\\\\MyFile.bat") << "\n";
 
-    std::cout << "is_readable: " << ngslib::is_readable("some") << "\n";
+    std::cout << "is_readable: " << ngslib::is_readable("some") << " - test_threadpool - " << ngslib::is_readable("test_bamrecord") << "\n";
     std::cout << ngslib::safe_mkdir("a/b/c")  << "\n";
     std::cout << ngslib::safe_remove("a/b/c") << "\n";
     std::cout << ngslib::safe_remove("t_t_")  << "\n";
