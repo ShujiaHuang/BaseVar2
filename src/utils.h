@@ -15,7 +15,7 @@ namespace ngslib {
 
     // Get a path that unambiguously identifies the location of a file.
     std::string abspath(const std::string file_path);
-    
+
     // Get stem directory and return
     std::string dirname(const std::string file_path);
     
@@ -60,7 +60,7 @@ namespace ngslib {
     std::string get_last_modification_file(std::string directory_path);
 
     template<typename T>
-    std::string join(std::vector<T> &input, const std::string delim="\t") {
+    std::string join(const std::vector<T> &input, const std::string delim="\t") {
         if (input.empty()) 
             return "";
 
