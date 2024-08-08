@@ -38,8 +38,12 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Get filename from Linux path: " << ngslib::basename("some/path/file.ext") << "\t" 
               << ngslib::remove_filename_extension(ngslib::basename("some/path/file.ext")) << "\n";
-    std::cout << "Get filename from window path " << ngslib::basename("C:\\MyDirectory\\MyFile.bat") << "\t" 
-              << ngslib::remove_filename_extension(ngslib::basename("C:\\MyDirectory\\MyFile.bat")) << "\n";
+    std::cout << "Get filename from window path " << ngslib::basename("C:\\\\MyDirectory\\\\MyFile.bat") << "\t" 
+              << ngslib::remove_filename_extension("C:\\\\MyDirectory\\\\MyFile.bat") << "\n";
+
+    std::cout << "Get dirname from Linux path: " << ngslib::dirname("some/path/file.ext") << "\t" 
+              << ngslib::dirname("./a") << "\n";
+    std::cout << "Get dirname from window path " << ngslib::dirname("C:\\\\MyDirectory\\\\MyFile.bat") << "\n";
 
     std::cout << "is_readable: " << ngslib::is_readable("some") << "\n";
     std::cout << ngslib::safe_mkdir("a/b/c")  << "\n";
@@ -53,6 +57,9 @@ int main(int argc, char *argv[]) {
 
     std::vector<int> vc = ngslib::vector_slicing(c, 1, 3);  // [start, end)
     std::cout << "vector slicing `vc` size: " << vc.size() << "\t" << ngslib::join(vc, "-") << "\n";
+
+    std::cout << "Get Linux absolute path: " << ngslib::abspath("some/path/file.ext") << "\n";
+    std::cout << "Get linux absolute path: " << ngslib::abspath("/file.ext") << "\n";
 
     return 0;
 }

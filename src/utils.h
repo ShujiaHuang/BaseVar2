@@ -13,11 +13,17 @@ namespace ngslib {
     // define a genome region data style
     typedef std::tuple<std::string, uint32_t, uint32_t> GenomeRegionTuple;
 
+    // Get a path that unambiguously identifies the location of a file.
+    std::string abspath(const std::string file_path);
+    
+    // Get stem directory and return
+    std::string dirname(const std::string file_path);
+    
     // Get file name from a path
-    std::string basename(const std::string &path, const std::string delims = "/\\");
+    std::string basename(const std::string file_path);
     
     // remove the filename extension
-    std::string remove_filename_extension(const std::string &filename);
+    std::string remove_filename_extension(const std::string filename);
 
     // Template function can only be defined in C++ header file
     template<typename T>
@@ -68,11 +74,13 @@ namespace ngslib {
 
     template<typename T>
     void split(std::string in_str, std::vector<T> &out, const char *delim, bool is_append=false) {
+        
         if (!is_append) out.clear();
-
         std::stringstream ss;
         T d;
         while(1) {
+            ss.clear();  // clear the stringstream pipe before the next loop!!! 
+
             //erase delimiter
             int i = in_str.find_first_not_of(delim);
             if (i == std::string::npos) break;
@@ -80,7 +88,7 @@ namespace ngslib {
 
             i = in_str.find_first_of(delim);
             if (i == std::string::npos) {
-                ss << in_str; ss >> d;  // data type conversion
+                ss << in_str; ss >> d;  // convert data tobe T from stringstream pipe
                 out.push_back(d);
                 break;  // hit the end of input string, break the loop
             } else {
@@ -89,7 +97,6 @@ namespace ngslib {
                 out.push_back(d);
                 in_str.erase(0, i);
             }
-            ss.clear();  // must clear the stream before next loop!!! 
         }
 
         return;
@@ -97,7 +104,7 @@ namespace ngslib {
 
     // Template function to slice a vector from range X to Y
     template <typename T>
-    std::vector<T> vector_slicing(const std::vector<T> &v, int x, int y) {
+    std::vector<T> vector_slicing(const std::vector<T> &v, size_t x, size_t y) {
     
         if (x > y) 
             throw std::invalid_argument(
@@ -105,18 +112,17 @@ namespace ngslib {
                 "(const std::vector<T> &v, int x, int y)', start (x) larger "
                 "than end(y)!");
 
-        // Begin and End iterator (C++17), [first, last)
+        // Begin and End iterator
         auto first = x < v.size() ? v.begin()+x : v.end();
         auto last  = y < v.size() ? v.begin()+y : v.end();
     
-        // Copy the element
+        // Copy the element: [first, last)
         std::vector<T> new_v(first, last);
 
         // Return the results
         return new_v;
     }
-    
 
 }  // namespace ngslib
 
-#endif  // #ifndef __INCLUDE_NGSLIB_UTILS_H__
+#endif
