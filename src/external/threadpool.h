@@ -2,6 +2,7 @@
  *  A simple C++11 Thread Pool implementation.
  *  Created by the author: Jakob Progsch. 
  *  Github link of this code: https://github.com/progschj/ThreadPool
+ *  Note: https://blog.yanjingang.com/?p=4487
  *
  */
 #ifndef THREAD_POOL_H
