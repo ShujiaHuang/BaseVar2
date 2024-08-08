@@ -12,7 +12,6 @@
 
 // inluding my own lib
 #include "basetype.h"
-#include "threadpool.h"
 #include "util.h"
 
 static const std::string AUTHOR = "Shujia Huang (hshujia@qq.com)";
@@ -26,7 +25,6 @@ static int usage() {
         "Usage: basevar <command> [options]\n\n" 
         "Commands:\n"
         "    basetype            Variants Caller\n"
-        "    basetypebatch       Variants discovery on one or more samples pre-call by basetype\n"
         "    VQSR                Variants Recalibrator\n"
         "    coverage            Calculating coverage depth for the whole genome or given regions/positions\n"
         "    merge               Merge bed/vcf files\n"
@@ -46,6 +44,8 @@ int basetype(int argc, char *argv[]) {
     }
 
     bt.set_arguments(argc, argv);
+    bt.run();
+
     return 0;
 }
 
@@ -75,5 +75,6 @@ int main(int argc, char *argv[]) {
     std::cout << "** Processing done on: " << ct << ", " 
               << (double)(clock() - start_time) / CLOCKS_PER_SEC 
               << " seconds elapsed **\n" << std::endl;
+
     return 0;
 }
