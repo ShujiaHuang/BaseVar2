@@ -15,7 +15,7 @@ int main() {
     BamHeader bh0;
     BamHeader bh1(fn1);
     // BamHeader bh2 = fn2; // Not allow
-    BamHeader bh2 = BamHeader(fn2);
+    BamHeader bh2 = BamHeader("../data/range.cram");
 
     // sam_hdr_t assign to BamHeader.
     BamHeader bh3(bh2.h());
@@ -64,7 +64,7 @@ int main() {
     std::cout << "HHHH: " << d1 << " -- " << 5%3 << "\n";
     
     std::cout << "bh9.get_sample_name: " << bh9.get_sample_name() << "\n";
-    std::cout << "bh7.get_sample_name: " << bh7.get_sample_name() << "\n";
+    // std::cout << "bh7.get_sample_name: " << bh7.get_sample_name() << "\n";  // no RG in header, throw error here
 
     sam_close(fp);
     return 0;

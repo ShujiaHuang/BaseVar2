@@ -60,9 +60,8 @@ namespace ngslib {
 
         // Copy constructor.
         BamHeader(const BamHeader &bh) { _h = sam_hdr_dup(bh._h); }
-        BamHeader &operator=(const sam_hdr_t *hdr);
         BamHeader &operator=(const BamHeader &bh);
-
+        BamHeader &operator=(const sam_hdr_t *hdr);
         friend std::ostream &operator<<(std::ostream &os, const BamHeader &hd);
 
         void init() {
@@ -70,7 +69,7 @@ namespace ngslib {
             _h = sam_hdr_init();
         }
 
-        // Free the memory and set Bam file header pointer to be NULL to save memory.
+        // Free the memory and set Bam file header pointer to be NULL (could save memory).
         void destroy();
 
         operator bool() const { return bool(_h != NULL); }
