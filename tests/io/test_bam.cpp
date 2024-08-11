@@ -21,6 +21,8 @@ void ret_br(ngslib::Bam &b) {
     }
 }
 
+#include <vector>
+
 int main() {
     clock_t start, end;  // time recorder
     
@@ -35,8 +37,19 @@ int main() {
 
     Bam b0;
     Bam b1(fn1, "r");
-    Bam b2(fn2, "r");
-    Bam *b3 = &b1;
+    // Bam b2(fn2, "r");
+    Bam b2("../data/range.bam", "r");
+    const Bam *b3; b3 = &b1;
+
+// std::vector<Bam> bb; 
+// for(size_t i(0); i < 2; ++i) {
+//     Bam b1(fn1, "r");
+//     bb.push_back(b1);
+//     std::cout << i << " - " << bb[i] << "\n";
+// }
+// std::cout << 0 << " - " << bb[0] << "\n";
+
+//     exit(1);
 
     if (b1.index_build() == 0)
         std::cout << "Successful generate BAI-format index for BAM "
