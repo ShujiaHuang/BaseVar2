@@ -7,11 +7,14 @@
 
 #include <iostream>
 #include <string>
+#include <memory>
 
 #include "bam_header.h"
 #include "bam_record.h"
 
 namespace ngslib {
+    // defined smart pointer for sam/bam/cram files. samFile is as the same as htsFile in sam.h
+    // typedef std::shared_ptr<samFile> ShareHTSFilePointer;  // 本来想用智能指针的，思考再三觉得不需要了
 
     // A Bam file I/O class
     class Bam {
@@ -20,10 +23,11 @@ namespace ngslib {
         std::string _mode;   // Mode matching / [rwa][bcefFguxz0-9]* /
         int _io_status;      // I/O status code in read() and next() function
 
+        // ShareHTSFilePointer _fp;  // sam/bam/cram file smart pointer, samFile is as the same as htsFile in sam.h
         samFile *_fp;        // samFile file pointer, samFile is as the same as htsFile in sam.h
-        BamHeader _hdr;      // The sam/bam/cram header.
         hts_idx_t *_idx;     // BAM or CRAM index pointer.
         hts_itr_t *_itr;     // A SAM/BAM/CRAM iterator for a specify region
+        BamHeader _hdr;      // header of sam/bam/cram
 
         // call `hts_open` function to open file.
         /*!
@@ -58,20 +62,26 @@ namespace ngslib {
               [rw]z  .. compressed VCF
               [rw]   .. uncompressed VCF
         */
-        void _open(const std::string fn, const std::string mode);
+        void _open(const std::string &fn, const std::string mode);
 
-        Bam(const Bam &b) = delete;             // reject using copy constructor (C++11 style).
-        Bam &operator=(const Bam &b) = delete;  // reject using copy/assignment operator (C++11 style).
+        // Bam(const Bam &b) = delete;             // reject using copy constructor (C++11 style).
+        // Bam &operator=(const Bam &b) = delete;  // reject using copy/assignment operator (C++11 style).
 
     public:
         Bam() : _fp(NULL), _itr(NULL), _idx(NULL), _io_status(-1) {}
-        Bam(const std::string &fn, const std::string mode = "r") : _fp(NULL), _itr(NULL), _idx(NULL),
-                                                                   _io_status(-1) {
-            // @mode matching: [rwa]
-            _open(fn, mode);
+        explicit Bam(const std::string &fn, const std::string mode = "r") : 
+            _fp(NULL), _itr(NULL), _idx(NULL), _io_status(-1) 
+        {
+            // @mode could only matching one of [rwa]
+            _open(fn, mode);  
         }
 
-        ~Bam();
+        // copy constructor
+        Bam(const Bam &b);
+        Bam &operator=(const Bam &bh);  // reload copy/assignment operator
+        
+        ~Bam() { destroy(); };
+        void destroy();
 
         // return the read-only BAM header
         samFile *fp() const;
@@ -85,9 +95,7 @@ namespace ngslib {
                      -2: opening fn failed; -3: format not indexable; -4:
                      failed to create and/or save the index)
         */
-        int index_build(int min_shift = 0) {
-            return sam_index_build(_fname.c_str(), min_shift);
-        }
+        int index_build(int min_shift = 0) { return sam_index_build(_fname.c_str(), min_shift); }
 
         // load index of BAM or CRAM
         void index_load();
@@ -130,7 +138,9 @@ namespace ngslib {
 
         operator bool() const { return _io_status >= 0; }
         friend std::ostream &operator<<(std::ostream &os, const Bam &b);
-    };
+
+    };  // class Bam
+
 };  // namespace ngslib
 
 #endif

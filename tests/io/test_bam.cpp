@@ -40,16 +40,17 @@ int main() {
     // Bam b2(fn2, "r");
     Bam b2("../data/range.bam", "r");
     const Bam *b3; b3 = &b1;
+    b0 = b1;
+std::cout << b0.header() << "\n";
 
-// std::vector<Bam> bb; 
-// for(size_t i(0); i < 2; ++i) {
-//     Bam b1(fn1, "r");
-//     bb.push_back(b1);
-//     std::cout << i << " - " << bb[i] << "\n";
-// }
-// std::cout << 0 << " - " << bb[0] << "\n";
-
-//     exit(1);
+std::vector<Bam> bb;  
+bb.reserve(5); //  capacity changed
+for(size_t i(0); i < 2; ++i) {
+    bb.push_back(Bam(fn1, "r"));
+    std::cout << i << " - " << bb[i] << "\n";
+}
+std::cout << "bb size: " << bb.size() << " 0 - " << bb[0] << "\n";
+exit(1);
 
     if (b1.index_build() == 0)
         std::cout << "Successful generate BAI-format index for BAM "
@@ -62,6 +63,7 @@ int main() {
     // b0 = b1;       // Not allow
     // b0 = fn1;      // Not allow
 
+    std::cout << b0.header() << "\n";
     std::cout << b1.header() << "\n";
     std::cout << ">>> 0. The file name is: " << b0 << "\n";
     std::cout << ">>> 1. The file name is: " << b1 << "\n";

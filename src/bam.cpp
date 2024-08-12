@@ -7,25 +7,44 @@
 
 namespace ngslib {
 
-    void Bam::_open(const std::string fn, const std::string mode) {
+// struct samFile_close_if_open { // shoudl also close cram index
+//     void operator()(samFile* x) { if (x) sam_close(x); }
+// };
+
+    void Bam::_open(const std::string &fn, const std::string mode) {
+
+        if ((mode[0] == 'r') && (!is_readable(fn))) {
+            throw std::runtime_error("[bam.cpp::Bam:_open] file not found - " + fn);
+        }
+
+        // Open a SAM/BAM/CRAM file and return samFile file smart pointer.
+        _fp = sam_open(fn.c_str(), mode.c_str()); 
+        // _fp = ShareHTSFilePointer(sam_open(fn.c_str(), mode.c_str()), samFile_close_if_open()); 
+
+        if (!_fp) {
+            throw std::runtime_error("[bam.cpp::Bam:_open] file open failure.");
+        }
 
         _fname = fn;
         _mode = mode;
-
-        if ((mode[0] == 'r') && (!is_readable(fn))) {
-            throw std::invalid_argument("[bam.cpp::Bam:_open] file not found - " + _fname);
-        }
-
-        _fp = sam_open(fn.c_str(), mode.c_str()); // Open a SAM/BAM/CRAM file
-        if (!_fp) {
-            throw std::invalid_argument("[bam.cpp::Bam:_open] file open failure.");
-        }
-
-        _io_status = 0;  // Everything is OK.
+        _itr = NULL,
+        _idx = NULL;
+        _io_status = 0;  // Everything is fine.
         return;
     }
 
-    Bam::~Bam() {
+    // copy constructor
+    Bam::Bam(const Bam &b) : _itr(NULL), _idx(NULL) {
+        _open(b._fname, b._mode);  // reopen the bamfile
+    }
+
+    Bam &Bam::operator=(const Bam &b) {
+        destroy();
+        _open(b._fname, b._mode);  // reopen the bamfile
+        return *this;
+    }
+
+    void Bam::destroy() {
         // sam_close function is an alias name of hts_close.
         if (_fp) sam_close(_fp);
         if (_idx) hts_idx_destroy(_idx);
@@ -59,17 +78,15 @@ namespace ngslib {
 
         _idx = sam_index_load(_fp, _fname.c_str());
         if (!_idx) {
-            throw std::invalid_argument(
-                    "[bam.cpp::Bam:index_load] Failed to load index BAM/CRAM "
-                    "file or the index file is not available. Rebuild by "
-                    "samtools index please."
-            );
+            throw std::runtime_error("[bam.cpp::Bam:index_load] Failed to load index BAM/CRAM "
+                                     "file or the index file is not available. Rebuild it by "
+                                     "using samtools index please.");
         }
     }
 
     // fetch 这个函数在使用多线程的时候会不会发生问题？尝试多区间处理方式？
     // 特别是类成员参数, _fp/_idx 在并行处理时是否存在问题? (htslib/thread_pool.h 参考一下)
-    // 最好不要在一份文件中做多线程，而是以文件为单位跑多线程，从而在根上避免？
+    // 最好不要在一份文件中做多线程，而是以文件为单位跑多线程，从而在根上避免？ (本 BaseVar 就是这样做)
     // Create a SAM/BAM/CRAM iterator for one region.
     bool Bam::fetch(const std::string &region) {
 
@@ -81,8 +98,8 @@ namespace ngslib {
         _itr = sam_itr_querys(_idx, _hdr.h(), region.c_str());
 
         if (!_itr) {
-            throw std::invalid_argument("[bam.cpp::Bam:fetch] Fail to fetch the "
-                                        "alignment data in : " + region);
+            throw std::runtime_error("[bam.cpp::Bam:fetch] Fail to fetch "
+                                     "the alignment data in : " + region);
         }
         return _itr != NULL;
     }
@@ -98,15 +115,15 @@ namespace ngslib {
 
         if (!_itr) {
             std::string region = seq_name + ":" + tostring(beg) + "-" + tostring(end);
-            throw std::invalid_argument("[bam.cpp::Bam:fetch] Fail to fetch the "
-                                        "alignment data in: " + region);
+            throw std::runtime_error("[bam.cpp::Bam:fetch] Fail to fetch "
+                                     "the alignment data in: " + region);
         }
 
         return _itr != NULL;
     }
 
     // 我应该用多个不同的 Record 去记录读取的信息，不同 record 共享一个 _fp 和 _itr
-    // 这样就可以解决线程中关于共享变量的问题了.
+    // 这样就可以解决线程中关于共享变量的问题?
     int Bam::read(BamRecord &br) {
 
         // If NULL, initial the BAM header by _fp.
@@ -129,7 +146,6 @@ namespace ngslib {
         if (b) {
             os << b._fname;
         }
-
         return os;
     }
 
