@@ -7,19 +7,14 @@
 
 namespace ngslib {
 
-// struct samFile_close_if_open { // shoudl also close cram index
-//     void operator()(samFile* x) { if (x) sam_close(x); }
-// };
-
     void Bam::_open(const std::string &fn, const std::string mode) {
 
         if ((mode[0] == 'r') && (!is_readable(fn))) {
             throw std::runtime_error("[bam.cpp::Bam:_open] file not found - " + fn);
         }
 
-        // Open a SAM/BAM/CRAM file and return samFile file smart pointer.
+        // Open a SAM/BAM/CRAM file and return samFile file pointer.
         _fp = sam_open(fn.c_str(), mode.c_str()); 
-        // _fp = ShareHTSFilePointer(sam_open(fn.c_str(), mode.c_str()), samFile_close_if_open()); 
 
         if (!_fp) {
             throw std::runtime_error("[bam.cpp::Bam:_open] file open failure.");
@@ -122,7 +117,7 @@ namespace ngslib {
         return _itr != NULL;
     }
 
-    // 我应该用多个不同的 Record 去记录读取的信息，不同 record 共享一个 _fp 和 _itr
+    // 应该用多个不同的 Record 去记录读取的信息，不同 record 共享一个 _fp 和 _itr
     // 这样就可以解决线程中关于共享变量的问题?
     int Bam::read(BamRecord &br) {
 

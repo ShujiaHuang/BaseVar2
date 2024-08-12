@@ -13,8 +13,6 @@
 #include "bam_record.h"
 
 namespace ngslib {
-    // defined smart pointer for sam/bam/cram files. samFile is as the same as htsFile in sam.h
-    // typedef std::shared_ptr<samFile> ShareHTSFilePointer;  // 本来想用智能指针的，思考再三觉得不需要了
 
     // A Bam file I/O class
     class Bam {
@@ -23,7 +21,6 @@ namespace ngslib {
         std::string _mode;   // Mode matching / [rwa][bcefFguxz0-9]* /
         int _io_status;      // I/O status code in read() and next() function
 
-        // ShareHTSFilePointer _fp;  // sam/bam/cram file smart pointer, samFile is as the same as htsFile in sam.h
         samFile *_fp;        // samFile file pointer, samFile is as the same as htsFile in sam.h
         hts_idx_t *_idx;     // BAM or CRAM index pointer.
         hts_itr_t *_itr;     // A SAM/BAM/CRAM iterator for a specify region
@@ -79,7 +76,7 @@ namespace ngslib {
         // copy constructor
         Bam(const Bam &b);
         Bam &operator=(const Bam &bh);  // reload copy/assignment operator
-        
+
         ~Bam() { destroy(); };
         void destroy();
 
