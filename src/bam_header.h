@@ -44,7 +44,7 @@ namespace ngslib {
     public:
 
         // Initializes a new empty BamHeader with no data.
-        BamHeader() : _h(nullptr) {}
+        BamHeader() : _h(NULL) {}
         ~BamHeader() { destroy(); }
 
         // Only explicit conversions allowed.
@@ -72,7 +72,7 @@ namespace ngslib {
         // Free the memory and set Bam file header pointer to be NULL (could save memory).
         void destroy();
 
-        operator bool() const { return bool(_h != nullptr); }
+        operator bool() const { return bool(_h != NULL); }
 
         // Write BAM header to a BAM file.
         int write(samFile *fp) {
@@ -102,7 +102,6 @@ namespace ngslib {
         int name2id(const std::string &name) const;
 
         // Return a length of the reference sequences by the index of chromosome
-        // in header.
         uint32_t seq_length(int i) const { return _h->target_len[i]; }
 
         // Returns the text representation of the header.

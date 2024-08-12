@@ -45,14 +45,14 @@ namespace ngslib {
 
     void BamHeader::destroy() {
         sam_hdr_destroy(_h);
-        _h = nullptr;
+        _h = NULL;
     }
 
     int BamHeader::name2id(const std::string &name) const {
         int tid = sam_hdr_name2tid(_h, name.c_str());
 
         if (tid < 0) {
-            throw std::invalid_argument(
+            throw std::runtime_error(
                 "[bam_header.cpp::BamHeader:name2id] Unknown reference name or "
                 "the header not be parsed: " + name);
         }
@@ -67,15 +67,14 @@ namespace ngslib {
             // -1 if the requested tag does not exist;
             // -2 on other errors
             r = sam_hdr_find_tag_pos(_h, "RG", i, "SM", &sm);
-            if (r < 0) continue;  // not found
-            break;  // 一个 bam 里可能有多个 RG，但找到第一个 SM 后就退出，不管其他的
+            if (r < 0) continue;  // not found, continue
+            break;                // 一个 bam 里可能有多个 RG，但找到第一个 SM 后就退出，不管其他的
         }
 
         std::string samplename = sm.s ? std::string(sm.s) : "";
         if (sm.s == NULL) {
-            throw std::invalid_argument(
-                "[bam_header.cpp::BamHeader:get_sample_name] Bam file format error: "
-                "missing `SM` tag in `@RG` field in BAM/CRAM/SAM header.");
+            throw std::runtime_error("[bam_header.cpp::BamHeader:get_sample_name] Bam file format error: "
+                                     "missing `SM` tag in `@RG` field in BAM/CRAM/SAM header.");
         } else {
             free(sm.s);
         }
