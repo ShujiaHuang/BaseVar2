@@ -44,7 +44,7 @@ namespace ngslib {
     public:
 
         // Initializes a new empty BamHeader with no data.
-        BamHeader() : _h(NULL) {}
+        BamHeader() : _h(nullptr) {}
         ~BamHeader() { destroy(); }
 
         // Only explicit conversions allowed.
@@ -72,7 +72,7 @@ namespace ngslib {
         // Free the memory and set Bam file header pointer to be NULL (could save memory).
         void destroy();
 
-        operator bool() const { return bool(_h != NULL); }
+        operator bool() const { return bool(_h != nullptr); }
 
         // Write BAM header to a BAM file.
         int write(samFile *fp) {

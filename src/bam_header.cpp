@@ -13,7 +13,7 @@ namespace ngslib {
     BamHeader::BamHeader(const std::string &fn) {
 
         if (!is_readable(fn)) {
-            throw std::invalid_argument("_bam_header::BamHeader: " + fn + " not found.");
+            throw std::runtime_error("_bam_header::BamHeader: " + fn + " not found.");
         }
 
         samFile *fp = hts_open(fn.c_str(), "r");
@@ -45,7 +45,7 @@ namespace ngslib {
 
     void BamHeader::destroy() {
         sam_hdr_destroy(_h);
-        _h = NULL;
+        _h = nullptr;
     }
 
     int BamHeader::name2id(const std::string &name) const {
