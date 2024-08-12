@@ -27,9 +27,9 @@ static const std::string __BASETYPE_USAGE =
     "  -R, --reference FILE         Input reference fasta file.\n\n"
 
     "  -m, --min-af=float           Setting prior precision of MAF and skip uneffective caller positions.\n"
-    "                               Usually you can set it to be min(0.001, 100/x), x is the number of your\n"
-    "                               input BAM files.[min(0.001, 100/x, cmm.MINAF)]. Probably you don't need\n"
-    "                               to take care about this parameter.\n\n" 
+    "                               Usually you can set it to be min(0.001, 100/x), x is the number of input\n"
+    "                               BAM files.[min(0.001, 100/x)]. Probably you don't need to take care about\n"
+    "                               this parameter.\n"
     "  -q, --mapq=INT               Only include reads with mapping quality >= INT. [10]\n"
     "  -B, --batch-count=INT        INT simples per batchfile. [200]\n" 
     "  -t, --thread=INT             Number of threads. [4]\n\n"
@@ -65,10 +65,12 @@ static const struct option BASETYPE_CMDLINE_LOPTS[] = {
     {"output-vcf",  required_argument, NULL, '1'},
     {"output-cvg",  required_argument, NULL, '2'},
 
-    // {"output-batch-file", required_argument, NULL, 0},  // not use?
+    // {"output-batch-file", required_argument, NULL, 0},  not use?
     {"filename-has-samplename", no_argument, NULL, '3'},
     {"smart-rerun",             no_argument, NULL, '4'},
     {"help",                    no_argument, NULL, 'h'},
+
+    // must set this value
     {0, 0, 0, 0}
 };
 
@@ -96,6 +98,13 @@ struct BaseTypeARGS {
                     smart_rerun(false), filename_has_samplename(false) {}
 };
 
+bool __create_single_batchfile(const std::vector<std::string> batch_align_files,  // Not a modifiable value
+                               const std::vector<std::string> batch_sample_ids,   // Not a modifiable value
+                               const std::string &fa_seq,                         // Not a modifiable value
+                               ngslib::GenomeRegionTuple genome_region,
+                               std::string output_batch_file,                     // output batchfile name
+                               uint32_t reg_expand_size=500);
+
 /**
  * @brief BaseTypeRunner class
  */
@@ -104,7 +113,7 @@ class BaseTypeRunner {
 private:
     BaseTypeARGS *_args;                                        // Commandline options
     std::vector<std::string> _samples_id;                       // sample ID of alignment files (BAM/CRAM/SAM)
-                                                                // _samples_id and `input_bf` have the same order 
+                                                                // `_samples_id` and `input_bf` have the same order 
     std::map<std::string, std::vector<size_t>> _groups_idx;     // sample group: group => samples index
     std::vector<ngslib::GenomeRegionTuple> _calling_intervals;  // vector of calling regions
 
@@ -142,5 +151,7 @@ public:
     void run();
 
 };  // BaseTypeRunner class
+
+
 
 #endif
