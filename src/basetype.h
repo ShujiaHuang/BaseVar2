@@ -17,6 +17,7 @@
 
 #include "Fasta.h"
 #include "utils.h"
+#include "external/robin_hood.h"
 
 static const std::string __BASETYPE_USAGE = 
     "About: Calling variants by BaseVar.\n" 
@@ -98,13 +99,22 @@ struct BaseTypeARGS {
                     smart_rerun(false), filename_has_samplename(false) {}
 };
 
+// This function is only used by BaseTypeRunner::_create_batchfiles
 bool __create_single_batchfile(const std::vector<std::string> batch_align_files,  // Not a modifiable value
                                const std::vector<std::string> batch_sample_ids,   // Not a modifiable value
                                const std::string &fa_seq,                         // Not a modifiable value
                                ngslib::GenomeRegionTuple genome_region,
-                               std::string output_batch_file,                     // output batchfile name
-                               uint32_t reg_expand_size=500);
+                               int mapq_thd_value,                                // mapping quality threshold
+                               std::string output_batch_file);                    // output batchfile name
 
+typedef robin_hood::unordered_map<uint32_t, std::string> PosMap;
+typedef std::vector<PosMap> PosMapVector;
+bool __fetch_base_by_position(const std::vector<std::string> &batch_align_files,  // Not a modifiable value
+                              const std::string &fa_seq,                          // Not a modifiable value
+                              ngslib::GenomeRegionTuple sub_genome_region,
+                              int mapq_thd_value,
+                              PosMapVector &out_pos_batchinfo,
+                              uint32_t reg_expand_size=200);  // In case missing the overlap reads
 /**
  * @brief BaseTypeRunner class
  */
@@ -139,6 +149,7 @@ public:
     // default constructor
     BaseTypeRunner() : _args(NULL) {}
     BaseTypeRunner(int cmdline_argc, char *cmdline_argv[]) { set_arguments(cmdline_argc, cmdline_argv); }
+    
     // Destroy the malloc'ed BasTypeArgs structure
     ~BaseTypeRunner(){ if(_args){delete _args; _args = NULL;} }
 
@@ -151,7 +162,5 @@ public:
     void run();
 
 };  // BaseTypeRunner class
-
-
 
 #endif
