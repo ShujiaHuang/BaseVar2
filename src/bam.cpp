@@ -117,8 +117,8 @@ namespace ngslib {
         return _itr != NULL;
     }
 
-    // 应该用多个不同的 Record 去记录读取的信息，不同 record 共享一个 _fp 和 _itr
-    // 这样就可以解决线程中关于共享变量的问题?
+    // Get alignement read into BamRecord
+    // 如何解决线程中关于共享变量的问题? (用智能指针？)
     int Bam::read(BamRecord &br) {
 
         // If NULL, initial the BAM header by _fp.
@@ -131,7 +131,8 @@ namespace ngslib {
         }
 
         // Destroy BamRecord and set br to be NULL if fail to read data
-        if (_io_status < 0) br.destroy();
+        if (_io_status < 0) 
+            br.destroy();
 
         return _io_status;
     }
