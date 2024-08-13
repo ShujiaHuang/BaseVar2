@@ -37,56 +37,55 @@ int main() {
     std::cout << hdr << "\n";
     while (br3.load_read(fp, hdr.h()) >= 0) {
 
-        std::cout << br3 << "; bool: " << bool(br3) << "\n";
-        std::cout << " * Read count: " << ++read_count
+        std::cout << br3 << "\n" 
+                  << " - Success:                 " << bool(br3) << "\n"
+                  << " - Read count:              " << ++read_count << "\n"
+                  << " - align_length:            " << br3.align_length() << "\n"
+                  << " - match_length('M'):       " << br3.match_length() << "\n"
+                  << " - mapping quality:         " << br3.mapq() << "\n"
+                  << " - Read name:               " << br3.qname() << "\n"
+                  << " - Read length:             " << br3.query_length() << "\n"
+                  << " - query_sequence:          " << br3.query_sequence() << "\n"
+                  << " - query_qual:              " << br3.query_qual() << "\n"
+                  << " - mean_qqual_phred:        " << br3.mean_qqual() << "\n"
+                  << " - query_start_pos:         " << br3.query_start_pos() << "\n"
+                  << " - query_end_pos:           " << br3.query_end_pos() << "\n"
+                  << " - query_start_pos_reverse: " << br3.query_start_pos_reverse() << "\n"
+                  << " - query_end_pos_reverse:   " << br3.query_end_pos_reverse()   << "\n"
+                  << " - read_group:              " << br3.read_group()  << "\n"
+                  << " - get_tag(NM):             " << br3.get_tag("NM") << "\n"
+                  << " - get_tag(MD):             " << br3.get_tag("MD") << "\n"
+                  << " - get_tag(XT):             " << br3.get_tag("XT") << "\n"
+                  << " - get_tag(RG):             " << br3.get_tag("RG") << "\n"
 
-                  << "; align_length: " << br3.align_length()
-                  << "; match_length('M'): " << br3.match_length()
-                  << "; Read name: " << br3.qname()
-                  << "; Read length: " << br3.query_length()
-                  << "; query_sequence: " << br3.query_sequence()
-                  << "; query_qual: " << br3.query_qual()
-                  << "; mean_qqual_phred: " << br3.mean_qqual()
-                  << "; query_start_pos: " << br3.query_start_pos()
-                  << "; query_start_pos_reverse: " << br3.query_start_pos_reverse()
-                  << "; query_end_pos: " << br3.query_end_pos()
-                  << "; query_end_pos_reverse: " << br3.query_end_pos_reverse()
-                  << "; read_group: " << br3.read_group()
-                  << "; get_tag(NM): " << br3.get_tag("NM")
-                  << "; get_tag(MD): " << br3.get_tag("MD")
-                  << "; get_tag(XT): " << br3.get_tag("XT")
-                  << "; get_tag(RG): " << br3.get_tag("RG")
+                  << " - FLAG:                    " << br3.flag() << "\n"
+                  << " - is_paired:               " << br3.is_paired() << "\n"
+                  << " - is_mapped:               " << br3.is_mapped() << "\n"
+                  << " - is_mate_mapped:          " << br3.is_mate_mapped() << "\n"
+                  << " - is_mapped_reverse:       " << br3.is_mapped_reverse() << "\n"
+                  << " - is_mate_mapped_reverse:  " << br3.is_mate_mapped_reverse() << "\n"
+                  << " - target_id:               " << br3.tid() << "\n"
+                  << " - tid_name:                " << br3.tid_name(hdr) << "\n"
+                  << " - tid_length:              " << br3.tid_length(hdr) << "\n"
+                  << " - mate_target_id:          " << br3.mate_tid() << "\n"
+                  << " - mate_tid_name:           " << br3.mate_tid_name(hdr) << "\n"
+                  << " - mapped_strand:           " << br3.map_strand() << "\n"
+                  << " - mapped begin_position:   " << br3.map_ref_start_pos() << "\n"
+                  << " - mapped end position:     " << br3.map_ref_end_pos() << "\n"
+                  << " - mate_mapped_strand:      " << br3.mate_map_strand() << "\n"
+                  << " - mate mapped position:    " << br3.mate_map_ref_start_pos() << "\n"
 
-                  << "; FLAG: " << br3.flag()
-                  << "; is_paired: " << br3.is_paired()
-                  << "; is_mapped: " << br3.is_mapped()
-                  << "; is_mate_mapped: " << br3.is_mate_mapped()
-                  << "; is_mapped_reverse: " << br3.is_mapped_reverse()
-                  << "; is_mate_mapped_reverse: " << br3.is_mate_mapped_reverse()
-                  << "; target_id: " << br3.tid()
-                  << "; mate_target_id: " << br3.mate_tid()
-                  << "; tid_name: " << br3.tid_name(hdr)
-                  << "; mate_tid_name: " << br3.mate_tid_name(hdr)
-                  << "; tid_length: " << br3.tid_length(hdr)
-                  << "; mapped_strand: " << br3.map_strand()
-                  << "; mate_mapped_strand: " << br3.mate_map_strand()
+                  << " - insert-size:             " << br3.insert_size() << "\n"
+                  << " - is_read1:                " << br3.is_read1() << "\n"
+                  << " - is_read2:                " << br3.is_read2() << "\n"
+                  << " - is_proper_pair:          " << br3.is_proper_pair() << "\n"
+                  << " - is_secondary:            " << br3.is_secondary() << "\n"
+                  << " - is_qc_fail:              " << br3.is_qc_fail() << "\n"
+                  << " - is_duplicate:            " << br3.is_duplicate() << "\n"
+                  << " - is_supplementary:        " << br3.is_supplementary() << "\n"
 
-                  << "; mapped begin_position: " << br3.reference_start_pos()
-                  << "; mapped end position: " << br3.reference_end_pos()
-                  << "; mate mapped position: " << br3.mate_reference_start_pos()
-                  << "; mapping quality: " << br3.mapq()
-
-                  << "; insert-size: " << br3.insert_size()
-                  << "; is_read1: " << br3.is_read1()
-                  << "; is_read2: " << br3.is_read2()
-                  << "; is_proper_pair: " << br3.is_proper_pair()
-                  << "; is_secondary: " << br3.is_secondary()
-                  << "; is_qc_fail: " << br3.is_qc_fail()
-                  << "; is_duplicate: " << br3.is_duplicate()
-                  << "; is_supplementary: " << br3.is_supplementary()
-
-                  << "; proper_orientation: " << br3.is_proper_orientation()
-                  << "; br0.is_mapped(): " << br0.is_mapped() << "\n";
+                  << " - proper_orientation:      " << br3.is_proper_orientation() << "\n"
+                  << " - br0.is_mapped():         " << br0.is_mapped() << "\n\n";
     }
 
     br3.set_qc_fail();
