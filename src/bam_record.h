@@ -57,18 +57,16 @@ namespace ngslib {
         unsigned int _max_cigar_Opsize(const char op) const;
 
     public:
-        BamRecord();  // initial to be NULL.
+        BamRecord() : _b(NULL), _p_cigar_field(NULL), _n_cigar_op(0) {}  // default constructor, initial to be NULL.
         ~BamRecord() { destroy(); }
 
         BamRecord(const BamRecord &b);  // copy constructor
         BamRecord &operator=(const BamRecord &b);
 
         BamRecord(const bam1_t *b);
-
         BamRecord &operator=(const bam1_t *b);
 
         void init();
-
         void destroy();
 
         /**************************
@@ -203,12 +201,10 @@ namespace ngslib {
             return is_mate_mapped() ? (is_mate_mapped_reverse() ? '-' : '+') : '*';
         }
 
-        /* Get begin mapped position on the reference genome, 0-based coordinate.
+        /* Get the begin mapped position on the reference genome, 0-based coordinate.
          * @return  a hts_pos_t value on success, -1 on NULL.
          * */
-        hts_pos_t reference_start_pos() const {
-            // Return the leftmost position of an alignment on the reference
-            // genome, 0-based coordinate
+        hts_pos_t map_ref_start_pos() const {
             return is_mapped() ? _b->core.pos : -1;
         }
 
@@ -223,14 +219,14 @@ namespace ngslib {
          * string) or a read whose cigar string consumes no reference bases at all,
          * we return b->core.pos + 1 by convention.
          */
-        hts_pos_t reference_end_pos() const {
+        hts_pos_t map_ref_end_pos() const {
             return is_mapped() ? bam_endpos(_b) : -1;
         }
 
         /* Get the begin mapped position of mate on the reference genome, 0-based
          * @return  a hts_pos_t value on success, -1 on NULL.
          * */
-        hts_pos_t mate_reference_start_pos() const {
+        hts_pos_t mate_map_ref_start_pos() const {
             // 0-based leftmost coordinate of next read in template
             return is_mate_mapped() ? _b->core.mpos : -1;
         }
@@ -288,6 +284,11 @@ namespace ngslib {
          * */
         int32_t query_start_pos() const;
 
+        /* Get the end of the alignment on the read, by removing soft-clips, 1-base
+         * @return The last position in 1-base on the read on success, -1 on NULL.
+         * */
+        int32_t query_end_pos() const;
+
         /* Get the alignment start position on this read, by removing soft-clips.
          *
          * Do it in the reverse orientation.
@@ -295,11 +296,6 @@ namespace ngslib {
          *
          * */
         int32_t query_start_pos_reverse() const;
-
-        /* Get the end of the alignment on the read, by removing soft-clips, 1-base
-         * @return The last position in 1-base on the read on success, -1 on NULL.
-         * */
-        int32_t query_end_pos() const;
 
         /* Get the end of the alignment on the read, by removing soft-clips, 1-base
          * Do it in the reverse orientation.

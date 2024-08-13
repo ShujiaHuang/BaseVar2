@@ -8,9 +8,6 @@
 
 namespace ngslib {
 
-    // The default constructor
-    BamRecord::BamRecord() : _b(NULL), _p_cigar_field(NULL), _n_cigar_op(0) {}
-
     // _p_cigar_field member should be initialization to a NULL pointer in constructor function.
     BamRecord::BamRecord(const BamRecord &b) : _p_cigar_field(NULL), _n_cigar_op(0) {
         this->_b = bam_dup1(b._b);
@@ -74,7 +71,7 @@ namespace ngslib {
         _b = bam_init1();
 
         if (_p_cigar_field) {
-            delete[] _p_cigar_field;
+            delete [] _p_cigar_field;
         }
 
         _n_cigar_op = 0;
@@ -138,13 +135,13 @@ namespace ngslib {
            << r.tid() + 1 << "\t"
 
            // mapping position +1 to make 1-base coordinate.
-           << r.reference_start_pos() + 1 << "\t"
+           << r.map_ref_start_pos() + 1 << "\t"
            << r.mapq() << "\t"
            << r.cigar() << "\t"
            << r.mate_tid() + 1 << "\t"
 
            // mapping position +1 to make 1-base coordinate.
-           << r.mate_reference_start_pos() + 1 << "\t"
+           << r.mate_map_ref_start_pos() + 1 << "\t"
            << r.insert_size() << "\t"
            << r.query_sequence() << "\t"
            << r.query_qual();
@@ -300,8 +297,8 @@ namespace ngslib {
                 break;
             }
         }
-        return (_b->core.l_qseq - p);
 
+        return (_b->core.l_qseq - p);
     }
 
     int32_t BamRecord::query_end_pos_reverse() const {
@@ -433,7 +430,6 @@ namespace ngslib {
             // try to get the read group tag from qname.
             std::string qn = qname();
             size_t pos = qn.find(":", 0);
-
             rg = (pos != std::string::npos) ? qn.substr(0, pos) : "";
         }
 
