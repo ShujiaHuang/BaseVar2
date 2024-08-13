@@ -74,9 +74,9 @@ int main(int argc, char *argv[]) {
     now = time(0);
     std::string ct(ctime(&now));
     ct.pop_back();  // rm the trailing '\n' put by `asctime`
-    std::cout << "** Processing done on: " << ct << ", " 
+    std::cout << "\n** " + ct + ". Processing all done, "
               << (double)(clock() - start_time) / CLOCKS_PER_SEC 
-              << " seconds elapsed **\n" << std::endl;
+              << " seconds elapsed in total. **\n" << std::endl;
 
     return 0;
 }
