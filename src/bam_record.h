@@ -212,7 +212,7 @@ namespace ngslib {
          * Calculate the rightmost base position of an alignment on the reference
          * genome.
          *
-         * @return  The coordinate of the first base after the alignment, 0-based.
+         * @return  The coordinate of the first base after the alignment, 1-based.
          *
          * For a mapped read, this is just b->core.pos + bam_cigar2rlen.
          * For an unmapped read (either according to its flags or if it has no cigar
