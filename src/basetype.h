@@ -16,6 +16,7 @@
 #include <map>
 
 #include "Fasta.h"
+#include "bam.h"
 #include "utils.h"
 #include "external/robin_hood.h"
 
@@ -103,18 +104,21 @@ struct BaseTypeARGS {
 bool __create_single_batchfile(const std::vector<std::string> batch_align_files,  // Not a modifiable value
                                const std::vector<std::string> batch_sample_ids,   // Not a modifiable value
                                const std::string &fa_seq,                         // Not a modifiable value
-                               ngslib::GenomeRegionTuple genome_region,
-                               int mapq_thd_value,                                // mapping quality threshold
+                               ngslib::GenomeRegionTuple genome_region,           // 切割该区间
+                               int mapq_thd,                                      // mapping quality threshold
                                std::string output_batch_file);                    // output batchfile name
 
 typedef robin_hood::unordered_map<uint32_t, std::string> PosMap;
 typedef std::vector<PosMap> PosMapVector;
-bool __fetch_base_by_position(const std::vector<std::string> &batch_align_files,  // Not a modifiable value
-                              const std::string &fa_seq,                          // Not a modifiable value
-                              ngslib::GenomeRegionTuple sub_genome_region,
-                              int mapq_thd_value,
-                              PosMapVector &out_pos_batchinfo,
-                              uint32_t reg_expand_size=200);  // In case missing the overlap reads
+bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
+                            const std::string &fa_seq,                   
+                            int mapq_thd,
+                            ngslib::GenomeRegionTuple sub_genome_region,  // 获取该区间内的 read
+                            PosMapVector &out_pos_batchinfo);
+
+void __seek_position(std::vector<ngslib::BamRecord> &sample_map_reads,  // ngslib::BamRecord include by 'bam.h'
+                     ngslib::GenomeRegionTuple genome_region,  // 获取该区间内所有位点的碱基比对信息
+                     PosMap &sample_posinfo_map);
 /**
  * @brief BaseTypeRunner class
  */

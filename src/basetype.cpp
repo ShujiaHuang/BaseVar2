@@ -11,9 +11,6 @@
 #include <ctime>
 
 #include "basetype.h"
-
-#include "bam_header.h"
-#include "bam.h"
 #include "external/threadpool.h"
 
 
@@ -91,7 +88,7 @@ void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
         "[INFO] BaseVar commandline and arguments:\n"
         "basevar basetype -R " + _args->reference + " \\ \n" + (_args->input_bf.empty() ? "" : 
         "   -I " + ngslib::join(_args->input_bf, " -I ") + " \\ \n") + (_args->in_bamfilelist.empty() ? "" : 
-        "   -L " + _args->in_bamfilelist)      + " \\ \n"
+        "   -L " + _args->in_bamfilelist       + " \\ \n") <<
         "   -R " + _args->reference            + " \\ \n"
         "   -q " << _args->mapq               << " \\ \n"
         "   -m " << _args->min_af             << " \\ \n"
@@ -369,15 +366,11 @@ void BaseTypeRunner::_variant_caller_process() {
     // 以区间为单位进行变异检测
     std::vector<std::string> batchfiles;
     for (size_t i(0); i < _calling_intervals.size(); ++i) {
-        
         batchfiles = _create_batchfiles(_calling_intervals[i]);
         std::cout << "[INFO] Done for creating batchfiles and start to call variants.\n";
         
         // calling variants from batchfiles
         /* add codes here */
-
-
-
 
     }
 
@@ -396,9 +389,10 @@ bool __create_single_batchfile(const std::vector<std::string> batch_align_files,
                                const std::vector<std::string> batch_sample_ids,   // Not a modifiable value
                                const std::string &fa_seq,                         // Not a modifiable value
                                ngslib::GenomeRegionTuple genome_region,
-                               int mapq_thd_value,             // mapping quality threshold
+                               int mapq_thd,                   // mapping quality threshold
                                std::string output_batch_file)  // output batchfile name
-{   // 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
+// 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
+{   
     const uint32_t STEP_REGION_LEN = 20; // this value affected the computing memory, could be set to 1000000, 10 just for test
     clock_t start_time = clock();
 
@@ -406,19 +400,17 @@ bool __create_single_batchfile(const std::vector<std::string> batch_align_files,
     std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
 
     PosMapVector pos_batchinfo;
-    pos_batchinfo.reserve(batch_align_files.size());  //  capacity changed
+    pos_batchinfo.reserve(batch_align_files.size());  //  pre-set the capacity
 
     uint32_t sub_reg_start, sub_reg_end;
     for (uint32_t i(reg_start), j(0); i < reg_end + 1; i += STEP_REGION_LEN, ++j) {
         sub_reg_start = i;
         sub_reg_end = sub_reg_start + STEP_REGION_LEN - 1 > reg_end ? reg_end : sub_reg_start + STEP_REGION_LEN - 1;
-
 std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end << "\n";
-        __fetch_base_by_position(batch_align_files,
-                                 fa_seq,
-                                 std::make_tuple(ref_id, sub_reg_start, sub_reg_end),
-                                 mapq_thd_value,
-                                 pos_batchinfo);  // 传引用，省点内存
+
+        __fetch_base_in_region(batch_align_files, fa_seq, mapq_thd, 
+                               std::make_tuple(ref_id, sub_reg_start, sub_reg_end),
+                               pos_batchinfo);  // 传引用，省点内存
         /* Output to batchfile */
 
 
@@ -436,44 +428,70 @@ std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end 
     return true;
 }
 
-bool __fetch_base_by_position(const std::vector<std::string> &batch_align_files,  
-                              const std::string &fa_seq,                       
-                              ngslib::GenomeRegionTuple genome_region,
-                              int mapq_thd_value,        // mapping quality threshold
-                              PosMapVector &out_pos_batchinfo,
-                              uint32_t reg_expand_size)  // In case missing the overlap reads
+bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,  
+                            const std::string &fa_seq,                       
+                            int mapq_thd,  // mapping quality threshold
+                            ngslib::GenomeRegionTuple genome_region,
+                            PosMapVector &out_pos_batchinfo)  
+{
+    static const uint32_t REG_EXPEND_SIZE = 200; // only using here, In case of missing the overlap reads
+
+    std::string ref_id; uint32_t reg_start, reg_end;
+    std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
+
+    uint32_t exp_reg_start = reg_start > REG_EXPEND_SIZE ? reg_start - REG_EXPEND_SIZE : 1;
+    uint32_t exp_reg_end   = reg_end + REG_EXPEND_SIZE;
+    std::string exp_regstr = ref_id + ":" + ngslib::tostring(exp_reg_start) + "-" + ngslib::tostring(exp_reg_end);
+
+    // Loop all alignment files
+    bool is_not_empty = false;
+    for(size_t i(0); i < batch_align_files.size(); ++i) {
+        ngslib::Bam bf(batch_align_files[i], "r");  // open bamfile in reading mode (one sample, one bamfile)
+
+        PosMap sample_posinfo_map;
+        if (bf.fetch(exp_regstr)) {  // Set the alignment region to iterator
+uint32_t read_count = 0;
+            hts_pos_t map_ref_start, map_ref_end;  // uint64_t
+            std::vector<ngslib::BamRecord> sample_target_reads; 
+            ngslib::BamRecord al; // alignment read
+            while (bf.next(al) >= 0) {  // -1 => hit the end of alignement file.
+++read_count;
+                if (al.mapq() < mapq_thd || al.is_duplicate()) continue;
+                map_ref_start = al.map_ref_start_pos() + 1;  // al.map_ref_start_pos() is 0-based, convert to 1-based
+                map_ref_end = al.map_ref_end_pos();          // al.map_ref_end_pos() is 1-based
+
+                // only keep the reads which overlap with [reg_start, reg_end]
+                if (reg_start > map_ref_end) continue;
+                if (reg_end < map_ref_start) break;
+
+                sample_target_reads.push_back(al);  // record the proper reads for sample
+            }
+
+            if (sample_target_reads.size() > 0) {
+                sample_posinfo_map.clear();  // make sure it's empty
+                __seek_position(sample_target_reads, genome_region, sample_posinfo_map);
+            }
+std::cout << "* " + exp_regstr + " total read count: " << read_count << ". Hit read count: " << sample_target_reads.size() << "\n\n";
+        }
+
+        if (!is_not_empty && !sample_posinfo_map.empty()) { 
+            // at least one sample has data in this region
+            is_not_empty = true; 
+        }
+
+        // make sure out_pos_batchinfo has the same size as `batch_align_files`
+        out_pos_batchinfo.push_back(sample_posinfo_map);
+    }
+
+    return is_not_empty;  // no cover reads in 'genome_region' if empty.
+}
+
+void __seek_position(std::vector<ngslib::BamRecord> &sample_map_reads,
+                     ngslib::GenomeRegionTuple genome_region,
+                     PosMap &sample_posinfo_map)
 {
     std::string ref_id; uint32_t reg_start, reg_end;
     std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
 
-    uint32_t exp_reg_start = reg_start > reg_expand_size ? reg_start - reg_expand_size : 1;
-    uint32_t exp_reg_end   = reg_end + reg_expand_size;
-    std::string exp_regstr = ref_id + ":" + ngslib::tostring(exp_reg_start) + "-" + ngslib::tostring(exp_reg_end);
-
-    // One batch of alignment files
-    for(size_t i(0); i < batch_align_files.size(); ++i) {
-
-        PosMap sample_pos_info;
-        // open bamfile
-        ngslib::Bam bf(batch_align_files[i], "r");
-        if (bf.fetch(exp_regstr)) {  // set iterator region
-            uint32_t read_count = 0;
-            ngslib::BamRecord al;
-            while (bf.next(al) >= 0) {  // -1 => on end of the file.
-                ++read_count;
-                /* coding here */
-                // 获取位点信息，存到 sample_pos_info 中
-
-            }
-            out_pos_batchinfo.push_back(sample_pos_info);  
-std::cout << "* " + exp_regstr + " read count: " << read_count << "\n";
-
-
-        }
-
-
-
-    }
-
-    return true;
+    return;
 }
