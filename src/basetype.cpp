@@ -343,7 +343,7 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(ngslib::GenomeRegion
 
         // make Thread Pool
         create_batchfile_processes.emplace_back(
-            thread_pool.enqueue(__create_single_batchfile, 
+            thread_pool.enqueue(__create_a_batchfile, 
                                 batch_align_files,  // 值会变，只能拷贝，如果传引用，多线程执行时将丢失该值
                                 batch_sample_ids,   // 值会变，只能拷贝，如果传引用，多线程执行时将丢失该值
                                 std::cref(fa_seq),  // 值不变，传引用
@@ -385,12 +385,12 @@ void BaseTypeRunner::run() {
 
 /// calling variant functions outside of class 'BaseTypeRunner' 
 // Create temp batch file for variant discovery
-bool __create_single_batchfile(const std::vector<std::string> batch_align_files,  // Not a modifiable value
-                               const std::vector<std::string> batch_sample_ids,   // Not a modifiable value
-                               const std::string &fa_seq,                         // Not a modifiable value
-                               ngslib::GenomeRegionTuple genome_region,
-                               int mapq_thd,                   // mapping quality threshold
-                               std::string output_batch_file)  // output batchfile name
+bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // Not a modifiable value
+                          const std::vector<std::string> batch_sample_ids,   // Not a modifiable value
+                          const std::string &fa_seq,                         // Not a modifiable value
+                          ngslib::GenomeRegionTuple genome_region,
+                          int mapq_thd,                   // mapping quality threshold
+                          std::string output_batch_file)  // output batchfile name
 // 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
 {   
     const uint32_t STEP_REGION_LEN = 20; // this value affected the computing memory, could be set to 1000000, 10 just for test
@@ -408,7 +408,9 @@ bool __create_single_batchfile(const std::vector<std::string> batch_align_files,
         sub_reg_end = sub_reg_start + STEP_REGION_LEN - 1 > reg_end ? reg_end : sub_reg_start + STEP_REGION_LEN - 1;
 std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end << "\n";
 
-        __fetch_base_in_region(batch_align_files, fa_seq, mapq_thd, 
+        __fetch_base_in_region(batch_align_files,
+                               fa_seq,
+                               mapq_thd, 
                                std::make_tuple(ref_id, sub_reg_start, sub_reg_end),
                                pos_batchinfo);  // 传引用，省点内存
         /* Output to batchfile */

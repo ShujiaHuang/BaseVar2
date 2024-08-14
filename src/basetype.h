@@ -101,12 +101,12 @@ struct BaseTypeARGS {
 };
 
 // This function is only used by BaseTypeRunner::_create_batchfiles
-bool __create_single_batchfile(const std::vector<std::string> batch_align_files,  // Not a modifiable value
-                               const std::vector<std::string> batch_sample_ids,   // Not a modifiable value
-                               const std::string &fa_seq,                         // Not a modifiable value
-                               ngslib::GenomeRegionTuple genome_region,           // 切割该区间
-                               int mapq_thd,                                      // mapping quality threshold
-                               std::string output_batch_file);                    // output batchfile name
+bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // Not a modifiable value
+                          const std::vector<std::string> batch_sample_ids,   // Not a modifiable value
+                          const std::string &fa_seq,                         // Not a modifiable value
+                          ngslib::GenomeRegionTuple genome_region,           // 切割该区间
+                          int mapq_thd,                                      // mapping quality threshold
+                          std::string output_batch_file);                    // output batchfile name
 
 typedef robin_hood::unordered_map<uint32_t, std::string> PosMap;
 typedef std::vector<PosMap> PosMapVector;
