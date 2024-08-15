@@ -42,9 +42,8 @@ namespace ngslib {
     }
 
     void BamRecord::_make_cigar_field() {
-
         if (_p_cigar_field)
-            delete[] _p_cigar_field;
+            delete [] _p_cigar_field;
 
         if (!_b)
             return;
@@ -53,8 +52,8 @@ namespace ngslib {
         _p_cigar_field = new CigarField[_n_cigar_op];
 
         if (!_p_cigar_field) {
-            throw std::invalid_argument("BamRecord::_make_cigar_field: Fail to "
-                                        "alloc memory space for CigarField.");
+            throw std::runtime_error("[BamRecord::_make_cigar_field]: Fail to "
+                                     "alloc memory space for CigarField.");
         }
 
         uint32_t *c = bam_get_cigar(_b);
@@ -64,6 +63,52 @@ namespace ngslib {
         }
 
         return;
+    }
+
+    std::vector<std::tuple<int, uint32_t>> BamRecord::get_cigar_blocks() {
+
+        if (!_b) {
+            throw std::runtime_error("[BamRecord::get_cigar_block]: Not found alignment data.");
+        }
+
+        std::vector<std::tuple<int, uint32_t>> cigar_block;
+
+        uint32_t *c = bam_get_cigar(_b);
+        for (size_t i(0); i < _b->core.n_cigar; ++i) {
+            cigar_block.push_back(std::make_tuple(bam_cigar_op(c[i]), bam_cigar_oplen(c[i]))); // (op, l) in sam.h
+        }
+
+        return cigar_block;
+    }
+
+    std::vector<std::tuple<hts_pos_t, hts_pos_t>> BamRecord::get_alignment_blocks() {
+
+        // get alignment block by CIGAR
+        if (!_b) {
+            throw std::runtime_error("[BamRecord::get_alignment_block]: Not found alignement data.");
+        }
+
+        std::vector<std::tuple<hts_pos_t, hts_pos_t>> align_block;
+        
+        int op;         // cigar OP
+        hts_pos_t len;  // cigar 'OP' length
+        hts_pos_t ref_map_pos = map_ref_start_pos();
+
+        uint32_t *c = bam_get_cigar(_b);
+        for (size_t i(0); i < _b->core.n_cigar; ++i) {
+
+            op   = bam_cigar_op(c[i]);
+            len  = bam_cigar_oplen(c[i]);
+
+            if (op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF) {  // 'BAM_XXX' is macros, which defined in sam.h
+                align_block.push_back(std::make_tuple(ref_map_pos, ref_map_pos + len));  // start position is 0-based
+                ref_map_pos += len;
+            } else if (op == BAM_CDEL || op == BAM_CREF_SKIP) {
+                ref_map_pos += len;
+            }
+        }
+
+        return align_block;  // start position is 0-based
     }
 
     void BamRecord::init() {
@@ -131,14 +176,14 @@ namespace ngslib {
             return os;
 
         os << r.qname() << "\t"
-           << r.flag() << "\t"
-           << r.tid() + 1 << "\t"
+           << r.flag()  << "\t"
+           << r.tid()   << "\t"
 
            // mapping position +1 to make 1-base coordinate.
            << r.map_ref_start_pos() + 1 << "\t"
            << r.mapq() << "\t"
            << r.cigar() << "\t"
-           << r.mate_tid() + 1 << "\t"
+           << r.mate_tid() << "\t"
 
            // mapping position +1 to make 1-base coordinate.
            << r.mate_map_ref_start_pos() + 1 << "\t"
@@ -196,7 +241,7 @@ namespace ngslib {
 
         if (!is_mapped()) return 0;
 
-        unsigned int max_size = 0;
+        int max_size = 0;
         for (size_t i = 0; i < _n_cigar_op; i++) {
             if (_p_cigar_field[i].op == op)
                 max_size = std::max(_p_cigar_field[i].len, max_size);
@@ -268,22 +313,6 @@ namespace ngslib {
         return p;
     }
 
-    int32_t BamRecord::query_start_pos_reverse() const {
-
-        if (!is_mapped()) return -1;
-
-        int32_t p = 0;
-        // loop from the end
-        for (size_t i = _n_cigar_op - 1; i >= 0; --i) {
-            if (_p_cigar_field[i].op == 'S') {
-                p += _p_cigar_field[i].len;
-            } else { // not a clip, stop counting
-                break;
-            }
-        }
-        return p;
-    }
-
     int32_t BamRecord::query_end_pos() const {
 
         if (!is_mapped()) return -1;
@@ -301,6 +330,22 @@ namespace ngslib {
         return (_b->core.l_qseq - p);
     }
 
+    int32_t BamRecord::query_start_pos_reverse() const {
+
+        if (!is_mapped()) return -1;
+
+        int32_t p = 0;
+        // loop from the end
+        for (size_t i = _n_cigar_op - 1; i >= 0; --i) {
+            if (_p_cigar_field[i].op == 'S') {
+                p += _p_cigar_field[i].len;
+            } else { // not a clip, stop counting
+                break;
+            }
+        }
+        return p;
+    }
+    
     int32_t BamRecord::query_end_pos_reverse() const {
 
         if (!is_mapped()) return -1;

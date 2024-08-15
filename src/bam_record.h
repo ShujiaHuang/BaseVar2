@@ -7,6 +7,8 @@
 
 #include <iostream>
 #include <string>
+#include <vector>
+#include <tuple>
 
 #include <htslib/sam.h>
 #include "bam_header.h"
@@ -41,7 +43,7 @@ namespace ngslib {
          * */
         typedef struct {
             char op;
-            unsigned int len;
+            int len;
         } CigarField;
 
         // A pointer to CigarField array.
@@ -303,8 +305,66 @@ namespace ngslib {
          * */
         int32_t query_end_pos_reverse() const;
 
-        /// Other useful functions
+        /**
+         * @brief Get the cigar block object
+         * 
+         * The cigar string order in the array is "MIDNSHP=X" followed by a field for the NM tag. 
+         * If the NM tag is not present, this field will always be 0. 
+         * 
+         * Detail in htslib/sam.h: "CIGAR related macros".
+         * 
+            +-----+--------------+-----+
+            |M    |BAM_CMATCH    |0    |
+            +-----+--------------+-----+
+            |I    |BAM_CINS      |1    |
+            +-----+--------------+-----+
+            |D    |BAM_CDEL      |2    |
+            +-----+--------------+-----+
+            |N    |BAM_CREF_SKIP |3    |
+            +-----+--------------+-----+
+            |S    |BAM_CSOFT_CLIP|4    |
+            +-----+--------------+-----+
+            |H    |BAM_CHARD_CLIP|5    |
+            +-----+--------------+-----+
+            |P    |BAM_CPAD      |6    |
+            +-----+--------------+-----+
+            |=    |BAM_CEQUAL    |7    |
+            +-----+--------------+-----+
+            |X    |BAM_CDIFF     |8    |
+            +-----+--------------+-----+
+            |B    |BAM_CBACK     |9    |
+            +-----+--------------+-----+
+            |NM   |NM tag        |10   |
+            +-----+--------------+-----+
+         * 
+         * If the cigar string is : '3M1I50M5D46M'
+         * then alignment.cigar is: [(0, 3), (1, 1), (0, 50), (2, 5), (0, 46)]
+         * 
+         * @return std::vector<std::tuple<int, uint32_t>> 
+         * 
+         */
+        std::vector<std::tuple<int, uint32_t>> get_cigar_blocks();
 
+        /**
+         * @brief Get a vector of tuple of start and end positions of aligned gapless blocks.
+
+            The start and end positions are in genomic coordinates. 
+            The start postion is 0-based, end position is 1-based.
+
+            Blocks are not normalized, i.e. two blocks might be directly adjacent. 
+            This happens if the two blocks are separated by an insertion in the read.
+
+            If the cigar string is: 3M1I50M5D46M, and the start mapping position is 22862751 in BAM.
+            Alignment.blocks looks like: [(22862750, 22862753), (22862753, 22862803), (22862808, 22862854)]
+
+            Ref the `get_block(self)` function in: https://github.com/pysam-developers/pysam/blob/master/pysam/libcalignedsegment.pyx
+        * 
+        * @return std::vector<std::tuple<hts_pos_t, hts_pos_t>> 
+        * 
+        */
+        std::vector<std::tuple<hts_pos_t, hts_pos_t>> get_alignment_blocks();
+
+        /// Other useful functions
         /* BamRecord has proper orientation (FR): lower position read is mapped to
          * forward strand(+) the higher one mapped to reverse strand(-).
          * */

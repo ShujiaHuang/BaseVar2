@@ -2,6 +2,8 @@
 // Date: 2021-08-25
 #include <iostream>
 #include <string>
+#include <vector>
+#include <tuple>
 
 #include <htslib/sam.h>
 
@@ -19,8 +21,8 @@ int main() {
     std::string fn3 = "../data/xx_MD.bam";
     std::string fn4 = "../data/xx_minimal.sam";
 
-//    samFile *fp = sam_open(fn1.c_str(), "r");
-    samFile *fp = sam_open(fn2.c_str(), "r");   // cram
+   samFile *fp = sam_open(fn1.c_str(), "r");
+    // samFile *fp = sam_open(fn2.c_str(), "r");   // cram
 //    samFile *fp = sam_open(fn3.c_str(), "r");   // bam
 //    samFile *fp = sam_open(fn4.c_str(), "r");    // sam
     BamHeader hdr = BamHeader(fp);
@@ -38,10 +40,11 @@ int main() {
     while (br3.load_read(fp, hdr.h()) >= 0) {
 
         std::cout << br3 << "\n" 
-                  << " - Success:                 " << bool(br3) << "\n"
+               // << " - Success:                 " << bool(br3) << "\n"
                   << " - Read count:              " << ++read_count << "\n"
                   << " - align_length:            " << br3.align_length() << "\n"
                   << " - match_length('M'):       " << br3.match_length() << "\n"
+                  << " - cigar:                   " << br3.cigar() << "\n"
                   << " - mapping quality:         " << br3.mapq() << "\n"
                   << " - Read name:               " << br3.qname() << "\n"
                   << " - Read length:             " << br3.query_length() << "\n"
@@ -86,6 +89,23 @@ int main() {
 
                   << " - proper_orientation:      " << br3.is_proper_orientation() << "\n"
                   << " - br0.is_mapped():         " << br0.is_mapped() << "\n\n";
+
+        std::cout << "Align: " << br3.tid_name(hdr) << ":" << br3.map_ref_start_pos() << "-" << br3.map_ref_end_pos() << "\n";
+        std::vector<std::tuple<hts_pos_t, hts_pos_t>> align_block = br3.get_alignment_blocks();
+        for (size_t i(0); i < align_block.size(); ++i) {
+            hts_pos_t start, end;
+            std::tie(start, end) = align_block[i];
+            std::cout << " - (" << start << ", " << end << ")\n";
+        }
+        
+        std::vector<std::tuple<int, uint32_t>> cigar_block = br3.get_cigar_blocks();
+        std::cout << "CIGAR: " << br3.cigar() << "\n";
+        for (size_t i(0); i < cigar_block.size(); ++i) {
+            int op; uint32_t len;
+            std::tie(op, len) = cigar_block[i];
+            std::cout << " - (" << op << ", " << len << ")\n";
+        }
+        std::cout << "\n";
     }
 
     br3.set_qc_fail();
