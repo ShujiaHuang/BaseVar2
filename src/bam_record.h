@@ -343,7 +343,7 @@ namespace ngslib {
          * @return std::vector<std::tuple<int, uint32_t>> 
          * 
          */
-        std::vector<std::tuple<int, uint32_t>> get_cigar_blocks();
+        std::vector<std::tuple<int, uint32_t>> get_cigar_blocks() const;
 
         /**
          * @brief Get a vector of tuple of start and end positions of aligned gapless blocks.
@@ -362,7 +362,7 @@ namespace ngslib {
         * @return std::vector<std::tuple<hts_pos_t, hts_pos_t>> 
         * 
         */
-        std::vector<std::tuple<hts_pos_t, hts_pos_t>> get_alignment_blocks();
+        std::vector<std::tuple<hts_pos_t, hts_pos_t>> get_alignment_blocks() const;
 
         /// Other useful functions
         /* BamRecord has proper orientation (FR): lower position read is mapped to
