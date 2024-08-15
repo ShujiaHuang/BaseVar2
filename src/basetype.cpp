@@ -9,6 +9,7 @@
 #include <sstream>
 #include <fstream>
 #include <ctime>
+#include <algorithm>  // std::min
 
 #include "basetype.h"
 #include "external/threadpool.h"
@@ -117,13 +118,14 @@ void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
               << " BAM/CRAM files for variants calling.\n";
 
     // Setting the resolution of AF
-    if (_args->min_af > 100.0/_args->input_bf.size())
-        _args->min_af = 100.0/_args->input_bf.size();
+    _args->min_af = std::min(float(100)/_args->input_bf.size(), _args->min_af);
 
-    reference = _args->reference;  // load fasta
+    // load fasta
+    reference = _args->reference;
+
     _get_calling_interval();
     print_calling_interval();
-    _get_sample_id_from_bam();     // get sample id from input aligne_files and record in `_samples_id`
+    _get_sample_id_from_bam();  // get sample id from input aligne_files and record in `_samples_id`
     if (!_args->pop_group_file.empty()) _get_popgroup_info();
 
     return;
@@ -393,7 +395,8 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // 
                           std::string output_batch_file)  // output batchfile name
 // 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
 {   
-    const uint32_t STEP_REGION_LEN = 20; // this value affected the computing memory, could be set to 1000000, 10 just for test
+    // this value affected the computing memory, could be set to 1000000, 10 just for test
+    static const uint32_t STEP_REGION_LEN = 20;
     clock_t start_time = clock();
 
     std::string ref_id; uint32_t reg_start, reg_end;
@@ -431,8 +434,8 @@ std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end 
 }
 
 bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,  
-                            const std::string &fa_seq,                       
-                            int mapq_thd,  // mapping quality threshold
+                            const std::string &fa_seq,  // must be the whole chromosome sequence  
+                            int mapq_thd,               // mapping quality threshold
                             ngslib::GenomeRegionTuple genome_region,
                             PosMapVector &out_pos_batchinfo)  
 {
@@ -458,7 +461,7 @@ uint32_t read_count = 0;
             ngslib::BamRecord al; // alignment read
             while (bf.next(al) >= 0) {  // -1 => hit the end of alignement file.
 ++read_count;
-                if (al.mapq() < mapq_thd || al.is_duplicate()) continue;
+                if (al.mapq() < mapq_thd || al.is_duplicate() || al.is_qc_fail()) continue;
                 map_ref_start = al.map_ref_start_pos() + 1;  // al.map_ref_start_pos() is 0-based, convert to 1-based
                 map_ref_end = al.map_ref_end_pos();          // al.map_ref_end_pos() is 1-based
 
@@ -471,7 +474,8 @@ uint32_t read_count = 0;
 
             if (sample_target_reads.size() > 0) {
                 sample_posinfo_map.clear();  // make sure it's empty
-                __seek_position(sample_target_reads, genome_region, sample_posinfo_map);
+                // data store in sample_posinfo_map and return
+                __seek_position(sample_target_reads, fa_seq, genome_region, sample_posinfo_map);
             }
 std::cout << "* " + exp_regstr + " total read count: " << read_count << ". Hit read count: " << sample_target_reads.size() << "\n\n";
         }
@@ -489,11 +493,65 @@ std::cout << "* " + exp_regstr + " total read count: " << read_count << ". Hit r
 }
 
 void __seek_position(std::vector<ngslib::BamRecord> &sample_map_reads,
+                     const std::string &fa_seq,  // must be the whole chromosome sequence
                      ngslib::GenomeRegionTuple genome_region,
-                     PosMap &sample_posinfo_map)
+                     PosMap &sample_posinfo_map)   // 位点信息存入该变量
 {
+    if (!sample_posinfo_map.empty()) 
+        throw std::runtime_error("[basetype.cpp::__seek_position] 'sample_posinfo_map' must be empty.");
+
     std::string ref_id; uint32_t reg_start, reg_end;
     std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
+
+    AlignBaseInfo align_base_info;
+
+    int op; uint32_t qpos, ref_pos; std::string read_base, read_qual, ref_base;
+    for(size_t i(0); i < sample_map_reads.size(); ++i) {
+
+char map_strand = sample_map_reads[i].map_strand();
+int  mapq = sample_map_reads[i].mapq();
+// uint32_t rpos = sample_map_reads[i].map_ref_start_pos();  // 0-based, reference position
+// uint32_t qpos = sample_map_reads[i].query_start_pos();    // 0-based, read postion
+// read_seq  = sample_map_reads[i].query_sequence();
+// read_qual = sample_map_reads[i].query_qual();
+std::cout << map_strand << " : " << mapq << " : " << sample_map_reads[i].map_ref_start_pos() << "\n";
+std::cout << sample_map_reads[i] << "\n";
+// std::cout << read_seq << "\n";
+// std::cout << read_qual << "\n\n";
+
+        align_base_info.strand = sample_map_reads[i].map_strand();
+        align_base_info.mapq   = sample_map_reads[i].mapq();
+
+        ReadAlignPairVector aligned_pairs = sample_map_reads[i].get_aligned_pairs(fa_seq);
+        int mean_qqual = int(sample_map_reads[i].mean_qqual());
+        for (size_t i(0); i < aligned_pairs.size(); ++i) {
+            std::tie(op, qpos, ref_pos, read_base, read_qual, ref_base) = aligned_pairs[i];
+            ref_pos += 1;  // ref_pos is 0-based, convert to 1-based;
+
+            if (reg_end < ref_pos) break;
+            if (reg_start > ref_pos) continue;
+
+            if (op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF) {
+                align_base_info.base      = read_base;
+                align_base_info.base_qual = read_qual[0];
+            } else if (op == BAM_CINS) {
+                align_base_info.base      = "+" + read_base;  // insertion
+                align_base_info.base_qual = mean_qqual;       // set to be mean quality of the whole read
+            } else if (op == BAM_CDEL) {
+                align_base_info.base      = "-" + ref_base;  // deletion
+                align_base_info.base_qual = mean_qqual;      // set to be mean quality of the whole read
+            }
+
+            // qpos is 0-based, conver to 1-based and set as the position rank of read.
+            align_base_info.rpr = qpos + 1;
+            sample_posinfo_map.insert({ref_pos, align_base_info});
+
+std::cout << " - "  << op << " - [" << ref_pos << ", " << ref_base << "] - [" 
+          << qpos << ", " << read_base << ", " << read_qual << "]\n";
+        }
+std::cout << "\n";
+
+    }
 
     return;
 }
