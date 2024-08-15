@@ -85,7 +85,7 @@ namespace ngslib {
     // Create a SAM/BAM/CRAM iterator for one region.
     bool Bam::fetch(const std::string &region) {
 
-        if (!_idx) index_load();  // May not be thread safety?
+        if (!_idx) index_load();           // May not be thread safety?
         if (!_hdr) _hdr = BamHeader(_fp);  // If NULL, set BAM header to _hdr.
 
         // Reset a iterator, An iterator on success; NULL on failure
