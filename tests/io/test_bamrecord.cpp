@@ -7,12 +7,14 @@
 
 #include <htslib/sam.h>
 
+#include "Fasta.h"
 #include "bam_header.h"
 #include "bam_record.h"
 #include "utils.h"
 
 
 int main() {
+    using ngslib::Fasta;
     using ngslib::BamHeader;
     using ngslib::BamRecord;
 
@@ -21,7 +23,8 @@ int main() {
     std::string fn3 = "../data/xx_MD.bam";
     std::string fn4 = "../data/xx_minimal.sam";
 
-   samFile *fp = sam_open(fn1.c_str(), "r");
+    Fasta fa = "../data/ce.fa.gz";
+    samFile *fp = sam_open(fn1.c_str(), "r");
     // samFile *fp = sam_open(fn2.c_str(), "r");   // cram
 //    samFile *fp = sam_open(fn3.c_str(), "r");   // bam
 //    samFile *fp = sam_open(fn4.c_str(), "r");    // sam
@@ -104,6 +107,18 @@ int main() {
             int op; uint32_t len;
             std::tie(op, len) = cigar_block[i];
             std::cout << " - (" << op << ", " << len << ")\n";
+        }
+        std::cout << "\n";
+
+        std::string fa_seq = fa[br3.tid_name(hdr)];
+        std::vector<std::tuple<int, uint32_t, hts_pos_t, std::string, std::string, std::string>> aligned_pairs = br3.get_aligned_pairs(fa_seq);
+        std::cout << "Aligned Pairs\n";
+        for (size_t i(0); i < aligned_pairs.size(); ++i) {
+
+            int op; uint32_t qpos; hts_pos_t rpos; std::string read_base, read_qual, ref_base;
+            std::tie(op, qpos, rpos, read_base, read_qual, ref_base) = aligned_pairs[i];
+            std::cout << " - "  << op << " - [" << rpos << ", " << ref_base << "] - [" 
+                      << qpos << ", " << read_base << ", " << read_qual << "]\n";
         }
         std::cout << "\n";
     }

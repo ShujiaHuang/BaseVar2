@@ -169,7 +169,7 @@ namespace ngslib {
     std::vector<std::tuple<int, uint32_t>> BamRecord::get_cigar_blocks() const {
 
         if (!_b) {
-            throw std::runtime_error("[BamRecord::get_cigar_block]: Not found alignment data.");
+            throw std::runtime_error("[BamRecord::get_cigar_blocks]: Not found alignment data.");
         }
 
         std::vector<std::tuple<int, uint32_t>> cigar_block;
@@ -186,14 +186,14 @@ namespace ngslib {
 
         // get alignment block by CIGAR
         if (!_b) {
-            throw std::runtime_error("[BamRecord::get_alignment_block]: Not found alignement data.");
+            throw std::runtime_error("[BamRecord::get_alignment_blocks]: Not found alignement data.");
         }
 
         std::vector<std::tuple<hts_pos_t, hts_pos_t>> align_block;
+        hts_pos_t rpos = map_ref_start_pos();  // mapping reference position
         
-        int op;         // cigar OP
-        hts_pos_t len;  // cigar 'OP' length
-        hts_pos_t ref_map_pos = map_ref_start_pos();
+        int op;         /* cigar OP */ 
+        hts_pos_t len;  /* cigar 'OP' length */
 
         uint32_t *c = bam_get_cigar(_b);
         for (size_t i(0); i < _b->core.n_cigar; ++i) {
@@ -204,14 +204,73 @@ namespace ngslib {
             // 'BAM_XXX' is macros, which defined in sam.h
             if (op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF) {  
                 // start position is 0-based
-                align_block.push_back(std::make_tuple(ref_map_pos, ref_map_pos + len));  
-                ref_map_pos += len;
+                align_block.push_back(std::make_tuple(rpos, rpos + len));  
+                rpos += len;
             } else if (op == BAM_CDEL || op == BAM_CREF_SKIP) {
-                ref_map_pos += len;
+                rpos += len;
             }
         }
 
         return align_block;  // start position is 0-based
+    }
+
+    std::vector<std::tuple<int, uint32_t, hts_pos_t, std::string, std::string, std::string>>
+        BamRecord::get_aligned_pairs(const std::string &fa) const 
+    {
+        if (!_b) {
+            throw std::runtime_error("[BamRecord::get_aligned_pairs]: Not found alignement data.");
+        }
+
+        // mapped pair of read mapped to reference information: 
+        // <cigar_op, read_pos, ref_pos, read_base, read_qual, ref_base>
+        std::vector<std::tuple<int, uint32_t, hts_pos_t, std::string, std::string, std::string>> aligned_pairs;
+
+        hts_pos_t rpos = map_ref_start_pos();  // mapping reference position (string index), 0-based
+        uint32_t  qpos = 0;                    // mapping read's position (string index), 0-based
+        std::string read_seq  = query_sequence();  // read bases
+        std::string read_qual = query_qual();      // read bases' qualities
+
+        int op;         /* cigar OP */ 
+        hts_pos_t len;  /* cigar 'OP' length */
+
+        uint32_t *c = bam_get_cigar(_b);
+        for (size_t i(0); i < _b->core.n_cigar; ++i) {
+
+            op   = bam_cigar_op(c[i]);
+            len  = bam_cigar_oplen(c[i]);
+
+            // 'BAM_XXX' is macros, which defined in sam.h
+            if (op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF) {  
+
+                for (hts_pos_t i(rpos); i < rpos + len; ++i) {
+                    // mapped pair of read mapped to reference information: 
+                    // <cigar_op, read_pos, ref_pos, read_base, read_qual, ref_base>
+                    aligned_pairs.push_back(std::make_tuple(op,                        // cigar op
+                                                            qpos,                      // read position
+                                                            i,                         // reference position
+                                                            read_seq.substr(qpos, 1),  // read base
+                                                            read_qual.substr(qpos, 1), // read quality base
+                                                            fa.substr(i, 1)));         // reference base
+                    ++qpos;
+                }
+                rpos += len;
+            } else if (op == BAM_CINS || op == BAM_CSOFT_CLIP || op == BAM_CPAD) {
+                aligned_pairs.push_back(std::make_tuple(op,                          // cigar op
+                                                        qpos,                        // left read position
+                                                        rpos,                        // left reference position
+                                                        read_seq.substr(qpos, len),  // read base
+                                                        read_qual.substr(qpos, len), // read quality base
+                                                        ""));                        // reference base
+                qpos += len;
+            } else if (op == BAM_CDEL || op == BAM_CREF_SKIP) {
+                aligned_pairs.push_back(std::make_tuple(op, qpos, rpos, "", "", fa.substr(rpos, len)));
+                rpos += len;
+            } else if (op == BAM_CHARD_CLIP) { 
+                /* do not know what to do. skipping */ 
+            }
+        }
+
+        return aligned_pairs;  // A vector of tuple.
     }
 
     unsigned int BamRecord::_max_cigar_Opsize(const char op) const {

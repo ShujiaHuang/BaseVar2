@@ -102,7 +102,6 @@ namespace ngslib {
 
         // conversion function
         operator bool() const { return bool(_b != NULL); }
-
         friend std::ostream &operator<<(std::ostream &os, const BamRecord &b);
 
         /// 12 inline functions for dealing with FLAG of BAM alignment record
@@ -363,6 +362,23 @@ namespace ngslib {
         * 
         */
         std::vector<std::tuple<hts_pos_t, hts_pos_t>> get_alignment_blocks() const;
+
+        /// mapped pair of read mapped to reference information: <op, read_pos, ref_pos, read_base, read_qual, ref_base>
+        /**
+         * @brief Get a vector of aligned read (query) and reference positions. 
+         * 
+         * Each item in the returned vector is a tuple consisting of the 0-based offset from the start of 
+         * the read sequence followed by the 0-based reference position.
+         * 
+         * Ref the `get_aligned_pairs` function in https://github.com/pysam-developers/pysam/blob/master/pysam/libcalignedsegment.pyx
+         * 
+         * @param fa 
+         * 
+         * <cigar_op, read_pos, ref_pos, read_base, read_qual, ref_base>
+         * @return std::vector<std::tuple<int, uint32_t, hts_pos_t, std::string, std::string, std::string>> 
+         * 
+         */
+        std::vector<std::tuple<int, uint32_t, hts_pos_t, std::string, std::string, std::string>> get_aligned_pairs(const std::string &fa) const;
 
         /// Other useful functions
         /* BamRecord has proper orientation (FR): lower position read is mapped to
