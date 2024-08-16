@@ -214,16 +214,15 @@ namespace ngslib {
         return align_block;  // start position is 0-based
     }
 
-    std::vector<std::tuple<int, uint32_t, hts_pos_t, std::string, std::string, std::string>>
-        BamRecord::get_aligned_pairs(const std::string &fa) const 
-    {
+    std::vector<ReadAlignedPair> BamRecord::get_aligned_pairs(const std::string &fa) const {
         if (!_b) {
             throw std::runtime_error("[BamRecord::get_aligned_pairs]: Not found alignement data.");
         }
 
         // mapped pair of read mapped to reference information: 
-        // <cigar_op, read_pos, ref_pos, read_base, read_qual, ref_base>
-        std::vector<std::tuple<int, uint32_t, hts_pos_t, std::string, std::string, std::string>> aligned_pairs;
+        // ReadAlignedPair: (cigar_op, read_pos, ref_pos, read_base, read_qual, ref_base)
+        std::vector<ReadAlignedPair> aligned_pairs;
+        ReadAlignedPair al_pair;
 
         hts_pos_t rpos = map_ref_start_pos();  // mapping reference position (string index), 0-based
         uint32_t  qpos = 0;                    // mapping read's position (string index), 0-based
@@ -243,30 +242,38 @@ namespace ngslib {
             if (op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF) {  
 
                 for (hts_pos_t i(rpos); i < rpos + len; ++i) {
-                    // mapped pair of read mapped to reference information: 
-                    // <cigar_op, read_pos, ref_pos, read_base, read_qual, ref_base>
-                    aligned_pairs.push_back(std::make_tuple(op,                        // cigar op
-                                                            qpos,                      // read position
-                                                            i,                         // reference position
-                                                            read_seq.substr(qpos, 1),  // read base
-                                                            read_qual.substr(qpos, 1), // read quality base
-                                                            fa.substr(i, 1)));         // reference base
+                    al_pair.op        = op;    // cigar op
+                    al_pair.qpos      = qpos;  // read position, 0-based
+                    al_pair.ref_pos   = i;     // reference position, 0-based
+                    al_pair.read_base = read_seq.substr(qpos, 1);   // read base
+                    al_pair.read_qual = read_qual.substr(qpos, 1);  // read quality base
+                    al_pair.ref_base  = fa.substr(i, 1);            // reference base
+
+                    aligned_pairs.push_back(al_pair);
                     ++qpos;
                 }
                 rpos += len;
             } else if (op == BAM_CINS || op == BAM_CSOFT_CLIP || op == BAM_CPAD) {
-                aligned_pairs.push_back(std::make_tuple(op,                          // cigar op
-                                                        qpos,                        // left read position
-                                                        rpos,                        // left reference position
-                                                        read_seq.substr(qpos, len),  // read base
-                                                        read_qual.substr(qpos, len), // read quality base
-                                                        ""));                        // reference base
+                al_pair.op        = op;    // cigar op
+                al_pair.qpos      = qpos;  // read position, 0-based
+                al_pair.ref_pos   = rpos;  // reference position, 0-based
+                al_pair.read_base = read_seq.substr(qpos, len);   // read base
+                al_pair.read_qual = read_qual.substr(qpos, len);  // read quality base
+                al_pair.ref_base  = "";                           // reference base, empty
+                
+                aligned_pairs.push_back(al_pair);
                 qpos += len;
             } else if (op == BAM_CDEL || op == BAM_CREF_SKIP) {
-                aligned_pairs.push_back(std::make_tuple(op, qpos, rpos, "", "", fa.substr(rpos, len)));
+                al_pair.op        = op;    // cigar op
+                al_pair.qpos      = qpos;  // read position, 0-based
+                al_pair.ref_pos   = rpos;  // reference position, 0-based
+                al_pair.read_base = "";   
+                al_pair.read_qual = "";   
+                al_pair.ref_base  = fa.substr(rpos, len); // reference base
+
+                aligned_pairs.push_back(al_pair);
                 rpos += len;
-            } else if (op == BAM_CHARD_CLIP) { 
-                /* do not know what to do. skipping */ 
+            } else if (op == BAM_CHARD_CLIP) { /* do not know what to do. skipping */ 
             }
         }
 

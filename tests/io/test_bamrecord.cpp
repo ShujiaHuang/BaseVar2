@@ -111,14 +111,16 @@ int main() {
         std::cout << "\n";
 
         std::string fa_seq = fa[br3.tid_name(hdr)];
-        std::vector<std::tuple<int, uint32_t, hts_pos_t, std::string, std::string, std::string>> aligned_pairs = br3.get_aligned_pairs(fa_seq);
+        std::vector<ngslib::ReadAlignedPair> aligned_pairs = br3.get_aligned_pairs(fa_seq);
+        ngslib::ReadAlignedPair al_pair;
         std::cout << "Aligned Pairs\n";
         for (size_t i(0); i < aligned_pairs.size(); ++i) {
 
             int op; uint32_t qpos; hts_pos_t rpos; std::string read_base, read_qual, ref_base;
-            std::tie(op, qpos, rpos, read_base, read_qual, ref_base) = aligned_pairs[i];
-            std::cout << " - "  << op << " - [" << rpos << ", " << ref_base << "] - [" 
-                      << qpos << ", " << read_base << ", " << read_qual << "]\n";
+
+            al_pair = aligned_pairs[i];
+            std::cout << " - "  << al_pair.op << " - [" << al_pair.ref_pos << ", " << al_pair.ref_base << "] - [" 
+                      << al_pair.qpos << ", " << al_pair.read_base << ", " << al_pair.read_qual << "]\n";
         }
         std::cout << "\n";
     }

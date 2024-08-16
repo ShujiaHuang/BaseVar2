@@ -30,6 +30,17 @@ namespace ngslib {
                                     'T', ' ', ' ', ' ',
                                     ' ', ' ', ' ', 'N'};
 
+    /// Defined a structure for recording the mapped pair information of read mapped on reference.
+    // been used in `BamRecord::get_aligned_pairs` 
+    typedef struct {
+        int         op;         // cigar op,    detail: `bam_get_cigar(_b)` in sam.h
+        uint32_t    qpos;       // read position
+        hts_pos_t   ref_pos;    // reference position
+        std::string read_base;  // read base
+        std::string read_qual;  // read quality base
+        std::string ref_base;   // reference base
+    } ReadAlignedPair;             
+
     class BamRecord {
 
     private:
@@ -363,22 +374,23 @@ namespace ngslib {
         */
         std::vector<std::tuple<hts_pos_t, hts_pos_t>> get_alignment_blocks() const;
 
-        /// mapped pair of read mapped to reference information: <op, read_pos, ref_pos, read_base, read_qual, ref_base>
+        /// mapped pair of read mapped to reference information: (op, read_pos, ref_pos, read_base, read_qual, ref_base)
         /**
          * @brief Get a vector of aligned read (query) and reference positions. 
          * 
-         * Each item in the returned vector is a tuple consisting of the 0-based offset from the start of 
-         * the read sequence followed by the 0-based reference position.
+         * Each item in the returned vector is a structure of ReadAlignedPair consisting of the 0-based offset 
+         * from the start of the read sequence followed by the 0-based reference position.
          * 
          * Ref the `get_aligned_pairs` function in https://github.com/pysam-developers/pysam/blob/master/pysam/libcalignedsegment.pyx
          * 
          * @param fa 
          * 
-         * <cigar_op, read_pos, ref_pos, read_base, read_qual, ref_base>
-         * @return std::vector<std::tuple<int, uint32_t, hts_pos_t, std::string, std::string, std::string>> 
+         * @return 
+         * std::vector<ReadAlignedPair> 
+         * (cigar_op, read_pos, ref_pos, read_base, read_qual, ref_base)
          * 
          */
-        std::vector<std::tuple<int, uint32_t, hts_pos_t, std::string, std::string, std::string>> get_aligned_pairs(const std::string &fa) const;
+        std::vector<ReadAlignedPair> get_aligned_pairs(const std::string &fa) const;
 
         /// Other useful functions
         /* BamRecord has proper orientation (FR): lower position read is mapped to
