@@ -101,10 +101,10 @@ struct BaseTypeARGS {
 };
 
 struct AlignBaseInfo {
-    std::string base;  // read base
+    std::string base;  // read base (not reference base)
     int mapq;          // mapping quality
     char strand;       // mapping reference strand, should be one of '*', '-', '+'
-    char base_qual;    // read base quality (get the first base quality if Indels, I don't care about Indels for NIPT data)
+    char base_qual;    // read base quality (get mean quality of read if Indels, I don't care about Indels for NIPT data)
     int rpr;           // read position rank
 };
 
@@ -124,8 +124,6 @@ bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
                             ngslib::GenomeRegionTuple target_genome_region,  // 获取该区间内的 read
                             PosMapVector &out_pos_batchinfo);
 
-typedef std::tuple<int, uint32_t, hts_pos_t, std::string, std::string, std::string> ReadAlignedPair;                
-typedef std::vector<ReadAlignedPair> ReadAlignPairVector;
 void __seek_position(std::vector<ngslib::BamRecord> &sample_map_reads,  // ngslib::BamRecord include by 'bam.h'
                      const std::string &fa_seq,
                      ngslib::GenomeRegionTuple target_genome_region,    // 获取该区间内所有位点的碱基比对信息

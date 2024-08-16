@@ -505,49 +505,45 @@ void __seek_position(std::vector<ngslib::BamRecord> &sample_map_reads,
 
     AlignBaseInfo align_base_info;
 
-    int op; uint32_t qpos, ref_pos; std::string read_base, read_qual, ref_base;
+    // al_pair: (cigar_op, read position, reference position, read base, read_qual, reference base)
+    ngslib::ReadAlignedPair al_pair;
+    std::vector<ngslib::ReadAlignedPair> aligned_pairs;
     for(size_t i(0); i < sample_map_reads.size(); ++i) {
 
 char map_strand = sample_map_reads[i].map_strand();
 int  mapq = sample_map_reads[i].mapq();
-// uint32_t rpos = sample_map_reads[i].map_ref_start_pos();  // 0-based, reference position
-// uint32_t qpos = sample_map_reads[i].query_start_pos();    // 0-based, read postion
-// read_seq  = sample_map_reads[i].query_sequence();
-// read_qual = sample_map_reads[i].query_qual();
 std::cout << map_strand << " : " << mapq << " : " << sample_map_reads[i].map_ref_start_pos() << "\n";
 std::cout << sample_map_reads[i] << "\n";
-// std::cout << read_seq << "\n";
-// std::cout << read_qual << "\n\n";
 
         align_base_info.strand = sample_map_reads[i].map_strand();
         align_base_info.mapq   = sample_map_reads[i].mapq();
 
-        ReadAlignPairVector aligned_pairs = sample_map_reads[i].get_aligned_pairs(fa_seq);
+        aligned_pairs = sample_map_reads[i].get_aligned_pairs(fa_seq);
         int mean_qqual = int(sample_map_reads[i].mean_qqual());
         for (size_t i(0); i < aligned_pairs.size(); ++i) {
-            std::tie(op, qpos, ref_pos, read_base, read_qual, ref_base) = aligned_pairs[i];
-            ref_pos += 1;  // ref_pos is 0-based, convert to 1-based;
+            al_pair = aligned_pairs[i];
+            al_pair.ref_pos += 1;  // ref_pos is 0-based, convert to 1-based;
 
-            if (reg_end < ref_pos) break;
-            if (reg_start > ref_pos) continue;
+            if (reg_end < al_pair.ref_pos) break;
+            if (reg_start > al_pair.ref_pos) continue;
 
-            if (op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF) {
-                align_base_info.base      = read_base;
-                align_base_info.base_qual = read_qual[0];
-            } else if (op == BAM_CINS) {
-                align_base_info.base      = "+" + read_base;  // insertion
+            if (al_pair.op == BAM_CMATCH || al_pair.op == BAM_CEQUAL || al_pair.op == BAM_CDIFF) {
+                align_base_info.base      = al_pair.read_base;
+                align_base_info.base_qual = al_pair.read_qual[0];
+            } else if (al_pair.op == BAM_CINS) {
+                align_base_info.base      = "+" + al_pair.read_base;  // insertion
                 align_base_info.base_qual = mean_qqual;       // set to be mean quality of the whole read
-            } else if (op == BAM_CDEL) {
-                align_base_info.base      = "-" + ref_base;  // deletion
+            } else if (al_pair.op == BAM_CDEL) {
+                align_base_info.base      = "-" + al_pair.ref_base;  // deletion
                 align_base_info.base_qual = mean_qqual;      // set to be mean quality of the whole read
             }
 
             // qpos is 0-based, conver to 1-based and set as the position rank of read.
-            align_base_info.rpr = qpos + 1;
-            sample_posinfo_map.insert({ref_pos, align_base_info});
+            align_base_info.rpr = al_pair.qpos + 1;
+            sample_posinfo_map.insert({al_pair.ref_pos, align_base_info});
 
-std::cout << " - "  << op << " - [" << ref_pos << ", " << ref_base << "] - [" 
-          << qpos << ", " << read_base << ", " << read_qual << "]\n";
+std::cout << " - "  << al_pair.op << " - [" << al_pair.ref_pos << ", " << align_base_info.strand  << ", " << al_pair.ref_base << "] - [" 
+          << al_pair.qpos << ", " << al_pair.read_base << ", " << al_pair.read_qual << "]\n";
         }
 std::cout << "\n";
 
