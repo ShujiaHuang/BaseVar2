@@ -467,7 +467,7 @@ uint32_t read_count = 0;
 ++read_count;
                 if (al.mapq() < mapq_thd || al.is_duplicate() || al.is_qc_fail()) continue;
                 map_ref_start = al.map_ref_start_pos() + 1;  // al.map_ref_start_pos() is 0-based, convert to 1-based
-                map_ref_end = al.map_ref_end_pos();          // al.map_ref_end_pos() is 1-based
+                map_ref_end   = al.map_ref_end_pos();        // al.map_ref_end_pos() is 1-based
 
                 // only keep the reads which overlap with [reg_start, reg_end]
                 if (reg_start > map_ref_end) continue;
