@@ -346,9 +346,9 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(ngslib::GenomeRegion
         // make Thread Pool
         create_batchfile_processes.emplace_back(
             thread_pool.enqueue(__create_a_batchfile, 
-                                batch_align_files,  // 值会变，只能拷贝，如果传引用，多线程执行时将丢失该值
-                                batch_sample_ids,   // 值会变，只能拷贝，如果传引用，多线程执行时将丢失该值
-                                std::cref(fa_seq),  // 值不变，传引用
+                                batch_align_files,  // 循环局部变量，值会变，只能拷贝，如果传引用，多线程执行时将丢失该值
+                                batch_sample_ids,   // 循环局部变量，值会变，只能拷贝，如果传引用，多线程执行时将丢失该值
+                                std::cref(fa_seq),  // 循环外变量，  值不变，传引用，省内存
                                 genome_region,
                                 _args->mapq,
                                 batchfile));
@@ -357,7 +357,14 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(ngslib::GenomeRegion
     for (auto && p: create_batchfile_processes) {
         // Run and make sure all processes are finished
         // return the value of `__create_single_batchfile`
-        p.get();
+
+        // p.get();
+        // 一般来说，只有当 valid() 返回 true的时候才调用 get() 去获取结果，这也是 C++ 文档推荐的操作。
+        if (p.valid()) {
+            // get() 调用会改变其共享状态，不再可用，也就是说 get() 只能被调用一次，多次调用会触发异常。
+            // 如果想要在多个线程中多次获取产出值需要使用 shared_future。
+            p.get();
+        }
     }
     create_batchfile_processes.clear();  // release the thread
 
