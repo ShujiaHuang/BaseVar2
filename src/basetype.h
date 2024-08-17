@@ -116,7 +116,7 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // 
                           int mapq_thd,                                      // mapping quality threshold
                           std::string output_batch_file);                    // output batchfile name
 
-typedef robin_hood::unordered_map<uint32_t, AlignBaseInfo> PosMap;
+typedef robin_hood::unordered_map<uint32_t, AlignBaseInfo> PosMap;  // give a short name to this type
 typedef std::vector<PosMap> PosMapVector;
 bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
                             const std::string &fa_seq,                   
