@@ -356,14 +356,13 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(ngslib::GenomeRegion
     
     for (auto && p: create_batchfile_processes) {
         // Run and make sure all processes are finished
-        // return the value of `__create_single_batchfile`
 
-        // p.get();
-        // 一般来说，只有当 valid() 返回 true的时候才调用 get() 去获取结果，这也是 C++ 文档推荐的操作。
+        // 一般来说，只有当 valid() 返回 true 的时候才调用 get() 去获取结果，这也是 C++ 文档推荐的操作。
         if (p.valid()) {
             // get() 调用会改变其共享状态，不再可用，也就是说 get() 只能被调用一次，多次调用会触发异常。
             // 如果想要在多个线程中多次获取产出值需要使用 shared_future。
-            p.get();
+            bool x = p.get(); // retrieve the return value of `__create_a_batchfile`
+
         }
     }
     create_batchfile_processes.clear();  // release the thread
