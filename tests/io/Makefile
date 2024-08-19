@@ -35,19 +35,19 @@ CXXSRC = $(wildcard *.cpp)
 OBJ = $(CXXSRC:.cpp=.o) $(CXXBS:.cpp=.o)
 
 
-PROGRAMS = test_fasta
-
-all: $(PROGRAMS)
-
-
-%.o: %.cpp
-	$(CXX) -c $(CXXFLAGS) $*.cpp
+PROGRAMS = test
+#all: $(PROGRAMS)
 
 
-$(PROGRAMS): $(OBJ)
-	$(CXX) $(FLAGS) -o test_fasta *.o $(LIBS)
+%.o: %.cpp    
+	$(CXX) $(CXXFLAGS) -o $@ -c $<
+
+
+test_fasta: test_fasta.o
+	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)
+	#$(CXX) $(FLAGS) -o test_fasta  $(LIBS)
 
 clean:
-	rm -f *.o
+	rm -f $(OBJ) test_fasta
 
 
