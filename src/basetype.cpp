@@ -422,7 +422,7 @@ std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end 
                                               fa_seq,
                                               mapq_thd, 
                                               std::make_tuple(ref_id, sub_reg_start, sub_reg_end),
-                                              sub_pos_batchinfo);  // 传引用，省点内存
+                                              sub_pos_batchinfo);  // 传引用，存数据，省点内存
         /* Output batchfile */
 
 
@@ -437,7 +437,7 @@ std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end 
               << (double)(clock() - start_time) / CLOCKS_PER_SEC   << " seconds elapsed.\n"
               << std::endl;
 
-    return true;
+    return is_not_empty;
 }
 
 bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,  
