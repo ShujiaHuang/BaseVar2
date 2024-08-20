@@ -33,7 +33,7 @@ namespace ngslib {
     /// Defined a structure for recording the mapped pair information of read mapped on reference.
     // been used in `BamRecord::get_aligned_pairs` 
     typedef struct {
-        int         op;         // cigar op,    detail: `bam_get_cigar(_b)` in sam.h
+        int         op;         // cigar op,    detail about: `bam_get_cigar(_b)` could be found in sam.h
         uint32_t    qpos;       // read position
         hts_pos_t   ref_pos;    // reference position
         std::string read_base;  // read base
@@ -374,7 +374,7 @@ namespace ngslib {
         */
         std::vector<std::tuple<hts_pos_t, hts_pos_t>> get_alignment_blocks() const;
 
-        /// mapped pair of read mapped to reference information: (op, read_pos, ref_pos, read_base, read_qual, ref_base)
+        /// mapped pair of read mapped to reference information: (cigar_op, read_pos, ref_pos, read_base, read_qual, ref_base)
         /**
          * @brief Get a vector of aligned read (query) and reference positions. 
          * 
