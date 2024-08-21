@@ -52,7 +52,7 @@ namespace ngslib {
             _open(fn, mode);
         }
         ~BGZFile();
-
+        
     };  // class BGZFile
 }  // namespace ngslib
 

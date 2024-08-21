@@ -20,4 +20,5 @@ namespace ngslib {
     BGZFile::~BGZFile() {
         if (_bgzf) bgzf_close(_bgzf);  // `bgzf_close` return 0 on success and -1 on error
     }
+    
 }  // namespace ngslib
