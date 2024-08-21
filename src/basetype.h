@@ -113,14 +113,14 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // 
                           const std::vector<std::string> batch_sample_ids,   // Not a modifiable value
                           const std::string &fa_seq,                         // Not a modifiable value
                           ngslib::GenomeRegionTuple genome_region,           // 切割该区间
-                          int mapq_thd,                                      // mapping quality threshold
-                          std::string output_batch_file);                    // output batchfile name
+                          const int mapq_thd,                                      // mapping quality threshold
+                          const std::string output_batch_file);              // output batchfile name
 
-typedef robin_hood::unordered_map<uint32_t, AlignBaseInfo> PosMap;  // give a short name to this type
+typedef robin_hood::unordered_map<uint32_t, AlignBaseInfo> PosMap;           // give a short name to this type
 typedef std::vector<PosMap> PosMapVector;
 bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
                             const std::string &fa_seq,                   
-                            int mapq_thd,
+                            const int mapq_thd,
                             ngslib::GenomeRegionTuple target_genome_region,  // 获取该区间内的 read
                             PosMapVector &out_pos_batchinfo);
 

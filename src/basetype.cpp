@@ -11,6 +11,8 @@
 #include <ctime>
 #include <algorithm>  // std::min
 
+#include <htslib/bgzf.h>
+
 #include "basetype.h"
 #include "external/threadpool.h"
 
@@ -300,9 +302,12 @@ void BaseTypeRunner::_get_popgroup_info() {
  * 
  */
 std::vector<std::string> BaseTypeRunner::_create_batchfiles(ngslib::GenomeRegionTuple genome_region) {
-    // Create cache directory
-    std::string outdir  = ngslib::dirname(_args->output_vcf);
-    std::string stem_bn = ngslib::remove_filename_extension(ngslib::basename(_args->output_vcf));
+    // Get filepath stem name
+    std::string _bname = ngslib::basename(_args->output_vcf);
+    size_t si = _bname.find_first_of(".vcf");
+    std::string stem_bn = si > 0 && si != std::string::npos ? _bname.substr(0, si) : _bname;
+
+    std::string outdir = ngslib::dirname(_args->output_vcf);
     std::string cache_outdir = outdir + "/cache_" + stem_bn;
     ngslib::safe_mkdir(cache_outdir);  // make cache directory for batchfiles
 
@@ -393,23 +398,38 @@ void BaseTypeRunner::run() {
 
 /// Calling variant functions outside of class 'BaseTypeRunner' 
 // Create temp batch file for variant discovery
+void __write_record_to_batchfile(PosMapVector &pos_batchinfo_vector, BGZF *obf) {
+
+std::string data = "-- Hello world!!! ---\n";
+if (bgzf_write(obf, data.c_str(), data.length()) != data.length()) {
+    throw std::runtime_error("[ERROR] fail to write data");
+}
+
+    return;
+}
+
 bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // Not a modifiable value
                           const std::vector<std::string> batch_sample_ids,   // Not a modifiable value
                           const std::string &fa_seq,                         // Not a modifiable value
                           ngslib::GenomeRegionTuple genome_region,
-                          int mapq_thd,                   // mapping quality threshold
-                          std::string output_batch_file)  // output batchfile name
+                          const int mapq_thd,                   // mapping quality threshold
+                          const std::string output_batch_file)  // output batchfile name
 // 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
 {   
-    // this value affected the computing memory, could be set to 1000000, 10 just for test
+    // This value affected the computing memory, could be set to 1000000, 10 just for test
     static const uint32_t STEP_REGION_LEN = 20;
     clock_t start_time = clock();
 
     std::string ref_id; uint32_t reg_start, reg_end;
     std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
 
-    PosMapVector sub_pos_batchinfo;
-    sub_pos_batchinfo.reserve(batch_align_files.size());  //  pre-set the capacity
+    PosMapVector pos_batchinfo_vector;
+    pos_batchinfo_vector.reserve(batch_align_files.size());  //  pre-set the capacity
+
+    BGZF *obf = bgzf_open(output_batch_file.c_str(), "w"); // output file handle of output_batch_file
+    if (!obf) {
+        throw std::runtime_error("[ERROR] " + output_batch_file + " open failure.");
+    }
 
     uint32_t sub_reg_start, sub_reg_end;
     bool is_not_empty = false;
@@ -422,11 +442,22 @@ std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end 
                                               fa_seq,
                                               mapq_thd, 
                                               std::make_tuple(ref_id, sub_reg_start, sub_reg_end),
-                                              sub_pos_batchinfo);  // 传引用，存数据，省点内存
+                                              pos_batchinfo_vector);  // 传引用，省内存，得数据
         /* Output batchfile */
+        if (is_not_empty) {
+            __write_record_to_batchfile(pos_batchinfo_vector, obf);
+// 写入文件并检查是否成功
+// if (bgzf_write(obf, output_batch_file.c_str(), output_batch_file.length()) != output_batch_file.length()) {
+//     throw std::runtime_error("[ERROR] fail to write data to " + output_batch_file);
+// }
+        }
 
+        pos_batchinfo_vector.clear();  // 清空，为下个循环做准备
+    }
 
-        sub_pos_batchinfo.clear();
+    int is_cl = bgzf_close(obf);
+    if (is_cl < 0) {
+        std::cout << "[WARNING] " + output_batch_file + " fail close.\n";
     }
 
     // Time information
@@ -442,9 +473,9 @@ std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end 
 
 bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,  
                             const std::string &fa_seq,  // must be the whole chromosome sequence  
-                            int mapq_thd,               // mapping quality threshold
+                            const int mapq_thd,         // mapping quality threshold
                             ngslib::GenomeRegionTuple genome_region,
-                            PosMapVector &out_pos_batchinfo)  
+                            PosMapVector &pos_batchinfo_vector)  
 {
     static const uint32_t REG_EXPEND_SIZE = 200; // only using here, In case of missing the overlap reads
 
@@ -495,12 +526,12 @@ std::cout << "* " + exp_regstr + " total read count: " << read_count << ". Hit r
             is_not_empty = true; 
         }
 
-        // make sure out_pos_batchinfo has the same size as `batch_align_files`
-        out_pos_batchinfo.push_back(sample_posinfo_map);
+        // make sure pos_batchinfo_vector has the same size as `batch_align_files`
+        pos_batchinfo_vector.push_back(sample_posinfo_map);
     }
 
-    if (out_pos_batchinfo.size() != batch_align_files.size())
-        throw std::runtime_error("[basetype.cpp::__fetch_base_in_region] 'out_pos_batchinfo.size()' "
+    if (pos_batchinfo_vector.size() != batch_align_files.size())
+        throw std::runtime_error("[basetype.cpp::__fetch_base_in_region] 'pos_batchinfo_vector.size()' "
                                  "should be the same as 'batch_align_files.size()'");
 
     return is_not_empty;  // no cover reads in 'genome_region' if empty.
@@ -509,15 +540,15 @@ std::cout << "* " + exp_regstr + " total read count: " << read_count << ". Hit r
 void __seek_position(std::vector<ngslib::BamRecord> &sample_map_reads,
                      const std::string &fa_seq,   // must be the whole chromosome sequence
                      ngslib::GenomeRegionTuple genome_region,
-                     PosMap &sample_posinfo_map)  
+                     PosMap &sample_posinfo_map)
 {
-    if (!sample_posinfo_map.empty()) 
+    if (!sample_posinfo_map.empty())
         throw std::runtime_error("[basetype.cpp::__seek_position] 'sample_posinfo_map' must be empty.");
 
     std::string ref_id; uint32_t reg_start, reg_end;
     std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
 
-    AlignBaseInfo align_base_info; 
+    AlignBaseInfo align_base_info;
 
     // A vector of: (cigar_op, read position, reference position, read base, read_qual, reference base)
     std::vector<ngslib::ReadAlignedPair> aligned_pairs;
@@ -536,17 +567,17 @@ std::cout << sample_map_reads[i] << "\n";
             if (reg_start > aligned_pairs[i].ref_pos) continue;
 
             // 'BAM_XXX' are macros for CIGAR, which defined in sam.h
-            if (aligned_pairs[i].op == BAM_CMATCH || 
-                aligned_pairs[i].op == BAM_CEQUAL || 
-                aligned_pairs[i].op == BAM_CDIFF) 
+            if (aligned_pairs[i].op == BAM_CMATCH ||  /* CIGAR: M */ 
+                aligned_pairs[i].op == BAM_CEQUAL ||  /* CIGAR: = */
+                aligned_pairs[i].op == BAM_CDIFF)     /* CIGAR: X */
             {
                 align_base_info.base      = aligned_pairs[i].read_base;
                 align_base_info.base_qual = aligned_pairs[i].read_qual[0];  // one base
-            } else if (aligned_pairs[i].op == BAM_CINS) {
-                align_base_info.base      = "+" + aligned_pairs[i].read_base;  // insertion
+            } else if (aligned_pairs[i].op == BAM_CINS) {  /* CIGAR: I */
+                align_base_info.base      = "+" + aligned_pairs[i].read_base;
                 align_base_info.base_qual = mean_qqual;  // set to be mean quality of the whole read
-            } else if (aligned_pairs[i].op == BAM_CDEL) {
-                align_base_info.base      = "-" + aligned_pairs[i].ref_base;  // deletion
+            } else if (aligned_pairs[i].op == BAM_CDEL) {  /* CIGAR: D */
+                align_base_info.base      = "-" + aligned_pairs[i].ref_base;
                 align_base_info.base_qual = mean_qqual;  // set to be mean quality of the whole read
             }
 
