@@ -398,9 +398,9 @@ void BaseTypeRunner::run() {
 
 /// Calling variant functions outside of class 'BaseTypeRunner' 
 // Create temp batch file for variant discovery
-void __write_record_to_batchfile(PosMapVector &pos_batchinfo_vector, BGZF *obf) {
+void __write_record_to_batchfile(const std::string ref_id, PosMapVector &pos_batchinfo_vector, BGZF *obf) {
 
-std::string data = "-- Hello world!!! ---\n";
+std::string data = "-- " + ref_id + " Hello world!!! ---\n";
 if (bgzf_write(obf, data.c_str(), data.length()) != data.length()) {
     throw std::runtime_error("[ERROR] fail to write data");
 }
@@ -445,7 +445,7 @@ std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end 
                                               pos_batchinfo_vector);  // 传引用，省内存，得数据
         /* Output batchfile */
         if (is_not_empty) {
-            __write_record_to_batchfile(pos_batchinfo_vector, obf);
+            __write_record_to_batchfile(ref_id, pos_batchinfo_vector, obf);
 // 写入文件并检查是否成功
 // if (bgzf_write(obf, output_batch_file.c_str(), output_batch_file.length()) != output_batch_file.length()) {
 //     throw std::runtime_error("[ERROR] fail to write data to " + output_batch_file);
@@ -549,50 +549,77 @@ void __seek_position(std::vector<ngslib::BamRecord> &sample_map_reads,
     std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
 
     AlignBaseInfo align_base_info;
+    align_base_info.ref_id = ref_id;
 
     // A vector of: (cigar_op, read position, reference position, read base, read_qual, reference base)
     std::vector<ngslib::ReadAlignedPair> aligned_pairs;
     for(size_t i(0); i < sample_map_reads.size(); ++i) {
 std::cout << sample_map_reads[i] << "\n";
 
-        align_base_info.strand = sample_map_reads[i].map_strand();
-        align_base_info.mapq   = sample_map_reads[i].mapq();
+        align_base_info.map_strand = sample_map_reads[i].map_strand();  // '*', '-' or '+'
+        align_base_info.mapq = sample_map_reads[i].mapq();
 
         aligned_pairs = sample_map_reads[i].get_aligned_pairs(fa_seq);
-        int mean_qqual = int(sample_map_reads[i].mean_qqual());
+        char mean_qqual_char = int(sample_map_reads[i].mean_qqual());
+        uint32_t map_ref_pos;
         for (size_t i(0); i < aligned_pairs.size(); ++i) {
-            aligned_pairs[i].ref_pos += 1;  // ref_pos is 0-based, convert to 1-based;
+            // Todo: The data of 'align_base_info' and 'aligned_pairs[i]' is similar, 
+            // could we just use 'aligned_pairs[i]' to replace 'align_base_info' directly?
 
-            if (reg_end < aligned_pairs[i].ref_pos) break;
-            if (reg_start > aligned_pairs[i].ref_pos) continue;
+            map_ref_pos = aligned_pairs[i].ref_pos + 1;  // ref_pos is 0-based, convert to 1-based;
 
-            // 'BAM_XXX' are macros for CIGAR, which defined in sam.h
+            if (reg_end < map_ref_pos) break;
+            if (reg_start > map_ref_pos) continue;
+
+            // 'BAM_XXX' are macros for CIGAR, which defined in 'htslib/sam.h'
             if (aligned_pairs[i].op == BAM_CMATCH ||  /* CIGAR: M */ 
                 aligned_pairs[i].op == BAM_CEQUAL ||  /* CIGAR: = */
                 aligned_pairs[i].op == BAM_CDIFF)     /* CIGAR: X */
             {
-                align_base_info.base      = aligned_pairs[i].read_base;
-                align_base_info.base_qual = aligned_pairs[i].read_qual[0];  // one base
+                // one character
+                align_base_info.ref_base       = aligned_pairs[i].ref_base[0];
+                align_base_info.read_base      = aligned_pairs[i].read_base[0];
+                align_base_info.read_base_qual = aligned_pairs[i].read_qual[0];
             } else if (aligned_pairs[i].op == BAM_CINS) {  /* CIGAR: I */
-                align_base_info.base      = "+" + aligned_pairs[i].read_base;
-                align_base_info.base_qual = mean_qqual;  // set to be mean quality of the whole read
-            } else if (aligned_pairs[i].op == BAM_CDEL) {  /* CIGAR: D */
-                align_base_info.base      = "-" + aligned_pairs[i].ref_base;
-                align_base_info.base_qual = mean_qqual;  // set to be mean quality of the whole read
-            }
+                if (!aligned_pairs[i].ref_base.empty()) {
+                    std::cerr << sample_map_reads[i] << "\n";
+                    throw std::runtime_error("[ERROR] We got reference base in insertion region.");
+                }
 
-            // qpos is 0-based, conver to 1-based and set as the position rank of read.
+                --map_ref_pos;  // roll back one position to the left side of insertion break point.
+                align_base_info.ref_base       = fa_seq[aligned_pairs[i].ref_pos-1]; // break point's ref base
+                align_base_info.read_base      = align_base_info.ref_base + aligned_pairs[i].read_base;
+                align_base_info.read_base_qual = mean_qqual_char;  // set to be mean quality of the whole read
+            } else if (aligned_pairs[i].op == BAM_CDEL) {  /* CIGAR: D */
+                if (!aligned_pairs[i].read_base.empty()) {
+                    std::cerr << sample_map_reads[i] << "\n";
+                    throw std::runtime_error("[ERROR] We got read bases in deletion region.");
+                }
+
+                --map_ref_pos;  // roll back one position to the left side of deletion break point.
+                align_base_info.ref_base       = fa_seq[aligned_pairs[i].ref_pos-1] + aligned_pairs[i].ref_base;
+                align_base_info.read_base      = fa_seq[aligned_pairs[i].ref_pos-1]; // break point's ref base
+                align_base_info.read_base_qual = mean_qqual_char;  // set to be mean quality of the whole read
+            } else { 
+                // Skip in basevar for other kind of CIGAR symbals.
+                continue;
+            }
+            align_base_info.ref_pos = map_ref_pos;
+
+            // qpos is 0-based, conver to 1-based to set the rank of base on read.
             align_base_info.rpr = aligned_pairs[i].qpos + 1;
 
-            if (sample_posinfo_map.find(aligned_pairs[i].ref_pos) == sample_posinfo_map.end()) {
+            if (sample_posinfo_map.find(map_ref_pos) == sample_posinfo_map.end()) {
                 // Just get the base from first read which aligned on this ref_pos,
                 // no matter the first one it's indel or not.
 
                 // {ref_pos (no need to add ref_id in the key) => map info}
-                sample_posinfo_map.insert({aligned_pairs[i].ref_pos, align_base_info});
+                sample_posinfo_map.insert({map_ref_pos, align_base_info});
             }
-std::cout << " - "  << aligned_pairs[i].op << " - [" << ref_id << ", "
-          << aligned_pairs[i].ref_pos << ", " << align_base_info.strand  << ", " << aligned_pairs[i].ref_base << "] - [" 
+            // align_base_info must set to be empty
+
+std::cout << " - "  << aligned_pairs[i].op << " - [" << ref_id << ", " << align_base_info.ref_pos << ", " 
+          << align_base_info.map_strand    << ", "   << aligned_pairs[i].ref_base << "-" << align_base_info.ref_base << "] - [" 
           << aligned_pairs[i].qpos << ", " << aligned_pairs[i].read_base << ", " << aligned_pairs[i].read_qual << "]\n";
         }
 std::cout << "\n";

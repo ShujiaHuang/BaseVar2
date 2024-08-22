@@ -101,11 +101,17 @@ struct BaseTypeARGS {
 };
 
 struct AlignBaseInfo {
-    std::string base;  // read base (not reference base)
-    int mapq;          // mapping quality
-    char strand;       // mapping reference strand, should be one of '*', '-', '+'
-    char base_qual;    // read base quality (get mean quality of read if Indels, I don't care about Indels for NIPT data)
-    int rpr;           // read position rank
+    std::string ref_id;
+    uint32_t ref_pos;
+    std::string ref_base;   // reference base
+
+    std::string read_base;  // read base
+    int mapq;               // mapping quality
+    int rpr;                // read position rank
+    char map_strand;        // mapping reference strand, should be one of '*', '-', '+'
+    char read_base_qual;    // read base quality (get mean quality of read if Indels, 
+                            // I don't care about Indels for NIPT data)
+    // set default argument
 };
 
 // This function is only used by BaseTypeRunner::_create_batchfiles
@@ -113,7 +119,7 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // 
                           const std::vector<std::string> batch_sample_ids,   // Not a modifiable value
                           const std::string &fa_seq,                         // Not a modifiable value
                           ngslib::GenomeRegionTuple genome_region,           // 切割该区间
-                          const int mapq_thd,                                      // mapping quality threshold
+                          const int mapq_thd,                                // mapping quality threshold
                           const std::string output_batch_file);              // output batchfile name
 
 typedef robin_hood::unordered_map<uint32_t, AlignBaseInfo> PosMap;           // give a short name to this type
@@ -128,6 +134,8 @@ void __seek_position(std::vector<ngslib::BamRecord> &sample_map_reads,  // ngsli
                      const std::string &fa_seq,
                      ngslib::GenomeRegionTuple target_genome_region,    // 获取该区间内所有位点的碱基比对信息
                      PosMap &sample_posinfo_map);
+
+void __write_record_to_batchfile(const std::string ref_id, PosMapVector &pos_batchinfo_vector, BGZF *obf);
 /**
  * @brief BaseTypeRunner class
  */

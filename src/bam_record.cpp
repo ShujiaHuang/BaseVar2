@@ -242,38 +242,40 @@ namespace ngslib {
             if (op == BAM_CMATCH || op == BAM_CEQUAL || op == BAM_CDIFF) {  
 
                 for (hts_pos_t i(rpos); i < rpos + len; ++i) {
-                    al_pair.op        = op;    // cigar op
-                    al_pair.qpos      = qpos;  // read position, 0-based
-                    al_pair.ref_pos   = i;     // reference position, 0-based
+                    al_pair.op        = op;                         // cigar op
+                    al_pair.ref_pos   = i;                          // reference position, 0-based
+                    al_pair.ref_base  = fa.substr(i, 1);            // reference base
+                    al_pair.qpos      = qpos;                       // read position, 0-based
                     al_pair.read_base = read_seq.substr(qpos, 1);   // read base
                     al_pair.read_qual = read_qual.substr(qpos, 1);  // read quality base
-                    al_pair.ref_base  = fa.substr(i, 1);            // reference base
 
                     aligned_pairs.push_back(al_pair);
                     ++qpos;
                 }
                 rpos += len;
             } else if (op == BAM_CINS || op == BAM_CSOFT_CLIP || op == BAM_CPAD) {
-                al_pair.op        = op;    // cigar op
-                al_pair.qpos      = qpos;  // read position, 0-based
-                al_pair.ref_pos   = rpos;  // reference position, 0-based
+                al_pair.op        = op;                           // cigar op
+                al_pair.ref_pos   = rpos;                         // reference position, 0-based
+                al_pair.ref_base  = "";                           // reference base, empty
+                al_pair.qpos      = qpos;                         // read position, 0-based
                 al_pair.read_base = read_seq.substr(qpos, len);   // read base
                 al_pair.read_qual = read_qual.substr(qpos, len);  // read quality base
-                al_pair.ref_base  = "";                           // reference base, empty
                 
                 aligned_pairs.push_back(al_pair);
                 qpos += len;
             } else if (op == BAM_CDEL || op == BAM_CREF_SKIP) {
-                al_pair.op        = op;    // cigar op
-                al_pair.qpos      = qpos;  // read position, 0-based
-                al_pair.ref_pos   = rpos;  // reference position, 0-based
-                al_pair.read_base = "";   
+                al_pair.op        = op;                    // cigar op
+                al_pair.ref_pos   = rpos;                  // reference position, 0-based
+                al_pair.ref_base  = fa.substr(rpos, len);  // reference base
+                al_pair.qpos      = qpos;                  // read position, 0-based
+                al_pair.read_base = "";                    // read base, empty
                 al_pair.read_qual = "";   
-                al_pair.ref_base  = fa.substr(rpos, len); // reference base
 
                 aligned_pairs.push_back(al_pair);
                 rpos += len;
-            } else if (op == BAM_CHARD_CLIP) { /* do not know what to do. skipping */ 
+            } else if (op == BAM_CHARD_CLIP) { 
+                /* Nothing to do and get nothing. skipping */ 
+                continue;
             }
         }
 

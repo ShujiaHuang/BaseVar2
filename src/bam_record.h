@@ -34,11 +34,11 @@ namespace ngslib {
     // been used in `BamRecord::get_aligned_pairs` 
     typedef struct {
         int         op;         // cigar op,    detail about: `bam_get_cigar(_b)` could be found in sam.h
-        uint32_t    qpos;       // read position
         hts_pos_t   ref_pos;    // reference position
+        std::string ref_base;   // reference base
+        uint32_t    qpos;       // read position
         std::string read_base;  // read base
         std::string read_qual;  // read quality base
-        std::string ref_base;   // reference base
     } ReadAlignedPair;             
 
     class BamRecord {
