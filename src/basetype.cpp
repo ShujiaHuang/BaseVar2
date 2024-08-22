@@ -405,18 +405,68 @@ void BaseTypeRunner::run() {
 
 /// Calling variant functions outside of class 'BaseTypeRunner' 
 // Create temp batch file for variant discovery
-void __write_record_to_batchfile(PosMapVector &batchsamples_posinfomap_vector, 
+void __write_record_to_batchfile(PosMapVector &batchsamples_posinfomap_vector,
+                                 const std::string &fa_seq,
                                  const ngslib::GenomeRegionTuple genome_region, 
                                  BGZF *obf) 
 {
+    const static char BASE_Q0_ASCII = '!';  // '!' ascii code is 33
+
     std::string ref_id; uint32_t reg_start, reg_end;
     std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
 
-// 写入文件并检查是否成功
-std::string data = "-- Hello world!!! ---: " + ngslib::tostring(batchsamples_posinfomap_vector.size()) + "\n";
-if (bgzf_write(obf, data.c_str(), data.length()) != data.length()) {
-    throw std::runtime_error("[ERROR] fail to write data");
-}
+    // Output columns: [CHROM, POS, REF, Depth(CoveredSample), MappingQuality, 
+    //                  Readbases, ReadbasesQuality, ReadPositionRank, Strand]
+    size_t sn = batchsamples_posinfomap_vector.size();
+    std::vector<int> mapq;                     mapq.reserve(sn);
+    std::vector<std::string> map_read_bases;   map_read_bases.reserve(sn);
+    std::vector<char> map_read_base_qualities; map_read_base_qualities.reserve(sn);
+    std::vector<int> read_pos_ranks;           read_pos_ranks.reserve(sn);
+    std::vector<char> map_strands;             map_strands.reserve(sn);
+    
+    for (uint32_t pos(reg_start); pos < reg_end+1; ++pos) {
+
+        PosMap::const_iterator pos_it;
+        uint32_t depth = 0;
+        for (size_t i = 0; i < sn; i++) {
+            pos_it = batchsamples_posinfomap_vector[i].find(pos);
+            if (pos_it != batchsamples_posinfomap_vector[i].end()) {
+
+                ++depth;
+                if (pos_it->second.ref_id != ref_id || pos_it->second.ref_pos != pos)
+                    throw std::runtime_error("[ERROR] reference id or position not match.");
+                
+                mapq.push_back(pos_it->second.mapq);
+                map_read_bases.push_back(pos_it->second.read_base);
+                map_read_base_qualities.push_back(pos_it->second.read_base_qual);
+                read_pos_ranks.push_back(pos_it->second.rpr);
+                map_strands.push_back(pos_it->second.map_strand);
+
+            } else {
+                mapq.push_back(0);
+                map_read_bases.push_back("N");
+                map_read_base_qualities.push_back(BASE_Q0_ASCII);
+                read_pos_ranks.push_back(0);
+                map_strands.push_back('.');
+            }
+        }
+
+        std::string out = ref_id + "\t" + ngslib::tostring(pos) + "\t" + fa_seq[pos-1] + "\t" + 
+                          ngslib::tostring(depth) + "\t" + ngslib::join(mapq, ",") + "\t" + 
+                          ngslib::join(map_read_bases, ",") + "\t" + ngslib::join(map_read_base_qualities, ",") + "\t" +
+                          ngslib::join(read_pos_ranks, ",") + "\t" + ngslib::join(map_strands, ",") + "\n";
+        
+        // write to file and check is successful or not.
+        if (bgzf_write(obf, out.c_str(), out.length()) != out.length()) {
+            throw std::runtime_error("[ERROR] fail to write data");
+        }
+
+        mapq.clear();
+        map_read_bases.clear();
+        map_read_base_qualities.clear();
+        read_pos_ranks.clear();
+        map_strands.clear();
+    }
 
     return;
 }
@@ -444,6 +494,14 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // 
         throw std::runtime_error("[ERROR] " + output_batch_file + " open failure.");
     }
 
+    // write header inforamtion to batchfile
+    std::string bf_header = "##fileformat=BaseVarBatchFile_v1.0\n" 
+                            "##SampleIDs=" + ngslib::join(batch_sample_ids, ",") + "\n" + 
+                            "#CHROM\tPOS\tREF\tDepth(CoveredSample)\tMappingQuality\t"
+                            "Readbases\tReadbasesQuality\tReadPositionRank\tStrand\n";
+    if (bgzf_write(obf, bf_header.c_str(), bf_header.length()) != bf_header.length())
+        throw std::runtime_error("[ERROR] fail to write data");
+
     uint32_t sub_reg_start, sub_reg_end;
     bool is_not_empty = false;
     for (uint32_t i(reg_start), j(0); i < reg_end + 1; i += STEP_REGION_LEN, ++j) {
@@ -456,12 +514,12 @@ std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end 
                                               mapq_thd, 
                                               std::make_tuple(ref_id, sub_reg_start, sub_reg_end),
                                               batchsamples_posinfomap_vector);  // 传引用，省内存，得数据
-        /* Output batchfile */
-        if (is_not_empty) {
-            __write_record_to_batchfile(batchsamples_posinfomap_vector, 
-                                        std::make_tuple(ref_id, sub_reg_start, sub_reg_end), 
-                                        obf);
-        }
+
+        /* Output batchfile, no matter 'batchsamples_posinfomap_vector' is empty or not. */
+        __write_record_to_batchfile(batchsamples_posinfomap_vector, 
+                                    fa_seq,
+                                    std::make_tuple(ref_id, sub_reg_start, sub_reg_end), 
+                                    obf);
 
         batchsamples_posinfomap_vector.clear();  // 清空，为下个循环做准备
     }
@@ -475,6 +533,7 @@ std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end 
     time_t now = time(0);
     std::string ct(ctime(&now));
     ct.pop_back();  // rm the trailing '\n' put by `asctime`
+
     std::cout << "[INFO] " + ct + ". Done for creating batchfile " << output_batch_file << ", " 
               << (double)(clock() - start_time) / CLOCKS_PER_SEC   << " seconds elapsed.\n"
               << std::endl;
@@ -524,9 +583,8 @@ uint32_t read_count = 0;
                 sample_target_reads.push_back(al);  // record the proper reads of sample
             }
 
+            sample_posinfo_map.clear();  // make sure it's empty
             if (sample_target_reads.size() > 0) {
-                sample_posinfo_map.clear();  // make sure it's empty
-
                 // get alignment information of [i] sample.
                 __seek_position(sample_target_reads, fa_seq, genome_region, sample_posinfo_map);
             }
@@ -631,7 +689,6 @@ std::cout << sample_map_reads[i] << "\n";
                 // {ref_pos (no need to add ref_id in the key) => map info}
                 sample_posinfo_map.insert({map_ref_pos, align_base_info});
             }
-            // align_base_info must set to be empty
 
 std::cout << " - "  << aligned_pairs[i].op << " - [" << ref_id << ", " << align_base_info.ref_pos << ", " 
           << align_base_info.map_strand    << ", "   << align_base_info.ref_base << "-" << align_base_info.read_base << "] - [" 

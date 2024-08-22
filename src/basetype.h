@@ -136,6 +136,7 @@ void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,  //
                      PosMap &sample_posinfo_map);
 
 void __write_record_to_batchfile(PosMapVector &batchsamples_posinfomap_vector, 
+                                 const std::string &fa_seq,
                                  const ngslib::GenomeRegionTuple target_genome_region,  // 该参数和 __seek_position 中一样 
                                  BGZF *obf);
 
