@@ -118,7 +118,7 @@ struct AlignBaseInfo {
 bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // Not a modifiable value
                           const std::vector<std::string> batch_sample_ids,   // Not a modifiable value
                           const std::string &fa_seq,                         // Not a modifiable value
-                          ngslib::GenomeRegionTuple genome_region,           // 切割该区间
+                          const ngslib::GenomeRegionTuple genome_region,     // 切割该区间
                           const int mapq_thd,                                // mapping quality threshold
                           const std::string output_batch_file);              // output batchfile name
 
@@ -127,15 +127,18 @@ typedef std::vector<PosMap> PosMapVector;
 bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
                             const std::string &fa_seq,                   
                             const int mapq_thd,
-                            ngslib::GenomeRegionTuple target_genome_region,  // 获取该区间内的 read
-                            PosMapVector &out_pos_batchinfo);
+                            const ngslib::GenomeRegionTuple target_genome_region,  // 获取该区间内的 read
+                            PosMapVector &batchsamples_posinfomap_vector);
 
-void __seek_position(std::vector<ngslib::BamRecord> &sample_map_reads,  // ngslib::BamRecord include by 'bam.h'
+void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,  // ngslib::BamRecord include by 'bam.h'
                      const std::string &fa_seq,
-                     ngslib::GenomeRegionTuple target_genome_region,    // 获取该区间内所有位点的碱基比对信息
+                     const ngslib::GenomeRegionTuple target_genome_region,    // 获取该区间内所有位点的碱基比对信息，该参数和 '__fetch_base_in_region' 中一样 
                      PosMap &sample_posinfo_map);
 
-void __write_record_to_batchfile(const std::string ref_id, PosMapVector &pos_batchinfo_vector, BGZF *obf);
+void __write_record_to_batchfile(PosMapVector &batchsamples_posinfomap_vector, 
+                                 const ngslib::GenomeRegionTuple target_genome_region,  // 该参数和 __seek_position 中一样 
+                                 BGZF *obf);
+
 /**
  * @brief BaseTypeRunner class
  */
@@ -159,7 +162,7 @@ private:
 
     // For variant calling
     void _variant_caller_process();
-    std::vector<std::string> _create_batchfiles(ngslib::GenomeRegionTuple genome_region);
+    std::vector<std::string> _create_batchfiles(ngslib::GenomeRegionTuple genome_region, std::string prefix);
 
     BaseTypeRunner(const BaseTypeRunner &b) = delete;             // reject using copy constructor (C++11 style).
     BaseTypeRunner &operator=(const BaseTypeRunner &b) = delete;  // reject using copy/assignment operator (C++11 style).
