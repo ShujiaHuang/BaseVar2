@@ -415,8 +415,9 @@ void __write_record_to_batchfile(PosMapVector &batchsamples_posinfomap_vector,
     std::string ref_id; uint32_t reg_start, reg_end;
     std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
 
-    // Output columns: [CHROM, POS, REF, Depth(CoveredSample), MappingQuality, 
-    //                  Readbases, ReadbasesQuality, ReadPositionRank, Strand]
+    // Output columns: 
+    // [CHROM, POS, REF, Depth(CoveredSample), MappingQuality, 
+    //  Readbases, ReadbasesQuality, ReadPositionRank, Strand]
     size_t sn = batchsamples_posinfomap_vector.size();
     std::vector<int> mapq;                     mapq.reserve(sn);
     std::vector<std::string> map_read_bases;   map_read_bases.reserve(sn);
@@ -509,15 +510,12 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // 
         sub_reg_end = sub_reg_start + STEP_REGION_LEN - 1 > reg_end ? reg_end : sub_reg_start + STEP_REGION_LEN - 1;
 
 std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end << "\n";
-        is_not_empty = __fetch_base_in_region(batch_align_files,
-                                              fa_seq,
-                                              mapq_thd, 
+        is_not_empty = __fetch_base_in_region(batch_align_files, fa_seq, mapq_thd, 
                                               std::make_tuple(ref_id, sub_reg_start, sub_reg_end),
                                               batchsamples_posinfomap_vector);  // 传引用，省内存，得数据
 
         /* Output batchfile, no matter 'batchsamples_posinfomap_vector' is empty or not. */
-        __write_record_to_batchfile(batchsamples_posinfomap_vector, 
-                                    fa_seq,
+        __write_record_to_batchfile(batchsamples_posinfomap_vector, fa_seq,
                                     std::make_tuple(ref_id, sub_reg_start, sub_reg_end), 
                                     obf);
 
