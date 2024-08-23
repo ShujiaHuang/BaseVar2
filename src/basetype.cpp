@@ -379,7 +379,7 @@ void BaseTypeRunner::_variant_caller_process() {
             ngslib::safe_remove(ngslib::get_last_modification_file(cache_outdir));
     }
 
-    // 构成 batchfile 临时目录和输出文件名的前缀
+    // 构造 batchfile 的临时目录和输出文件名前缀
     std::string prefix = cache_outdir + "/" + stem_bn;
 
     // 以区间为单位进行变异检测, 每个区间里再调用多线程
@@ -423,7 +423,7 @@ void __write_record_to_batchfile(PosMapVector &batchsamples_posinfomap_vector,
     std::vector<char> map_read_base_qualities; map_read_base_qualities.reserve(sn);
     std::vector<int> read_pos_ranks;           read_pos_ranks.reserve(sn);
     std::vector<char> map_strands;             map_strands.reserve(sn);
-    
+
     for (uint32_t pos(reg_start); pos < reg_end+1; ++pos) {
 
         PosMap::const_iterator pos_it;
