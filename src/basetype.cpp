@@ -415,7 +415,7 @@ void __write_record_to_batchfile(PosMapVector &batchsamples_posinfomap_vector,
     std::string ref_id; uint32_t reg_start, reg_end;
     std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
 
-    // Output columns: 
+    // Output columns and set zhe capacity for each vector: 
     // [CHROM, POS, REF, Depth(CoveredSample), MappingQuality, 
     //  Readbases, ReadbasesQuality, ReadPositionRank, Strand]
     size_t sn = batchsamples_posinfomap_vector.size();
@@ -427,21 +427,21 @@ void __write_record_to_batchfile(PosMapVector &batchsamples_posinfomap_vector,
 
     for (uint32_t pos(reg_start); pos < reg_end+1; ++pos) {
 
-        PosMap::const_iterator pos_it;
+        PosMap::const_iterator smp_pos_it;  // specifi sample position map
         uint32_t depth = 0;
         for (size_t i = 0; i < sn; i++) {
-            pos_it = batchsamples_posinfomap_vector[i].find(pos);
-            if (pos_it != batchsamples_posinfomap_vector[i].end()) {
+            smp_pos_it = batchsamples_posinfomap_vector[i].find(pos);
+            if (smp_pos_it != batchsamples_posinfomap_vector[i].end()) {
 
                 ++depth;
-                if (pos_it->second.ref_id != ref_id || pos_it->second.ref_pos != pos)
+                if (smp_pos_it->second.ref_id != ref_id || smp_pos_it->second.ref_pos != pos)
                     throw std::runtime_error("[ERROR] reference id or position not match.");
                 
-                mapq.push_back(pos_it->second.mapq);
-                map_read_bases.push_back(pos_it->second.read_base);
-                map_read_base_qualities.push_back(pos_it->second.read_base_qual);
-                read_pos_ranks.push_back(pos_it->second.rpr);
-                map_strands.push_back(pos_it->second.map_strand);
+                mapq.push_back(smp_pos_it->second.mapq);
+                map_read_bases.push_back(smp_pos_it->second.read_base);
+                map_read_base_qualities.push_back(smp_pos_it->second.read_base_qual);
+                read_pos_ranks.push_back(smp_pos_it->second.rpr);
+                map_strands.push_back(smp_pos_it->second.map_strand);
 
             } else {
                 mapq.push_back(0);
@@ -462,9 +462,8 @@ void __write_record_to_batchfile(PosMapVector &batchsamples_posinfomap_vector,
                           ngslib::join(map_strands, ",")               + "\n";
         
         // write to file and check is successful or not.
-        if (bgzf_write(obf, out.c_str(), out.length()) != out.length()) {
+        if (bgzf_write(obf, out.c_str(), out.length()) != out.length())
             throw std::runtime_error("[ERROR] fail to write data");
-        }
 
         mapq.clear();
         map_read_bases.clear();
@@ -512,14 +511,15 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // 
     for (uint32_t i(reg_start), j(0); i < reg_end + 1; i += STEP_REGION_LEN, ++j) {
         sub_reg_start = i;
         sub_reg_end = sub_reg_start + STEP_REGION_LEN - 1 > reg_end ? reg_end : sub_reg_start + STEP_REGION_LEN - 1;
-
 std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end << "\n";
+
         is_not_empty = __fetch_base_in_region(batch_align_files, fa_seq, mapq_thd, 
                                               std::make_tuple(ref_id, sub_reg_start, sub_reg_end),
                                               batchsamples_posinfomap_vector);  // 传引用，省内存，得数据
 
         /* Output batchfile, no matter 'batchsamples_posinfomap_vector' is empty or not. */
-        __write_record_to_batchfile(batchsamples_posinfomap_vector, fa_seq,
+        __write_record_to_batchfile(batchsamples_posinfomap_vector, 
+                                    fa_seq,
                                     std::make_tuple(ref_id, sub_reg_start, sub_reg_end), 
                                     obf);
 
