@@ -302,22 +302,19 @@ void BaseTypeRunner::_get_popgroup_info() {
  * 
  */
 std::vector<std::string> BaseTypeRunner::_create_batchfiles(ngslib::GenomeRegionTuple genome_region, 
-                                                            std::string prefix) 
+                                                            const std::string bf_prefix) 
 {
-    std::string ref_id; uint32_t reg_start, reg_end;
-    std::tie(ref_id, reg_start, reg_end) = genome_region;
-
-    std::string regstr = ref_id + "_" + ngslib::tostring(reg_start) + "-" + ngslib::tostring(reg_end);
-    std::string bf_prefix = prefix + "." + regstr;
+    std::string ref_id;
+    std::tie(ref_id, std::ignore, std::ignore) = genome_region;
+    std::string fa_seq = reference[ref_id];  // use the whole sequence of ``ref_id`` for simply
 
     int bn = _args->input_bf.size() / _args->batchcount;
     if (_args->input_bf.size() % _args->batchcount > 0)
         bn++;
 
     ThreadPool thread_pool(_args->thread_num);  // set multiple-thread
-    std::vector<std::future<bool> > create_batchfile_processes;
+    std::vector<std::future<bool>> create_batchfile_processes;
 
-    std::string fa_seq = reference[ref_id];  // use the whole sequence of ``ref_id`` for simply
     std::vector<std::string> batchfiles;
     for (size_t i(0), j(1); i < _args->input_bf.size(); i+=_args->batchcount, ++j) {
         // set name for batchfile
@@ -361,9 +358,54 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(ngslib::GenomeRegion
     return batchfiles;  // done for batchfiles created and return
 }
 
+void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfiles, 
+                                         const std::string sub_vcf_fn,
+                                         const std::string sub_cvg_fn) 
+{
+    std::vector<BGZF*> batch_fp_vector;
+    for (size_t i(0); i < batchfiles.size(); ++i) {
+        BGZF *f = bgzf_open(batchfiles[i].c_str(), "r");
+        if (!f) {
+            throw std::runtime_error("[ERROR] " + batchfiles[i] + " open failure.");
+        }
+        batch_fp_vector.push_back(f);
+    }
+
+    BGZF *VCF = bgzf_open(sub_vcf_fn.c_str(), "w"); // output vcf file
+    if (!VCF)
+        throw std::runtime_error("[ERROR] " + sub_vcf_fn + " open failure.");
+    
+    BGZF *CVG = bgzf_open(sub_vcf_fn.c_str(), "w"); // output vcf file
+    if (!CVG)
+        throw std::runtime_error("[ERROR] " + sub_cvg_fn + " open failure.");
+
+
+    // 按位点进行多线程，数据存入缓存数组，以缓存数组为单位进行多线程操作，然后再输出到文件
+
+
+    // close VCF and CVG file
+    int is_cl = bgzf_close(VCF);  // 关闭文件
+    if (is_cl < 0)
+        std::cout << "[WARNING] " + sub_vcf_fn + " fail close.\n";
+
+    is_cl = bgzf_close(CVG);
+    if (is_cl < 0)
+        std::cout << "[WARNING] " + sub_cvg_fn + " fail close.\n";
+
+    // close all batchfiles
+    for (size_t i(0); i < batch_fp_vector.size(); ++i) {
+        is_cl = bgzf_close(batch_fp_vector[i]);
+        if (is_cl < 0)
+            std::cout << "[WARNING] " + batchfiles[i] + " fail close.\n";
+    }
+    
+    return;
+
+}
+
 void BaseTypeRunner::_variant_caller_process() {
 
-    // Get filepath stem name
+    // Get filepath and stem name first.
     std::string _bname = ngslib::basename(_args->output_vcf);
     size_t si = _bname.find_first_of(".vcf");
     std::string stem_bn = si > 0 && si != std::string::npos ? _bname.substr(0, si) : _bname;
@@ -374,43 +416,61 @@ void BaseTypeRunner::_variant_caller_process() {
 
     if (_args->smart_rerun) {
         // Remove and rollback `thread_num` last modification files. 
-        // Must do these before calling '_create_batchfiles', and DO NOT do these process in loop!
+        // Must do is before calling '_create_batchfiles'
         for (size_t i(0); i < _args->thread_num; ++i)
             ngslib::safe_remove(ngslib::get_last_modification_file(cache_outdir));
     }
 
-    // 构造 batchfile 的临时目录和输出文件名前缀
-    std::string prefix = cache_outdir + "/" + stem_bn;
+    // comprise the batchfile's stem prefix by cache directory and stem_bn
+    std::string prefix_stem = cache_outdir + "/" + stem_bn;
 
     // 以区间为单位进行变异检测, 每个区间里再调用多线程
-    std::vector<std::string> batchfiles;
+    std::vector<std::string> batchfiles, vcffiles, cvgfiles;
+
+    std::string ref_id; uint32_t reg_start, reg_end;
     for (size_t i(0); i < _calling_intervals.size(); ++i) {
+
+        std::tie(ref_id, reg_start, reg_end) = _calling_intervals[i];
+        std::string regstr = ref_id + "_" + ngslib::tostring(reg_start) + "-" + ngslib::tostring(reg_end);
+        std::string prefix = prefix_stem + "." + regstr;     
+
+        // Create batchfiles
         batchfiles = _create_batchfiles(_calling_intervals[i], prefix);
         std::cout << "[INFO] Done for creating all " << i << " - " << batchfiles.size() 
                   << " batchfiles and start to call variants.\n";
         
-        // calling variants from batchfiles
-        /* add codes here */
+        // Calling variants from batchfiles
+        std::string sub_vcf_fn = prefix + ".vcf.gz";
+        std::string sub_cvg_fn = prefix + ".cvg.gz";
 
+        _variants_discovery(batchfiles, sub_vcf_fn, sub_cvg_fn);
+        std::cout << "[INFO] Do for calling variants in " + regstr  + 
+                     " and save in temporary files: [" + sub_vcf_fn + ", " + 
+                     sub_cvg_fn + "]\n";
+
+        vcffiles.push_back(sub_vcf_fn);
+        cvgfiles.push_back(sub_cvg_fn);
     }
 
     return;
 }
 
+// Run the processes of calling variant and output files.
 void BaseTypeRunner::run() {
-    // Run the process of calling variant and output files.
+
     _variant_caller_process();
     return;
 }
 
-/// Calling variant functions outside of class 'BaseTypeRunner' 
+/// Functions for calling variants outside of 'BaseTypeRunner' class 
+
 // Create temp batch file for variant discovery
 void __write_record_to_batchfile(PosMapVector &batchsamples_posinfomap_vector,
                                  const std::string &fa_seq,
                                  const ngslib::GenomeRegionTuple genome_region, 
                                  BGZF *obf) 
 {
-    const static char BASE_Q0_ASCII = '!';  // '!' ascii code is 33
+    const static char BASE_Q0_ASCII = '!';  // The ascii code of '!' character is 33
 
     std::string ref_id; uint32_t reg_start, reg_end;
     std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
@@ -438,7 +498,13 @@ void __write_record_to_batchfile(PosMapVector &batchsamples_posinfomap_vector,
                     throw std::runtime_error("[ERROR] reference id or position not match.");
                 
                 mapq.push_back(smp_pos_it->second.mapq);
-                map_read_bases.push_back(smp_pos_it->second.read_base);
+                if (smp_pos_it->second.ref_base.size() == smp_pos_it->second.read_base.size()) { // SNV
+                    map_read_bases.push_back(smp_pos_it->second.read_base);
+                } else if (smp_pos_it->second.ref_base.size() < smp_pos_it->second.read_base.size()) {  // Ins
+                    map_read_bases.push_back("+" + smp_pos_it->second.read_base);
+                } else { // Deletion
+                    map_read_bases.push_back("-" + smp_pos_it->second.ref_base);
+                }
                 map_read_base_qualities.push_back(smp_pos_it->second.read_base_qual);
                 read_pos_ranks.push_back(smp_pos_it->second.rpr);
                 map_strands.push_back(smp_pos_it->second.map_strand);
@@ -479,19 +545,16 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // 
                           const std::vector<std::string> batch_sample_ids,   // Not a modifiable value
                           const std::string &fa_seq,                         // Not a modifiable value
                           const ngslib::GenomeRegionTuple genome_region,
-                          const int mapq_thd,                   // mapping quality threshold
-                          const std::string output_batch_file)  // output batchfile name
+                          const int mapq_thd,                                // mapping quality threshold
+                          const std::string output_batch_file)               // output batchfile name
 // 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
 {   
-    // This value affected the computing memory, could be set to 1000000, 20 just for test
+    // This value affected the computing memory, could be set to 500000 or 1000000, 20 just for test
     static const uint32_t STEP_REGION_LEN = 20;
     clock_t start_time = clock();
 
     std::string ref_id; uint32_t reg_start, reg_end;
     std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
-
-    PosMapVector batchsamples_posinfomap_vector;
-    batchsamples_posinfomap_vector.reserve(batch_align_files.size());  //  pre-set the capacity
 
     BGZF *obf = bgzf_open(output_batch_file.c_str(), "w"); // output file handle of output_batch_file
     if (!obf) {
@@ -506,8 +569,11 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // 
     if (bgzf_write(obf, bf_header.c_str(), bf_header.length()) != bf_header.length())
         throw std::runtime_error("[ERROR] fail to write data");
 
+    PosMapVector batchsamples_posinfomap_vector;
+    batchsamples_posinfomap_vector.reserve(batch_align_files.size());  //  pre-set the capacity
+
+    bool is_not_empty = false, has_data = false;
     uint32_t sub_reg_start, sub_reg_end;
-    bool is_not_empty = false;
     for (uint32_t i(reg_start), j(0); i < reg_end + 1; i += STEP_REGION_LEN, ++j) {
         sub_reg_start = i;
         sub_reg_end = sub_reg_start + STEP_REGION_LEN - 1 > reg_end ? reg_end : sub_reg_start + STEP_REGION_LEN - 1;
@@ -516,6 +582,9 @@ std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end 
         is_not_empty = __fetch_base_in_region(batch_align_files, fa_seq, mapq_thd, 
                                               std::make_tuple(ref_id, sub_reg_start, sub_reg_end),
                                               batchsamples_posinfomap_vector);  // 传引用，省内存，得数据
+        if (!has_data && is_not_empty) {
+            has_data = true;
+        }
 
         /* Output batchfile, no matter 'batchsamples_posinfomap_vector' is empty or not. */
         __write_record_to_batchfile(batchsamples_posinfomap_vector, 
@@ -540,7 +609,7 @@ std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end 
               << (double)(clock() - start_time) / CLOCKS_PER_SEC   << " seconds elapsed.\n"
               << std::endl;
 
-    return is_not_empty;
+    return has_data;
 }
 
 bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,  
@@ -627,8 +696,8 @@ void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,
     // A vector of: (cigar_op, read position, reference position, read base, read_qual, reference base)
     std::vector<ngslib::ReadAlignedPair> aligned_pairs;
     for(size_t i(0); i < sample_map_reads.size(); ++i) {
-std::cout << sample_map_reads[i] << "\n";
 
+std::cout << sample_map_reads[i] << "\n";
         align_base_info.map_strand = sample_map_reads[i].map_strand();  // '*', '-' or '+'
         align_base_info.mapq = sample_map_reads[i].mapq();
 
@@ -692,9 +761,10 @@ std::cout << sample_map_reads[i] << "\n";
                 sample_posinfo_map.insert({map_ref_pos, align_base_info});
             }
 
-std::cout << " - "  << aligned_pairs[i].op << " - [" << ref_id << ", " << align_base_info.ref_pos << ", " 
-          << align_base_info.map_strand    << ", "   << align_base_info.ref_base << "-" << align_base_info.read_base << "] - [" 
-          << aligned_pairs[i].qpos << ", " << aligned_pairs[i].read_base << ", " << aligned_pairs[i].read_qual << "]\n";
+std::cout 
+<< " - "  << aligned_pairs[i].op << " - [" << ref_id << ", " << align_base_info.ref_pos << ", " 
+<< align_base_info.map_strand    << ", "   << align_base_info.ref_base << "-" << align_base_info.read_base << "] - [" 
+<< aligned_pairs[i].qpos << ", " << aligned_pairs[i].read_base << ", " << aligned_pairs[i].read_qual << "]\n";
         }
 std::cout << "\n";
     }
