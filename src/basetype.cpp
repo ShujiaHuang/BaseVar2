@@ -452,10 +452,14 @@ void __write_record_to_batchfile(PosMapVector &batchsamples_posinfomap_vector,
             }
         }
 
-        std::string out = ref_id + "\t" + ngslib::tostring(pos) + "\t" + fa_seq[pos-1] + "\t" + 
-                          ngslib::tostring(depth) + "\t" + ngslib::join(mapq, ",") + "\t" + 
-                          ngslib::join(map_read_bases, ",") + "\t" + ngslib::join(map_read_base_qualities, ",") + "\t" +
-                          ngslib::join(read_pos_ranks, ",") + "\t" + ngslib::join(map_strands, ",") + "\n";
+        std::string out = ref_id + "\t" + 
+                          ngslib::tostring(pos) + "\t" + fa_seq[pos-1] + "\t" + 
+                          ngslib::tostring(depth)                      + "\t" + 
+                          ngslib::join(mapq, ",")                      + "\t" + 
+                          ngslib::join(map_read_bases, ",")            + "\t" + 
+                          ngslib::join(map_read_base_qualities, ",")   + "\t" +
+                          ngslib::join(read_pos_ranks, ",")            + "\t" + 
+                          ngslib::join(map_strands, ",")               + "\n";
         
         // write to file and check is successful or not.
         if (bgzf_write(obf, out.c_str(), out.length()) != out.length()) {
