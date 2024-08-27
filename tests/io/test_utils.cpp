@@ -5,34 +5,35 @@
 
 int main(int argc, char *argv[]) {
 
-    // // create thread pool with 4 worker threads
-    // ThreadPool pool(4);
-
-    // // enqueue and store future
-    // auto result = pool.enqueue([](int answer) { return answer; }, 42);
-
-    // // get result from future
-    // std::cout << result.get() << std::endl;
-
     std::vector<std::string> a, b;
-    std::vector<int> c = {1,2,3,4};
-    std::vector<float> d = {0.1,2.5,3,4.0};
     a.push_back("Hello");
     a.push_back("World!");
+    std::string s = "Hello world. There are two needles in this haystack with needles.";
+    std::cout << "Find first 'are': " << s.find("are") << " - " << (s.find("are", 100) ==std::string::npos) << "\n";
+    std::cout << s.size() << " - " << s.length() << "\n";
+    
+    ngslib::split(".I am hello\tworld,w", b, ".");
+    std::cout << "'I am thello\\tworld,w' : " << b.size() << " : " << ngslib::join(b, "--") << std::endl;
 
-    std::cout << ngslib::join(a, ",") << std::endl;
-    ngslib::split("hello::world", b, ":");
-    std::cout << ngslib::join(b, " -- ") << std::endl;
+    ngslib::split("hello,world::ww", b, ":");
+    std::cout << "'hello,world::ww'    : " << b.size() << " " << ngslib::join(b, "--") << std::endl;
+
+    ngslib::split(",hello,world,,ww,", b, ",");
+    std::cout << "',hello,world,,ww,'  : " << b.size() << " " << ngslib::join(b, "--") << std::endl;
+
+    ngslib::split("hello::world", b, ">>", false);
+    ngslib::split("hello::world", b, "h", false);
+    std::cout << b[0] << ": " << ngslib::join(b, "--") << std::endl;
+
+    std::vector<int> c = {1,2,3,4};
     std::cout << ngslib::join(c) << std::endl;
     std::cout << ngslib::join(c, ":") << std::endl;
+
+    std::vector<float> d = {0.1,2.5,3,4.0};
     std::cout << ngslib::join(d, " - ") << std::endl;
 
-    ngslib::split("hello::world", b, ">>", true);
-    ngslib::split("hello::world", b, ">>h", true);
-    std::cout << ngslib::join(b, " -- ") << std::endl;
-
     ngslib::split("1,2,3,4", c, ",", false);
-    ngslib::split("1,2,3,4", d, ",", true);
+    ngslib::split(",1,2,3,4", d, ",", false);
     std::cout << ngslib::join(c, " ") << std::endl;
     std::cout << ngslib::join(d, " ") << std::endl;
 

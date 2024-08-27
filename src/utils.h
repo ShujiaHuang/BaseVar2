@@ -5,9 +5,12 @@
 
 #include <sstream>
 #include <string>
+#include <cstring>  // use the 'strlen' function
 #include <vector>
 #include <tuple>
+#include <iterator>
 
+#include <iostream>
 
 namespace ngslib {
     // define a genome region data style
@@ -27,9 +30,10 @@ namespace ngslib {
 
     // Template function can only be defined in C++ header file
     template<typename T>
-    std::string tostring(T d) {
-        std::stringstream ss;
-        ss << d;
+    std::string tostring(const T &value) {
+
+        std::ostringstream ss;
+        ss << value;
         return ss.str();
     }
 
@@ -72,31 +76,38 @@ namespace ngslib {
         return out_str;
     }
 
+    void split(const std::string &in_str, std::vector<std::string> &out, const char *delim, bool is_append=false);
+    
+    // 重载除了 vector<string> 之外的所有其他基础数据类型
     template<typename T>
-    void split(std::string in_str, std::vector<T> &out, const char *delim, bool is_append=false) {
+    void split(const std::string &in_str, std::vector<T> &out, const char *delim, bool is_append=false) {
         
-        if (!is_append) out.clear();
-        std::stringstream ss;
+        if (!is_append) { out.clear(); }
+
+        // Takes only space separated C++ strings when using 'stringstream'  
+        std::istringstream ss;
+
+        size_t i(0), find_start_idx(0), delim_len(std::strlen(delim)), len;
+        std::string tok;
         T d;
-        while(1) {
-            ss.clear();  // clear the stringstream pipe before the next loop!!! 
 
-            //erase delimiter
-            int i = in_str.find_first_not_of(delim);
-            if (i == std::string::npos) break;
-            in_str.erase(0, i);
+        while(i != std::string::npos) {
 
-            i = in_str.find_first_of(delim);
-            if (i == std::string::npos) {
-                ss << in_str; ss >> d;  // convert data tobe T from stringstream pipe
+            ss.clear();  // clear the stringstream pipe first
+
+            i = in_str.find(delim, find_start_idx);
+            len = (i==std::string::npos) ? in_str.length() - find_start_idx : i - find_start_idx;
+            tok = in_str.substr(find_start_idx, len); 
+
+            if (!tok.empty()) {
+                ss.str(tok);
+                ss >> d;
                 out.push_back(d);
-                break;  // hit the end of input string, break the loop
             } else {
-                std::string tok = in_str.substr(0, i);
-                ss << tok; ss >> d;  // data type conversion
-                out.push_back(d);
-                in_str.erase(0, i);
+                out.push_back(0);  // Empty value set to be 0. [int, double, float]
             }
+
+            find_start_idx = i + delim_len;  // skip 'delim' character and set to find next 'delim' string
         }
 
         return;
