@@ -12,11 +12,11 @@ int main(int argc, char *argv[]) {
     std::cout << "Find first 'are': " << s.find("are") << " - " << (s.find("are", 100) ==std::string::npos) << "\n";
     std::cout << s.size() << " - " << s.length() << "\n";
     
-    ngslib::split(".I am hello\tworld,w", b, ".");
-    std::cout << "'I am thello\\tworld,w' : " << b.size() << " : " << ngslib::join(b, "--") << std::endl;
+    ngslib::split(". I am hello\tworld,w", b, ".");
+    std::cout << "'. I am thello\\tworld,w' : " << b.size() << " : " << ngslib::join(b, "--") << std::endl;
 
-    ngslib::split("hello,world::ww", b, ":");
-    std::cout << "'hello,world::ww'    : " << b.size() << " " << ngslib::join(b, "--") << std::endl;
+    ngslib::split("hello, world :: ww", b, ":");
+    std::cout << "'hello, world :: ww'    : " << b.size() << " " << ngslib::join(b, "--") << std::endl;
 
     ngslib::split(",hello,world,,ww,", b, ",");
     std::cout << "',hello,world,,ww,'  : " << b.size() << " " << ngslib::join(b, "--") << std::endl;
@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
     std::cout << ngslib::join(d, " - ") << std::endl;
 
     ngslib::split("1,2,3,4", c, ",", false);
-    ngslib::split(",1,2,3,4", d, ",", false);
+    ngslib::split(",1.1,2,3,4", d, ",", true);  // The first element is empty and will be initial by 0.
     std::cout << ngslib::join(c, " ") << std::endl;
     std::cout << ngslib::join(d, " ") << std::endl;
 
