@@ -11,6 +11,10 @@ int main(int argc, char *argv[]) {
     std::string s = "Hello world. There are two needles in this haystack with needles.";
     std::cout << "Find first 'are': " << s.find("are") << " - " << (s.find("are", 100) ==std::string::npos) << "\n";
     std::cout << s.size() << " - " << s.length() << "\n";
+
+    const char *ts = "##Sample IDs=ERS225193";
+    std::vector<std::string> h; ngslib::split(ts, h, "=");
+    std::cout << "##Sample IDs=ERS225193 : " << h[0] << " - " << h[1] << "\n" << ngslib::join(h, "/") << "\n";
     
     ngslib::split(". I am hello\tworld,w", b, ".");
     std::cout << "'. I am thello\\tworld,w' : " << b.size() << " : " << ngslib::join(b, "--") << std::endl;
