@@ -117,11 +117,6 @@ struct AlignBaseInfo {
     // set default argument
 };
 
-typedef robin_hood::unordered_map<uint32_t, AlignBaseInfo> PosMap;           // give a short name to this type
-typedef std::vector<PosMap> PosMapVector;
-
-
-
 /**
  * @brief BaseTypeRunner class
  */
@@ -174,6 +169,9 @@ public:
     void run();
 
 };  // BaseTypeRunner class
+
+typedef robin_hood::unordered_map<uint32_t, AlignBaseInfo> PosMap;           // give a short name to this type
+typedef std::vector<PosMap> PosMapVector;
 
 // This function is only used by BaseTypeRunner::_create_batchfiles
 bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // Not a modifiable value
