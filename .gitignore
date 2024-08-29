@@ -10,6 +10,7 @@
 CMakeCache.txt
 cmake_install.cmake
 
+cache_*/
 build/
 CMakeFiles/
 *.egg-info/
