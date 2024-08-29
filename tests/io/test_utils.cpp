@@ -1,9 +1,21 @@
 #include <iostream>
+#include <cmath>
+#include <string>
+#include <algorithm>
+
 
 #include <vector>
 #include "utils.h"
 
+static const double MLN10TO10 = -0.23025850929940458;  // 换底，把 10 换为 e 为底：log(10)/10;
+
 int main(int argc, char *argv[]) {
+
+    std::cout << "phred 'a': " << exp(('a'-33) * MLN10TO10) << "\n";
+
+    std::string str = "AbcG";
+    std::transform(str.begin(), str.end(), str.begin(), ::toupper);
+    std::cout << "Toupper case: 'AbcG' => " << str << "\n";
 
     std::vector<std::string> a, b;
     a.push_back("Hello");
