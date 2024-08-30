@@ -5,8 +5,8 @@
  *  Note: https://blog.yanjingang.com/?p=4487
  *
  */
-#ifndef THREAD_POOL_H
-#define THREAD_POOL_H
+#ifndef __INCLUDE_THREAD_POOL_H__
+#define __INCLUDE_THREAD_POOL_H__
 
 #include <vector>
 #include <queue>

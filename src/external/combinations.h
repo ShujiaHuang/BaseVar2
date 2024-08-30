@@ -1,4 +1,8 @@
 // combinations.h, from https://stackoverflow.com/questions/9430568/generating-combinations-in-c
+
+#ifndef __INCLUDE_COMBINATIONS_H__
+#define __INCLUDE_COMBINATIONS_H__
+
 #include <vector>
 
 /**
@@ -79,3 +83,4 @@ unsigned long long Combinations<T>::comb(unsigned long long n, unsigned long lon
     return r;
 }
 
+#endif
