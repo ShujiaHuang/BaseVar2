@@ -104,14 +104,14 @@ bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
                             const std::string &fa_seq,                   
                             const int mapq_thd,
                             const ngslib::GenomeRegionTuple target_genome_region,  // 获取该区间内的 read
-                            PosMapVector &batchsamples_posinfomap_vector);
+                            PosMapVector &batchsamples_posinfomap_vector);         // 信息存入该变量
 
 void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,  // ngslib::BamRecord include by 'bam.h'
                      const std::string &fa_seq,
                      const ngslib::GenomeRegionTuple target_genome_region,    // 获取该区间内所有位点的碱基比对信息，该参数和 '__fetch_base_in_region' 中一样 
                      PosMap &sample_posinfo_map);
 
-void __write_record_to_batchfile(PosMapVector &batchsamples_posinfomap_vector, 
+void __write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vector, 
                                  const std::string &fa_seq,
                                  const ngslib::GenomeRegionTuple target_genome_region,  // 该参数和 __seek_position 中一样 
                                  BGZF *obf);

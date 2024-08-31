@@ -925,8 +925,8 @@ std::cout << "\n";
     return;
 }
 
-// Create temp batch file for variant discovery
-void __write_record_to_batchfile(PosMapVector &batchsamples_posinfomap_vector,
+// Create batch file for variant discovery
+void __write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vector,
                                  const std::string &fa_seq,
                                  const ngslib::GenomeRegionTuple genome_region, 
                                  BGZF *obf) 
