@@ -11,6 +11,13 @@ static const double MLN10TO10 = -0.23025850929940458;  // 换底，把 10 换为
 
 int main(int argc, char *argv[]) {
 
+std::vector<double> tt{1,2,3,4};
+std::cout << ngslib::join(tt, ",") <<"\n";
+tt = std::vector<double> (tt.size(), 0); 
+std::cout << ngslib::join(tt, ",") <<"\n";
+tt.clear();
+exit(1);
+
     std::cout << "phred 'a': " << exp(('a'-33) * MLN10TO10) << "\n";
 
     std::string str = "AbcG";

@@ -10,16 +10,15 @@
 #define __INCLUDE_BASETYPE_H__
 
 #include <iostream>
+#include <cmath>  // use exp() function
 #include <string>
 #include <vector>
 #include <map>
 
-#include <cmath>  // use exp() function
-
-static const std::string BASES = "ACGT";  // 定义这个值，目的是为了限定 likehood 数组中碱基似然值的存放顺序
-static const std::map<char, int> B_IDX = {{'A', 0}, {'C', 1}, {'G', 2}, {'T', 3}};
-static const double MLN10TO10 = -0.23025850929940458;  // 换底，把 10 换为 e 为底：log(10)/10;
-
+static const std::vector<char> BASES = {'A', 'C', 'G', 'T'}; // 定义这个值，限定 likelihood 数组中碱基似然值的存放顺序
+static const double MLN10TO10   = -0.23025850929940458;      // ln(10)/10，把 phred-value 换成 e 为底，方便调用 exp()
+static const int LRT_THRESHOLD  = 24;                        // 24 corresponding to a chi-pvalue of 10^-6
+static const int QUAL_THRESHOLD = 60;                        // -10 * lg(10^-6)
 
 // Mainly use for basevar variant callling
 struct BatchInfo {
@@ -42,6 +41,17 @@ struct BatchInfo {
     BatchInfo(): n(0), ref_pos(0), depth(0) {}
 };
 
+/**
+ * @brief Define a structure for recording allele information return by _f() 
+ * in this class.
+ * 
+ */
+typedef struct {
+    std::vector<std::vector<char>> bc;
+    std::vector<std::vector<double>> bp;
+    std::vector<double> lr;
+} AA;
+
 // A class for calculate the base probability
 class BaseType {
 
@@ -50,11 +60,25 @@ private:
 
     std::string _ref_id, _ref_base;
     uint32_t ref_pos;
-    std::vector<std::string> _alt_bases;
+    std::vector<std::string> _alt_bases;    
     double _min_af;
 
-    //Allele [A, C, G, T] likelihood vector for echo individual
-    std::vector<std::vector<double>> ind_allele_likelihood;
+    
+    // [A, C, G, T] likelihood vector for echo individual
+    std::vector<std::vector<double>> _ind_allele_likelihood; // 2d-array, n x 4 matrix, n is sample size.
+    std::map<char, size_t> _B_IDX;  // A map for recrod the BASE => index
+    
+    // Estimated allele frequency by EM and LRT
+    std::map<std::string, double> _af_by_lrt;
+
+    int _total_depth;              // sum depth of ACGT
+    std::map<char, double> _depth; // allele depth of [A, C, G, T]
+
+    // init the base likelihood by input bases
+    std::vector<double> _set_allele_frequence(const std::vector<char> &bases);
+
+    // Calculate population likelihood for all the combination of bases
+    AA _f(const std::vector<char> &bases, int n);
 
     BaseType(const BaseType &b) = delete;             // reject using copy constructor (C++11 style).
     BaseType &operator=(const BaseType &b) = delete;  // reject using copy/assignment operator (C++11 style).
@@ -62,11 +86,17 @@ private:
 public:
     // Constructor
     BaseType(const BatchInfo *smp_bi, double af);
+    ~BaseType() {};
 
-    ~BaseType() {_min_af = 0;};
-    void set_minaf(double af) { _min_af = af; }
-
-    void lrt();
+    // The main function for likelihood ratio test
+    /**
+     * @brief 
+     * 
+     * @param specific_bases a 1d-array. [optional]
+     * Calculating LRT for specific base combination if provided.
+     */
+    void lrt() { /* default */ lrt(BASES); }
+    void lrt(const std::vector<char> &specific_bases);
 
 }; // BaseType class
 

@@ -12,4 +12,6 @@ g++ -O3 -fPIC test_threadpool.cpp -I ../../src -o test_threadpool
 
 g++ -O3 -fPIC test_utils.cpp ../../src/utils.cpp -I ../../src -o test_utils
 
+gcc -O3 -Wall -I ../../src -std=c++11 -lstdc++ -o test_combinations test_combinations.cpp
+
 
