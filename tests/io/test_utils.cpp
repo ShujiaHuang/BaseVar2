@@ -13,7 +13,7 @@ int main(int argc, char *argv[]) {
 
 std::vector<double> tt{1,2,3,4};
 std::cout << ngslib::join(tt, ",") <<"\n";
-tt = std::vector<double> (tt.size(), 0); 
+tt = std::vector<double> (3, 0); 
 std::cout << ngslib::join(tt, ",") <<"\n";
 tt.clear();
 exit(1);

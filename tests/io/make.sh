@@ -11,7 +11,10 @@ g++ -O3 -fPIC test_cmdline.cpp -I ../../src -lz -lbz2 -lm -llzma -lpthread -lcur
 g++ -O3 -fPIC test_threadpool.cpp -I ../../src -o test_threadpool
 
 g++ -O3 -fPIC test_utils.cpp ../../src/utils.cpp -I ../../src -o test_utils
+g++ -O3 -fPIC test_algorithm.cpp ../../htslib/libhts.a -I ../../src -I ../../htslib -o test_algorithm && ./test_algorithm
+
 
 gcc -O3 -Wall -I ../../src -std=c++11 -lstdc++ -o test_combinations test_combinations.cpp
 
 
+g++ -O3 -fPIC test_algorithm.cpp ../../htslib/libhts.a -I ../../src -I ../../htslib -o test_algorithm && ./test_algorithm
