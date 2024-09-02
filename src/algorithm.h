@@ -52,10 +52,9 @@ double fisher_exact_test(int n11, int n12, int n21, int n22,
                                &left_pvalue, 
                                &right_pvalue, 
                                &twoside_pvalue);
-                               
+
     return (is_twoside) ? twoside_pvalue : (is_leftside ? left_pvalue : right_pvalue);
 }
-
 
 double wilcoxon_ranksum_test(const std::vector<double>& sample1, const std::vector<double>& sample2) {
 
@@ -117,37 +116,6 @@ double wilcoxon_ranksum_test(const std::vector<double>& sample1, const std::vect
     
     // 返回秩和
     return rankSum1;
-}
-
-double ref_vs_alt_ranksumtest(const char ref_base, 
-                              const std::string alt_bases_string,
-                              const std::vector<char> &bases,
-                              const std::vector<int> &values)  // values 和 bases 的值是配对的，一一对应 
-{
-    std::vector<double> ref, alt;
-    ref.reserve(values.size());  // change capacity and save time
-    alt.reserve(values.size());  // change capacity and save time
-
-    for (size_t i = 0; i < bases.size(); i++) {
-        if (bases[i] == 'N' || bases[i] == '-' || bases[i] == '+') 
-            continue;
-
-        if (bases[i] == ref_base) {
-            ref.push_back(values[i]);
-        } else if (alt_bases_string.find(bases[i]) != std::string::npos) {
-            alt.push_back(values[i]);
-        }
-    }
-std::cout << "ref_vs_alt_ranksumtest: Ref - " << ref_base << " - " << ngslib::join(ref, ",") << "\n";
-std::cout << "ref_vs_alt_ranksumtest: ALT - " << alt_bases_string << " - " << ngslib::join(alt, ",") << "\n";
-    
-    double p_value = wilcoxon_ranksum_test(ref, alt);
-    double p_phred_scale_value = -10 * log10(p_value);
-    if (std::isinf(p_phred_scale_value)) {
-        p_phred_scale_value = 10000;
-    }
-
-    return p_phred_scale_value;
 }
 
 /**
