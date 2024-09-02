@@ -2,10 +2,10 @@
  * @file algorthm.h
  * 
  * 
- * @brief
+ * @brief  Contain some main algorithms of BaseVar
  *  
  * @author Shujia Huang
- * @date 2024-08-30
+ * @date 2018-08-30
  * 
  */
 
