@@ -114,8 +114,8 @@ double wilcoxon_ranksum_test(const std::vector<double>& sample1, const std::vect
     double z = (rankSum1 - e) / std::sqrt(double(n1*n2*(n1+n2+1))/12.0);
     double p = 2 * norm_dist(std::abs(z));
     
-    // 返回秩和
-    return rankSum1;
+    // 返回秩和检验 pvalue
+    return p;
 }
 
 /**
