@@ -8,28 +8,39 @@
  */
 
 #include <numeric>  // use std::accumulate function
+#include <cctype>   // use topper()
+
+#include <htslib/kfunc.h>
 
 #include "basetype.h"
 #include "algorithm.h"
 #include "external/combinations.h"
+
+#include "utils.h"  // join()
 
 //////////////////////////////////////////////////////////////
 //// The codes for the member function of BaseType class /////
 //////////////////////////////////////////////////////////////
 BaseType::BaseType(const BatchInfo *smp_bi, double min_af) : _only_call_snp(true) {
 
-    _min_af = min_af;
-    _total_depth = 0;
-
-    // some common value
+    // set common values
     for (size_t i(0); i < BASES.size(); ++i) {
         _B_IDX[BASES[i]] = i;  // set [A, C, G, T] char map to array index
         _depth[BASES[i]] = 0;  // inital the base depth to 0.
     }
 
+    _min_af      = min_af;
+    _total_depth = 0;
+
+    _ref_id   = smp_bi->ref_id;
+    _ref_pos  = smp_bi->ref_pos;
+    _ref_base = smp_bi->ref_base;
+    _alt_bases.clear();
+
     // Initialized the array to {0, 0, 0, 0}, which set allele likelihood for [A, C, G, T]
     std::vector<double> allele_lh(BASES.size(), 0);
     _ind_allele_likelihood.reserve(smp_bi->n);
+    _qual_pvalue.reserve(smp_bi->n);
 
     double epsilon; // base error probability
     char fb;
@@ -46,15 +57,58 @@ BaseType::BaseType(const BatchInfo *smp_bi, double min_af) : _only_call_snp(true
             _depth[fb]++;  // record the depth for read base: [A, C, G, T]
             _total_depth++;
 
+            epsilon = exp((smp_bi->align_base_quals[i] - 33) * MLN10TO10);
+            _qual_pvalue.push_back(1.0 - epsilon);
+
             for(size_t j(0); j < BASES.size(); ++j) {
                 // convert the quality phred scale to be the base confident probabilty value
-                epsilon = exp((smp_bi->align_base_quals[i] - 33) * MLN10TO10);
                 allele_lh[j] = (fb == BASES[j]) ? 1.0 - epsilon : epsilon / 3;
             }
             _ind_allele_likelihood.push_back(allele_lh); // A 2d-array, n x 4 matrix, n is sample size.
         }
     }
 }
+
+BaseType::BaseType(const BaseType &b) {
+
+    this->_only_call_snp = b._only_call_snp;
+    this->_ref_id        = b._ref_id;
+    this->_ref_pos       = b._ref_pos;
+    this->_ref_base      = b._ref_base;
+    this->_alt_bases     = b._alt_bases;
+
+    this->_min_af      = b._min_af;
+    this->_var_qual    = b._var_qual;
+    this->_af_by_lrt   = b._af_by_lrt;
+    this->_qual_pvalue = b._qual_pvalue;
+    this->_ind_allele_likelihood = b._ind_allele_likelihood;
+
+    this->_depth       = b._depth;
+    this->_total_depth = b._total_depth;
+    this->_B_IDX       = b._B_IDX;
+}
+
+// We do not have free any data before assige, no need this function.
+// BaseType &BaseType::operator=(const BaseType &b) { 
+
+//     this->_only_call_snp = b._only_call_snp;
+//     this->_ref_id        = b._ref_id;
+//     this->_ref_pos       = b._ref_pos;
+//     this->_ref_base      = b._ref_base;
+//     this->_alt_bases     = b._alt_bases;
+
+//     this->_min_af      = b._min_af;
+//     this->_var_qual    = b._var_qual;
+//     this->_af_by_lrt   = b._af_by_lrt;
+//     this->_qual_pvalue = b._qual_pvalue;
+//     this->_ind_allele_likelihood = b._ind_allele_likelihood;
+
+//     this->_depth       = b._depth;
+//     this->_total_depth = b._total_depth;
+//     this->_B_IDX       = b._B_IDX;
+
+//     return *this;
+// }
 
 std::vector<double> BaseType::_set_allele_frequence(const std::vector<char> &bases) {
     // bases 数组中 A,C,G,T 这四个碱基最多只能各出现一次
@@ -88,7 +142,7 @@ AA BaseType::_f(const std::vector<char> &bases, int n) {
 
     Combinations<char> c(bases, n);
     std::vector<std::vector<char>> cbs_v = c.get();  // combination bases vector
-    for (size_t i = 0; i < cbs_v.size(); i++) {
+    for (size_t i = 0; i < cbs_v.size(); i++) {      // 计算该位点每一种可能的碱基组合
 
         std::vector<double> obs_allele_freq = this->_set_allele_frequence(cbs_v[i]);
         double sum_freq = std::accumulate(obs_allele_freq.begin(), obs_allele_freq.end(), 0);
@@ -96,25 +150,33 @@ AA BaseType::_f(const std::vector<char> &bases, int n) {
             continue;
         
         std::vector<double> log10_marginal_likelihood;
+        // 'obs_allele_freq' and 'log10_marginal_likelihood' are updated in EM.
         EM(_ind_allele_likelihood, obs_allele_freq, log10_marginal_likelihood);
 
         double sum_log10_marginal_likelihood = std::accumulate(log10_marginal_likelihood.begin(), 
                                                                log10_marginal_likelihood.end(), 0);
-        
+
         data.bc.push_back(cbs_v[i]);
-        data.lr.push_back(sum_log10_marginal_likelihood);
         data.bp.push_back(obs_allele_freq);
+        data.lr.push_back(sum_log10_marginal_likelihood);
     }
     
     return data;
 }
 
-// The main function for likelihood ratio test
+/**
+ * @brief The main function for likelihood ratio test
+ * 
+ * @param specific_bases Calculating LRT for specific base combination
+ * 
+ */
 void BaseType::lrt(const std::vector<char> &specific_bases) {
+
+    if (_total_depth == 0) return;
     
     std::vector<char> active_bases;
-    // Get active bases which count frequence > _min_af
     for (auto b: specific_bases) {
+        // Get active bases which count frequence > _min_af
         if (_depth[b] / _total_depth >= _min_af)
             active_bases.push_back(b);
     }
@@ -122,19 +184,179 @@ void BaseType::lrt(const std::vector<char> &specific_bases) {
     if (active_bases.size() == 0) return;
 
     // init. Base combination of active_bases
-    AA var = _f(active_bases, active_bases.size());
+    AA var = _f(active_bases, active_bases.size());  // F4
 
     double chi_sqrt_value = 0;
-    std::vector<double> base_frq = var.bp[0];
-    std::vector<double> lr_alt   = var.lr;
-    std::vector<double> ltr_chivalue;
+    std::vector<double> active_bases_freq = var.bp[0];
+    double lr_alt   = var.lr[0];  // f4
 
     // Find candinate altnative alleles
     for (size_t n = active_bases.size() - 1; n > 0; --n) {
         var = _f(active_bases, n);
 
-        // ltr_chivalue = ;
+        size_t i_min = 0;
+        double lrt_chivalue = 2 * (lr_alt - var.lr[i_min]);
+        double chi_sqrt_value = lrt_chivalue;
+
+        for (size_t j(1); j < var.lr.size(); ++j) {
+            lrt_chivalue = 2 * (lr_alt - var.lr[j]);
+            if (lrt_chivalue < chi_sqrt_value) {
+                chi_sqrt_value = lrt_chivalue;
+                i_min = j;
+            }
+        }
+
+        lr_alt = var.lr[i_min];
+        if (chi_sqrt_value < LRT_THRESHOLD) {
+            // Take the null hypothesis and continue
+std::cout << "Before: " << ngslib::join(active_bases, ",") << "\n";
+            active_bases = var.bc[i_min];
+            active_bases_freq = var.bp[i_min];
+std::cout << "After:  " << ngslib::join(active_bases, ",") << "\n";
+        } else {
+            // Take the alternate hypothesis
+            break;
+        }
+    }
+
+std::cout << "- The 'active_bases': " << ngslib::join(active_bases, ",") << "\n";
+std::cout << "- The size of 'active_bases_freq' must be 4, and we get: " << active_bases_freq.size() << "\n";
+    char upper_ref_base = toupper(this->_ref_base[0]);  // Only call SNP: only get the first base for SNP
+    for (auto b: active_bases) {
+        if (b != upper_ref_base) {
+            this->_alt_bases.push_back(b);
+            this->_af_by_lrt[b] = active_bases_freq[_B_IDX[b]];
+        }
+    }
+
+    // Todo: improve the calculation method for var_qual
+    if (this->_alt_bases.size()) {
+        double r = this->_depth[active_bases[0]] / this->_total_depth;
+        if ((active_bases.size() == 1) && (this->_total_depth > 10) && (r > 0.5)) {
+            this->_var_qual = 5000.0;
+        } else {
+            // 'chi2_test' may return nan, which is caused by 'chi_sqrt_value' <= 0 and means p value is 1.0.
+            double chi_prob = chi2_test(chi_sqrt_value, 1);  // Python: chi_prob = chi2.sf(chi_sqrt_value, 1)
+            if (std::isnan(chi_prob)) chi_prob = 1.0;
+
+            this->_var_qual = (chi_prob) ? -10 * log10(chi_prob) : 10000.0;
+        }
     }
 
     return;
 }
+
+/**
+ * @brief Mann-Whitney-Wilcoxon Rank Sum Test for REF and ALT array.
+ * 
+ * @param ref_base A reference base
+ * @param alt_bases_string 
+ * @param bases 
+ * @param values 
+ * @return double   Phred-scale value of ranksum-test pvalue
+ * 
+ * Note: There's some difference between scipy.stats.ranksums with R's wilcox.test:
+ *       https://stackoverflow.com/questions/12797658/pythons-scipy-stats-ranksums-vs-rs-wilcox-test
+ * 
+ */
+double ref_vs_alt_ranksumtest(const char ref_base, 
+                              const std::string alt_bases_string,
+                              const std::vector<char> &bases,
+                              const std::vector<int> &values)  // values 和 bases 的值是配对的，一一对应 
+{
+    std::vector<double> ref, alt;
+    ref.reserve(values.size());  // change capacity and save time
+    alt.reserve(values.size());  // change capacity and save time
+
+    for (size_t i = 0; i < bases.size(); i++) {
+        if (bases[i] == 'N' || bases[i] == '-' || bases[i] == '+') 
+            continue;
+
+        if (bases[i] == ref_base) {
+            ref.push_back(values[i]);
+        } else if (alt_bases_string.find(bases[i]) != std::string::npos) {
+            alt.push_back(values[i]);
+        }
+    }
+std::cout << "ref_vs_alt_ranksumtest: Ref - " << ref_base << " - " << ngslib::join(ref, ",") << "\n";
+std::cout << "ref_vs_alt_ranksumtest: ALT - " << alt_bases_string << " - " << ngslib::join(alt, ",") << "\n";
+    
+    double p_phred_scale_value;
+    if (ref.size() > 0 && alt.size()) { // not empty
+        double p_value = wilcoxon_ranksum_test(ref, alt);
+        p_phred_scale_value = -10 * log10(p_value);
+        if (std::isinf(p_phred_scale_value)) {
+            p_phred_scale_value = 10000;
+        }
+    } else {
+        // set a big enough phred-scale value if only get REF or ALT base on this postion.
+        p_phred_scale_value = 10000;
+    }
+    return p_phred_scale_value;
+}
+
+double ref_vs_alt_ranksumtest(const char ref_base, 
+                              const std::string alt_bases_string,
+                              const std::vector<char> &bases,
+                              const std::vector<char> &values) 
+{
+std::cout << "Before convert char      : " << ngslib::join(values, ",") << "\n";
+    std::vector<int> v(values.begin(), values.end()); 
+std::cout << "After convert char -> int: " << ngslib::join(v, ",") << "\n\n";
+    return ref_vs_alt_ranksumtest(ref_base, alt_bases_string, bases, v);
+}
+
+StrandBiasInfo strand_bias(const char ref_base, 
+                           const std::string alt_bases_string,
+                           const std::vector<char> &bases,
+                           const std::vector<char> &strands)  // strands 和 bases 是配对的，一一对应 
+{
+    int ref_fwd = 0, ref_rev = 0;
+    int alt_fwd = 0, alt_rev = 0;
+
+    for (size_t i(0); i < bases.size(); ++i) {
+        // ignore non bases or indels
+        if (bases[i] == 'N' || bases[i] == '-' || bases[i] == '+') 
+            continue;
+        
+        if (strands[i] == '+') {
+            if (bases[i] == ref_base) {
+                ++ref_fwd;
+            } else if (alt_bases_string.find(bases[i]) != std::string::npos) {
+                ++alt_fwd;
+            }
+
+        } else if (strands[i] == '-') {
+            if (bases[i] == ref_base) {
+                ++ref_rev;
+            } else if (alt_bases_string.find(bases[i]) != std::string::npos) {
+                ++alt_rev;
+            }
+
+        } else {
+            throw std::runtime_error("[ERROR] Get strange strand symbol: " + ngslib::tostring(strands[i]));
+        }
+    }
+
+    // 如果是'全 Ref' 或者是 '全 ALT' 怎么办？
+    double fs = -10 * log10(fisher_exact_test(ref_fwd, ref_rev, alt_fwd, alt_rev));
+    if (std::isinf(fs)) {
+        fs = 10000;
+    } else if (fs == 0) {
+        fs = 0.0;
+    }
+
+    // Strand bias estimated by the Symmetric Odds Ratio test
+    // https://software.broadinstitute.org/gatk/documentation/tooldocs/current/org_broadinstitute_gatk_tools_walkers_annotator_StrandOddsRatio.php
+    double sor = (ref_rev * alt_fwd > 0) ? (double)(ref_fwd * alt_rev) / (double)(ref_rev * alt_fwd): 10000;
+
+    StrandBiasInfo sbi;
+    sbi.ref_fwd = ref_fwd; sbi.ref_rev = ref_rev; 
+    sbi.alt_fwd = alt_fwd; sbi.alt_rev = alt_rev;
+    sbi.fs  = fs; 
+    sbi.sor = sor;
+
+    return sbi;
+}
+
+

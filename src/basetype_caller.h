@@ -13,12 +13,13 @@
 
 #include <map>
 
-#include "basetype_utils.h"
-
 #include "Fasta.h"
 #include "bam.h"
 #include "utils.h"
 #include "external/robin_hood.h"
+
+#include "basetype.h"
+#include "basetype_utils.h"
 
 
 // Mainly use for create batchfile
@@ -33,7 +34,6 @@ struct AlignBaseInfo {
     char map_strand;        // mapping reference strand, should be one of '*', '-', '+'
     char read_base_qual;    // read base quality (get mean quality of read if Indels, 
                             // I don't care about Indels for NIPT data)
-    // set default argument
 };
 
 /**
@@ -126,9 +126,20 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
                            const std::string tmp_cvg_fn);
 
 bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, 
+                     const std::map<std::string, std::vector<size_t>> &group_smp_idx,
                      double min_af,
                      size_t n_sample, 
                      BGZF *vcf_hd, 
                      BGZF *cvg_hd);
+
+const BaseType __gb(const BatchInfo *smp_bi, 
+              const std::vector<size_t> group_idx, 
+              const std::vector<char> &basecombination, 
+              double min_af);
+
+void _out_vcf_line(const BaseType &bt, 
+                   const std::map<std::string, BaseType> &group_bt, 
+                   const BatchInfo *smp_bi, 
+                   BGZF *vcf_hd);
 
 #endif

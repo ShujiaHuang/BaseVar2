@@ -14,7 +14,6 @@
 #include <htslib/bgzf.h>
 #include <htslib/tbx.h>
 
-#include "basetype.h"
 #include "basetype_caller.h"
 #include "external/threadpool.h"
 
@@ -147,7 +146,7 @@ void BaseTypeRunner::_variant_caller_process() {
     // Get filepath and stem name first.
     std::string _bname = ngslib::basename(_args->output_vcf);
     size_t si = _bname.find(".vcf");
-    std::string stem_bn = si > 0 && si != std::string::npos ? _bname.substr(0, si) : _bname;
+    std::string stem_bn = (si > 0 && si != std::string::npos) ? _bname.substr(0, si) : _bname;
 
     std::string outdir = ngslib::dirname(_args->output_vcf);
     std::string cache_outdir = outdir + "/cache_" + stem_bn;
@@ -160,7 +159,7 @@ void BaseTypeRunner::_variant_caller_process() {
             ngslib::safe_remove(ngslib::get_last_modification_file(cache_outdir));
     }
 
-    // 以区间为单位进行变异检测, 每个区间里再调用多线程
+    // 以区间为单位进行变异检测, 每个区间里调用多线程
     std::vector<std::string> batchfiles, vcffiles, cvgfiles;
 
     std::string ref_id; uint32_t reg_start, reg_end;
@@ -340,15 +339,17 @@ void BaseTypeRunner::_get_popgroup_info() {
     _groups_idx.clear();
     std::map<std::string, std::string>::iterator s2g_it;
     
-    // follow the order of samples
-    for (size_t i(0); i < _samples_id.size(); ++i) {
-        s2g_it = sample2group.find(_samples_id[i]);
-        
-        // ignore all the samples which not found
-        if (s2g_it != sample2group.end()) {
-            // record sample index of group groups
-            // group -> index of _samples_id
-            _groups_idx[sample2group[_samples_id[i]]].push_back(i);
+    // follow the order of '_samples_id'
+    if (sample2group.size() > 0) {
+        for (size_t i(0); i < _samples_id.size(); ++i) {
+            s2g_it = sample2group.find(_samples_id[i]);
+            
+            // ignore all the samples which not found
+            if (s2g_it != sample2group.end()) {
+                // record sample index of group groups
+                // group -> index of _samples_id
+                _groups_idx[sample2group[_samples_id[i]]].push_back(i);
+            }
         }
     }
     // test
@@ -470,26 +471,17 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
         }
     }
 
-    // merge all the subfiles
-    BGZF *VCF = bgzf_open(out_vcf_fn.c_str(), "w"); // output vcf file
-    if (!VCF)
-        throw std::runtime_error("[ERROR] " + out_vcf_fn + " open failure.");
-    
-    BGZF *CVG = bgzf_open(out_cvg_fn.c_str(), "w"); // output coverage file
-    if (!CVG)
-        throw std::runtime_error("[ERROR] " + out_cvg_fn + " open failure.");
-
-    /* Merge temparory files here */
-
-
-    /// close VCF and CVG file
-    int is_cl = bgzf_close(VCF);
-    if (is_cl < 0)
-        throw std::runtime_error("[ERROR] " + out_vcf_fn + " fail close.");
-
-    is_cl = bgzf_close(CVG);
-    if (is_cl < 0)
-        throw std::runtime_error("[ERROR] " + out_cvg_fn + " fail close.");
+    // Merge all the subfiles
+    std::vector<std::string> add_group_info;
+    std::map<std::string, std::vector<size_t>>::iterator it = _groups_idx.begin();
+    for(; it != _groups_idx.end(); ++it) {
+        add_group_info.push_back("##INFO=<ID=" + it->first + "_AF,Number=A,Type=Float,Description="
+                           "\"Allele frequency in the " + it->first + " populations calculated "
+                           "base on LRT, in the range (0,1)\">");
+    }
+    std::string header = vcf_header_define(_args->reference, add_group_info, _samples_id);
+    merge_file_by_line(subvcfs, out_vcf_fn, header);
+    merge_file_by_line(subcvgs, out_cvg_fn, header);
     
     return;
 }
@@ -504,9 +496,7 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
                            const std::string tmp_vcf_fn,
                            const std::string tmp_cvg_fn)
 {
-    bool has_data = false;
-
-    // Prepare for reading data
+    /*************** Preparing for reading data **************/
     std::vector<BGZF*> batch_file_hds;
     std::vector<tbx_t*> batch_file_tbx;
     std::vector<hts_itr_t*> batch_file_itr;
@@ -536,7 +526,7 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
         free(s.s);
         if ((bgzf_close(f)) < 0) throw std::runtime_error("[ERROR] " + batchfiles[i] + " fail close.");
 
-        f = bgzf_open(batchfiles[i].c_str(), "r");
+        f = bgzf_open(batchfiles[i].c_str(), "r"); // open again
         batch_file_hds.push_back(f);  // record the file handle
 
         tbx_t *tbx = tbx_index_load(batchfiles[i].c_str());
@@ -559,8 +549,9 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
                                      "input bamfiles.\n" 
                                      "Sample ids in batchfiles: " + ngslib::join(bf_smp_ids, ",") + "\n" 
                                      "Sample ids in bamfiles  : " + ngslib::join(sample_ids, ",") + "\n");
+    /************* Done for reading data prepare *************/
 
-    // start calling variants
+    // Start calling variants
     BGZF *VCF = bgzf_open(tmp_vcf_fn.c_str(), "w"); // output vcf file
     if (!VCF) throw std::runtime_error("[ERROR] " + tmp_vcf_fn + " open failure.");
     
@@ -570,37 +561,34 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
     std::vector<std::string> smp_bf_line_vector;
     smp_bf_line_vector.reserve(batchfiles.size());
 
-    bool is_eof = false, is_empty;
-    kstring_t s; s.s = NULL; s.l = s.m = 0;
+    bool is_eof = false, has_data = false;
     uint32_t n = 0;
     while (!is_eof) {
         // clear the vector before next loop.
         smp_bf_line_vector.clear();
-        is_empty = true;
         for (size_t i(0); i < batchfiles.size(); ++i) {
+            
             // Fetch one line from each batchfile per loop and the row number of batchfiles must be the same.
+            kstring_t s; s.s = NULL; s.l = s.m = 0; // must be refreshed in loop
             int eof = tbx_bgzf_itr_next(batch_file_hds[i], batch_file_tbx[i], batch_file_itr[i], &s);
             if (eof < 0) {
                 is_eof = true;
+                free(s.s);
                 break;
             }
-
-// std::cout << i << " - BF line: " << s.s << "\n";
             smp_bf_line_vector.push_back(s.s);
-            if (smp_bf_line_vector[i].length()) {
-                // has data
-                is_empty = false;
-            }
+            free(s.s);
         }
+        
         ++n;  // line number
-
-        // Empty, skip!
-        if (is_empty) continue;
+        if (n % 10000 == 0) {
+            std::cout << "[INFO] Have been loaded " << n << "lines.\n";
+        }
 
         // Samples' data for each poistion is ready and calling variants now
-        _basevar_caller(smp_bf_line_vector, min_af, sample_ids.size(), VCF, CVG);
+        bool cc = _basevar_caller(smp_bf_line_vector, group_smp_idx, min_af, sample_ids.size(), VCF, CVG);
+        if (cc && !has_data) has_data = cc;
     }
-    free(s.s);
 
     // close all batchfiles
     for (size_t i(0); i < batchfiles.size(); ++i) {
@@ -617,18 +605,23 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
     return has_data;
 }
 
-bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, double min_af, size_t n_sample,
-                     BGZF *vcf_hd, BGZF *cvg_hd) 
+bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, 
+                     const std::map<std::string, std::vector<size_t>> &group_smp_idx,
+                     double min_af, 
+                     size_t n_sample,
+                     BGZF *vcf_hd, 
+                     BGZF *cvg_hd) 
 {
-    // initial
+    // Initial
     BatchInfo samples_bi;
 
-    // prepare the capacity for saving time
+    // Prepare the capacity for saving time
     samples_bi.align_bases.reserve(n_sample);
     samples_bi.align_base_quals.reserve(n_sample);
     samples_bi.mapqs.reserve(n_sample);
     samples_bi.map_strands.reserve(n_sample);
     samples_bi.base_pos_ranks.reserve(n_sample);
+    samples_bi.n     = n_sample;
     samples_bi.depth = 0;
 
     std::vector<std::string> col_info;
@@ -636,17 +629,17 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, double 
     for (size_t i(0); i < smp_bf_line_vector.size(); ++i) {
         // smp_bf_line_vector[i] format is: 
         // [CHROM, POS, REF, Depth, MappingQuality, Readbases, ReadbasesQuality, ReadPositionRank, Strand]
-        // looks like: chr11 5246595 C 10 37,0,0,0,0  ...
+        // Looks like: chr11   5246595   C   10 37,0,0,0,0    ...
         ngslib::split(smp_bf_line_vector[i], col_info, "\t");
-        if (col_info.size() != 9) {
+        if (col_info.size() != 9) {  // 9 is the column number of batchfile 
             throw std::runtime_error("[ERROR] batchfile has invalid data:\n" + smp_bf_line_vector[i]);
         }
 
         if (i == 0) {
-            samples_bi.ref_id   = col_info[0];  // chromosome id
-            samples_bi.ref_pos  = std::stoi(col_info[1]);
+            samples_bi.ref_id   = col_info[0];             // chromosome id
+            samples_bi.ref_pos  = std::stoi(col_info[1]);  // string to int type
             samples_bi.ref_base = col_info[2];
-        } else if ((samples_bi.ref_id   != col_info[0]) || 
+        } else if ((samples_bi.ref_id   != col_info[0])            || 
                    (samples_bi.ref_pos  != std::stoi(col_info[1])) || 
                    (samples_bi.ref_base != col_info[2])) 
         {
@@ -661,7 +654,7 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, double 
         ngslib::split(col_info[8], samples_bi.map_strands,      " ", keep_push_back);
     }
 
-    // Ignore if mapping coverage is 0 of all samples on this position. 
+    // Coverage is 0 of all samples on this position. skip
     if (samples_bi.depth == 0) return false;
     
     // check data
@@ -671,8 +664,8 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, double 
         (samples_bi.map_strands.size()      != n_sample) || 
         (samples_bi.base_pos_ranks.size()   != n_sample))
     {
-        std::cerr << "Total samples size is : "   << n_sample << "\n" + samples_bi.ref_id            << " " 
-                  << samples_bi.ref_pos    << " " << samples_bi.ref_base                             << "\n" 
+        std::cerr << "Total samples size is : "    << n_sample << "\n" + samples_bi.ref_id           << " " 
+                  << samples_bi.ref_pos << " "                 << samples_bi.ref_base                << "\n" 
                   << "bt.samples_bi.mapqs.size():            " << samples_bi.mapqs.size()            << "\n"
                   << "bt.samples_bi.align_bases.size():      " << samples_bi.align_bases.size()      << "\n"
                   << "bt.samples_bi.align_base_quals.size(): " << samples_bi.align_base_quals.size() << "\n"
@@ -681,10 +674,57 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, double 
 
         throw std::runtime_error("[ERROR] Something is wrong in batchfiles.");
     }
-    samples_bi.n = n_sample;
     
     BaseType bt(&samples_bi, min_af);
-    return true;
+    bt.lrt();
+
+    if (bt.get_alt_bases().size() && bt.is_only_snp()) { // only output SNPs in VCF file
+        
+        std::map<std::string, BaseType> popgroup_bt;
+        if (!group_smp_idx.empty()) { // group is not empty
+            std::vector<char> basecombination;
+            basecombination.push_back(toupper(bt.get_ref_base()[0]));  // push upper reference base. 
+            // do not sort, keep the order with 'alt_bases'
+            basecombination.insert(basecombination.end(), bt.get_alt_bases().begin(), bt.get_alt_bases().end());
+std::cout << "For Group: basecombination: " << ngslib::join(basecombination, ",") << "\n";
+            
+            // Call BaseType for each group
+            std::map<std::string, std::vector<size_t>>::const_iterator it = group_smp_idx.begin();
+            for (; it != group_smp_idx.end(); ++it) {
+                popgroup_bt[it->first] = __gb(&samples_bi, it->second, basecombination, min_af);
+            }
+        }
+
+        _out_vcf_line(bt, popgroup_bt, &samples_bi, vcf_hd);
+    }
+
+    return !bt.get_alt_bases().empty() && bt.is_only_snp();  // has SNP
+}
+
+const BaseType __gb(const BatchInfo *smp_bi, 
+                    const std::vector<size_t> group_idx, 
+                    const std::vector<char> &basecombination, 
+                    double min_af) 
+{
+    BatchInfo g_smp_bi;
+    g_smp_bi.ref_id   = smp_bi->ref_id;
+    g_smp_bi.ref_pos  = smp_bi->ref_pos;
+    g_smp_bi.ref_base = smp_bi->ref_base;
+    g_smp_bi.depth    = smp_bi->depth;    // 这个深度肯定不是 group samples 的深度，但没关系，反正不会用到
+    g_smp_bi.n        = group_idx.size(); // sample size for speific group
+
+    for (auto i : group_idx) {
+        g_smp_bi.align_bases.push_back(smp_bi->align_bases[i]);
+        g_smp_bi.align_base_quals.push_back(smp_bi->align_base_quals[i]);
+        g_smp_bi.mapqs.push_back(smp_bi->mapqs[i]);
+        g_smp_bi.map_strands.push_back(smp_bi->map_strands[i]);
+        g_smp_bi.base_pos_ranks.push_back(smp_bi->base_pos_ranks[i]);
+    }
+
+    BaseType bt(&g_smp_bi, min_af);
+    bt.lrt(basecombination);
+
+    return bt;
 }
 
 bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // Not a modifiable value
@@ -693,8 +733,8 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // 
                           const ngslib::GenomeRegionTuple &genome_region,    // [chr, start, end]
                           const int mapq_thd,                                // mapping quality threshold
                           const std::string output_batch_file)               // output batchfile name
-// 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
 {   
+// 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
     // This value affected the computing memory, could be set larger than 500000, 20 just for test
     static const uint32_t STEP_REGION_LEN = 20;
     clock_t start_time = clock();
@@ -979,13 +1019,13 @@ void __write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vec
             }
         }
 
-        std::string out = ref_id + "\t" + ngslib::tostring(pos) + "\t" + fa_seq[pos-1] + "\t" + 
-                          ngslib::tostring(depth)                      + "\t" + 
-                          ngslib::join(mapq, " ")                      + "\t" + 
-                          ngslib::join(map_read_bases, " ")            + "\t" + 
-                          ngslib::join(map_read_base_qualities, " ")   + "\t" +
-                          ngslib::join(read_pos_ranks, " ")            + "\t" + 
-                          ngslib::join(map_strands, " ")               + "\n";
+        std::string out = ref_id + "\t" + std::to_string(pos) + "\t" + fa_seq[pos-1] + "\t" + 
+                          std::to_string(depth)                      + "\t" + 
+                          ngslib::join(mapq, " ")                    + "\t" + 
+                          ngslib::join(map_read_bases, " ")          + "\t" + 
+                          ngslib::join(map_read_base_qualities, " ") + "\t" +
+                          ngslib::join(read_pos_ranks, " ")          + "\t" + 
+                          ngslib::join(map_strands, " ")             + "\n";
         
         // write to file and check is successful or not.
         if (bgzf_write(obf, out.c_str(), out.length()) != out.length())
@@ -998,6 +1038,116 @@ void __write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vec
         read_pos_ranks.clear();
         map_strands.clear();
     }
+
+    return;
+}
+
+void _out_vcf_line(const BaseType &bt, 
+                   const std::map<std::string, BaseType> &group_bt, 
+                   const BatchInfo *smp_bi, 
+                   BGZF *vcf_hd) 
+{
+
+    std::map<char, std::string> alt_gt;
+    std::vector<int> cm_ac; 
+    std::vector<double> cm_af, cm_caf;
+    double ad_sum = 0;
+    for (size_t i(0); i < bt.get_alt_bases().size(); ++i) {
+
+        char b = bt.get_alt_bases()[i];
+        alt_gt[b] = "./" + std::to_string(i+1);
+
+        ad_sum = ad_sum + bt.get_base_depth(b);
+        cm_ac.push_back(bt.get_base_depth(b));
+        cm_af.push_back(bt.get_lrt_af(b));
+        cm_caf.push_back(bt.get_base_depth(b) / bt.get_total_depth());  // Allele frequency by read count
+    }
+
+    // Sample genotype information
+    std::vector<std::string> samples;
+    std::vector<char> align_bases;  // used in ranksumtest
+    std::string gt;
+    char upper_ref_base = toupper(bt.get_ref_base()[0]);  // only for SNPs
+    for (size_t i(0); i < smp_bi->n; ++i) {
+
+        char fb = smp_bi->align_bases[i][0];  // a string, get first base
+        align_bases.push_back(fb);            // only get the first base, suit for SNPs
+        if (fb != 'N' && fb != '+' && fb != '-') {
+            // For the base which not in bt.get_alt_bases()
+            if (alt_gt.find(fb) == alt_gt.end()) alt_gt[fb] = "./.";
+            gt = (fb == upper_ref_base) ? "0/." : alt_gt[fb];
+
+            double qual = bt.get_qual_pvalue()[i];
+            // GT:AB:SO:BP
+            samples.push_back(gt + ":" + fb + ":" + smp_bi->map_strands[i] + ":" + std::to_string(qual));
+        } else {
+            samples.push_back("./.");  // 'N' or Indel.
+        }
+    }
+
+    // For INFO
+    std::string alt_bases_string = ngslib::join(bt.get_alt_bases(), "");
+
+    // Rank Sum Test for mapping qualities of REF versus ALT reads
+    int mq_rank_sum = ref_vs_alt_ranksumtest(upper_ref_base, alt_bases_string, align_bases, smp_bi->mapqs);
+
+    // Rank Sum Test for variant appear position among read of REF versus ALT
+    int read_pos_rank_sum = ref_vs_alt_ranksumtest(upper_ref_base, alt_bases_string, align_bases, smp_bi->base_pos_ranks);
+    
+    // Rank Sum Test for base quality of REF versus ALT
+    int base_q_rank_sum = ref_vs_alt_ranksumtest(upper_ref_base, alt_bases_string, align_bases, smp_bi->align_base_quals);
+
+    // Variant call confidence normalized by depth of sample reads supporting a variant.
+    double qd = bt.get_var_qual() / ad_sum; 
+    if (qd == 0) qd = 0.0; // make sure -0.0 => 0.0
+
+    // Strand bias by fisher exact test and Strand bias estimated by the Symmetric Odds Ratio test.
+    StrandBiasInfo sbi = strand_bias(upper_ref_base, alt_bases_string, align_bases, smp_bi->map_strands);
+
+    // construct the INFO field.
+    std::vector<std::string> info = {
+        "CM_DP="  + std::to_string(bt.get_total_depth()),
+        "CM_AC="  + ngslib::join(cm_ac, ","),
+        "CM_AF="  + ngslib::join(cm_af, ","), 
+        "CM_CAF=" + ngslib::join(cm_caf, ","),
+        "MQRankSum="      + std::to_string(mq_rank_sum),
+        "ReadPosRankSum=" + std::to_string(read_pos_rank_sum),
+        "BaseQRankSum="   + std::to_string(base_q_rank_sum),
+        "QD="     + std::to_string(qd),  // use 'roundf(qd * 1000) / 1000' to round the value to 3 decimal places
+        "SOR="    + std::to_string(sbi.sor),
+        "FS="     + std::to_string(sbi.fs), 
+        "SB_REF=" + std::to_string(sbi.ref_fwd) + "," + std::to_string(sbi.ref_rev),
+        "SB_ALT=" + std::to_string(sbi.alt_fwd) + "," + std::to_string(sbi.alt_rev)
+    };
+
+    if (!group_bt.empty()) { // not empty
+
+        std::vector<std::string> group_af_info;
+        for (std::map<std::string, BaseType>::const_iterator it(group_bt.begin()); it != group_bt.end(); ++it) {
+
+            std::vector<double> af;
+            char b;
+            for (auto b : it->second.get_alt_bases()) {
+                af.push_back(it->second.get_lrt_af(b));
+            }
+            group_af_info.push_back(it->first + "_AF=" + ngslib::join(af, ",")); // groupX_AF=xxx,xxx
+        }
+
+        info.insert(info.end(), group_af_info.begin(), group_af_info.end());
+    }
+
+std::cout << "Calling _out_vcf_line: "<< bt.get_ref_id() << " - " << bt.get_ref_pos() 
+          << " - " << bt.get_ref_base() << " - " << ngslib::join(bt.get_alt_bases(), ",") << " - "
+          << ngslib::join(info, ";") << "\n";
+    
+    std::string sample_format = "GT:AB:SO:BP";
+    std::string qs  = (bt.get_var_qual() > QUAL_THRESHOLD) ? std::to_string(bt.get_var_qual()) : "LowQual";
+    std::string out = bt.get_ref_id() + "\t" + std::to_string(bt.get_ref_pos()) + "\t" + bt.get_ref_base() + "\t" + 
+                      ngslib::join(bt.get_alt_bases(), ",") + "\t"  + qs + "\t" + ngslib::join(info, ";")  + "\t" + 
+                      sample_format + "\t" + ngslib::join(samples, "\t") + "\n";
+    // write to file and check is successful or not.
+    if (bgzf_write(vcf_hd, out.c_str(), out.length()) != out.length())
+        throw std::runtime_error("[ERROR] fail to write data");
 
     return;
 }
