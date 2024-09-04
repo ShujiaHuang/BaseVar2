@@ -6,8 +6,12 @@
 int main() {
     using ngslib::Fasta;
 
+    Fasta ff = "../data/ce.fa.gz";
+    for (size_t i(0); i < ff.nseq(); ++i) {
+        std::cout << i+1 << " - " << ff.iseq_name(i) << " - " << ff.seq_length(ff.iseq_name(i)) << "\n";
+    }
+    
     std::string fn = "../data/tinyfasta.fa";
-
     Fasta fa0;                // default constructor function
     Fasta fa(fn);             // constructor function: `Fasta(const string file_name)`
     Fasta fa1(fn.c_str()); 

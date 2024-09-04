@@ -16,6 +16,13 @@ std::cout << ngslib::join(tt, ",") <<"\n";
 tt = std::vector<double> (3, 0); 
 std::cout << ngslib::join(tt, ",") <<"\n";
 tt.clear();
+
+std::vector<char> cc = {'z', 'c', 'y', 'a', 'G', 'C', 'T', 'A'};
+std::cout << "Before sort: " << ngslib::join(cc, " - ") <<"\n";
+
+std::sort(cc.begin(), cc.end());
+std::cout << "After sort : " << ngslib::join(cc, " - ") <<"\n";
+
 exit(1);
 
     std::cout << "phred 'a': " << exp(('a'-33) * MLN10TO10) << "\n";
