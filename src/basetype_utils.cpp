@@ -6,7 +6,7 @@
 #include "utils.h"
 
 std::string vcf_header_define(const std::string &ref_file_path, const std::vector<std::string> &addition_info, 
-                              const std::vector<std::string> samples)
+                              const std::vector<std::string> &samples)
 {
     ngslib::Fasta fa = ref_file_path;
     std::vector<std::string> contigs;
@@ -44,6 +44,23 @@ std::string vcf_header_define(const std::string &ref_file_path, const std::vecto
     header.insert(header.end(), contigs.begin(), contigs.end());
     header.push_back("##reference=file://" + ngslib::abspath(ref_file_path));
     header.push_back("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" + ngslib::join(samples, "\t"));
+
+    return ngslib::join(header, "\n");
+}
+
+std::string cvg_header_define(const std::vector<std::string> &group_info, const std::vector<char> &BASES) {
+
+    std::string h = "#CHROM\tPOS\tREF\tDepth\t" + ngslib::join(BASES, "\t") + "\t"
+                    "Indels\tFS\tSOR\tStrand_Coverage(REF_FWD,REF_REV,ALT_FWD,ALT_REV)";
+    std::vector<std::string> header = {
+        "##fileformat=CVGv1.0",
+        "##Group information is the depth of A:C:G:T:Indel",
+        h
+    };
+
+    if (!group_info.empty()) {
+        header.push_back(ngslib::join(group_info, "\t"));
+    }
 
     return ngslib::join(header, "\n");
 }

@@ -137,9 +137,18 @@ const BaseType __gb(const BatchInfo *smp_bi,
               const std::vector<char> &basecombination, 
               double min_af);
 
+const BatchInfo __get_group_batchinfo(const BatchInfo *smp_bi, const std::vector<size_t> group_idx);
+
 void _out_vcf_line(const BaseType &bt, 
                    const std::map<std::string, BaseType> &group_bt, 
                    const BatchInfo *smp_bi, 
                    BGZF *vcf_hd);
+
+void _out_cvg_line(const BatchInfo *smp_bi, 
+                   const std::map<std::string, std::vector<size_t>> & group_smp_idx, 
+                   BGZF *cvg_hd);
+
+typedef std::tuple<std::string, std::map<char, int>> IndelTuple;
+IndelTuple __base_depth_and_indel(const std::vector<std::string> &align_bases);
 
 #endif

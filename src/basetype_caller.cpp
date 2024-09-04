@@ -471,17 +471,21 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
         }
     }
 
-    // Merge all the subfiles
-    std::vector<std::string> add_group_info;
+    // Merge all VCF subfiles
+    std::vector<std::string> add_group_info, group_name;
     std::map<std::string, std::vector<size_t>>::iterator it = _groups_idx.begin();
     for(; it != _groups_idx.end(); ++it) {
+        group_name.push_back(it->first);
         add_group_info.push_back("##INFO=<ID=" + it->first + "_AF,Number=A,Type=Float,Description="
                            "\"Allele frequency in the " + it->first + " populations calculated "
                            "base on LRT, in the range (0,1)\">");
     }
     std::string header = vcf_header_define(_args->reference, add_group_info, _samples_id);
-    merge_file_by_line(subvcfs, out_vcf_fn, header);
-    merge_file_by_line(subcvgs, out_cvg_fn, header);
+    merge_file_by_line(subvcfs, out_vcf_fn, header, true);
+
+    // Merge all CVG subfiles
+    header = cvg_header_define(group_name, BASES);
+    merge_file_by_line(subcvgs, out_cvg_fn, header, true);
     
     return;
 }
@@ -543,12 +547,13 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
         batch_file_itr.push_back(itr);
     }
 
-    // check smaples
+    // Check smaples
     if (ngslib::join(bf_smp_ids, ",") != ngslib::join(sample_ids, ","))
             throw std::runtime_error("[BUG] The order of sample ids in batchfiles must be the same as "
                                      "input bamfiles.\n" 
                                      "Sample ids in batchfiles: " + ngslib::join(bf_smp_ids, ",") + "\n" 
                                      "Sample ids in bamfiles  : " + ngslib::join(sample_ids, ",") + "\n");
+
     /************* Done for reading data prepare *************/
 
     // Start calling variants
@@ -561,7 +566,7 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
     std::vector<std::string> smp_bf_line_vector;
     smp_bf_line_vector.reserve(batchfiles.size());
 
-    bool is_eof = false, has_data = false;
+    bool is_eof(false), has_data(false);
     uint32_t n = 0;
     while (!is_eof) {
         // clear the vector before next loop.
@@ -682,6 +687,7 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector,
         
         std::map<std::string, BaseType> popgroup_bt;
         if (!group_smp_idx.empty()) { // group is not empty
+
             std::vector<char> basecombination;
             basecombination.push_back(toupper(bt.get_ref_base()[0]));  // push upper reference base. 
             // do not sort, keep the order with 'alt_bases'
@@ -698,6 +704,7 @@ std::cout << "For Group: basecombination: " << ngslib::join(basecombination, ","
         _out_vcf_line(bt, popgroup_bt, &samples_bi, vcf_hd);
     }
 
+    _out_cvg_line(&samples_bi, group_smp_idx, cvg_hd);
     return !bt.get_alt_bases().empty() && bt.is_only_snp();  // has SNP
 }
 
@@ -706,6 +713,15 @@ const BaseType __gb(const BatchInfo *smp_bi,
                     const std::vector<char> &basecombination, 
                     double min_af) 
 {
+    BatchInfo g_smp_bi = __get_group_batchinfo(smp_bi, group_idx);
+    BaseType bt(&g_smp_bi, min_af);
+    bt.lrt(basecombination);
+
+    return bt;
+}
+
+const BatchInfo __get_group_batchinfo(const BatchInfo *smp_bi, const std::vector<size_t> group_idx) {
+
     BatchInfo g_smp_bi;
     g_smp_bi.ref_id   = smp_bi->ref_id;
     g_smp_bi.ref_pos  = smp_bi->ref_pos;
@@ -721,11 +737,10 @@ const BaseType __gb(const BatchInfo *smp_bi,
         g_smp_bi.base_pos_ranks.push_back(smp_bi->base_pos_ranks[i]);
     }
 
-    BaseType bt(&g_smp_bi, min_af);
-    bt.lrt(basecombination);
-
-    return bt;
+    return g_smp_bi;
 }
+
+
 
 bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // Not a modifiable value
                           const std::vector<std::string> batch_sample_ids,   // Not a modifiable value
@@ -1121,7 +1136,6 @@ void _out_vcf_line(const BaseType &bt,
     };
 
     if (!group_bt.empty()) { // not empty
-
         std::vector<std::string> group_af_info;
         for (std::map<std::string, BaseType>::const_iterator it(group_bt.begin()); it != group_bt.end(); ++it) {
 
@@ -1130,15 +1144,14 @@ void _out_vcf_line(const BaseType &bt,
             for (auto b : it->second.get_alt_bases()) {
                 af.push_back(it->second.get_lrt_af(b));
             }
-            group_af_info.push_back(it->first + "_AF=" + ngslib::join(af, ",")); // groupX_AF=xxx,xxx
+            group_af_info.push_back(it->first + "_AF=" + ngslib::join(af, ",")); // groupID_AF=xxx,xxx
         }
-
         info.insert(info.end(), group_af_info.begin(), group_af_info.end());
     }
 
-std::cout << "Calling _out_vcf_line: "<< bt.get_ref_id() << " - " << bt.get_ref_pos() 
-          << " - " << bt.get_ref_base() << " - " << ngslib::join(bt.get_alt_bases(), ",") << " - "
-          << ngslib::join(info, ";") << "\n";
+// std::cout << "Calling _out_vcf_line: "<< bt.get_ref_id() << " - " << bt.get_ref_pos() 
+//           << " - " << bt.get_ref_base() << " - " << ngslib::join(bt.get_alt_bases(), ",") << " - "
+//           << ngslib::join(info, ";") << "\n";
     
     std::string sample_format = "GT:AB:SO:BP";
     std::string qs  = (bt.get_var_qual() > QUAL_THRESHOLD) ? std::to_string(bt.get_var_qual()) : "LowQual";
@@ -1150,4 +1163,87 @@ std::cout << "Calling _out_vcf_line: "<< bt.get_ref_id() << " - " << bt.get_ref_
         throw std::runtime_error("[ERROR] fail to write data");
 
     return;
+}
+
+void _out_cvg_line(const BatchInfo *smp_bi, 
+                   const std::map<std::string, std::vector<size_t>> & group_smp_idx, 
+                   BGZF *cvg_hd) 
+{
+    std::map<char, int> base_depth;
+    std::string indel_string;
+    // coverage info for each position
+    std::tie(indel_string, base_depth) = __base_depth_and_indel(smp_bi->align_bases);
+
+    // base depth and indels for each subgroup
+    std::map<std::string, IndelTuple> group_cvg;
+    // Call BaseType for each group
+    std::map<std::string, std::vector<size_t>>::const_iterator it = group_smp_idx.begin();
+    for (; it != group_smp_idx.end(); ++it) {
+        const BatchInfo g_smp_bi = __get_group_batchinfo(smp_bi, it->second);
+        group_cvg[it->first] = __base_depth_and_indel(g_smp_bi.align_bases);
+
+    }
+
+    std::vector<char> align_bases;  // used in ranksumtest
+    for (size_t i(0); i < smp_bi->n; ++i) {
+        char fb = smp_bi->align_bases[i][0];  // a string, get first base
+        align_bases.push_back(fb); 
+    }
+
+    char upper_ref_base = toupper(smp_bi->ref_base[0]);  // only for SNPs
+    std::vector<char> alt_bases;  // used in ranksumtest
+    int total_depth = 0;
+    for (std::map<char, int>::iterator it(base_depth.begin()); it != base_depth.end(); ++it) {
+        total_depth += it->second;
+        if (it->first != upper_ref_base) {
+            alt_bases.push_back(it->first);
+        }
+    }
+
+    std::string alt_bases_string = ngslib::join(alt_bases, "");
+    StrandBiasInfo sbi = strand_bias(upper_ref_base, alt_bases_string, align_bases, smp_bi->map_strands);
+
+    if (total_depth > 0) {
+        std::vector<int> dd;
+        for (auto b : BASES) dd.push_back(base_depth[b]);
+        std::string out = smp_bi->ref_id + "\t" + std::to_string(smp_bi->ref_pos)         + "\t" + 
+                          std::to_string(total_depth) + "\t" + ngslib::join(dd, "\t")     + "\t" +
+                          std::to_string(sbi.fs) + "\t" + std::to_string(sbi.sor)         + "\t" +
+                          std::to_string(sbi.ref_fwd) + "," + std::to_string(sbi.ref_rev) + "," +
+                          std::to_string(sbi.alt_fwd) + "," + std::to_string(sbi.alt_rev) + "\n";
+        if (bgzf_write(cvg_hd, out.c_str(), out.length()) != out.length())
+            throw std::runtime_error("[ERROR] fail to write data");
+    }
+
+    return;
+}
+
+
+IndelTuple __base_depth_and_indel(const std::vector<std::string> &align_bases)
+{
+    std::map<char, int> base_depth;
+    std::string indel_string;
+
+    for (auto b : BASES) base_depth[b] = 0;
+
+    std::map<std::string, int> indel_depth;
+    for (auto bs: align_bases) {
+        if (bs[0] == 'N') continue;
+
+        if (base_depth.find(bs[0]) != base_depth.end()) {
+            // ignore all bases('*') which not match ``BASE``
+            base_depth[bs[0]]++;
+        } else {
+            // indel
+            indel_depth[bs]++;
+        }
+    }
+
+    std::vector<std::string> indels;
+    for (std::map<std::string, int>::iterator it(indel_depth.begin()); it != indel_depth.end(); ++it) {
+        indels.push_back(it->first + "|" + std::to_string(it->second));
+    }
+    indel_string = (!base_depth.empty()) ? ngslib::join(indels, ",") : ".";
+
+    return std::make_tuple(indel_string, base_depth);
 }

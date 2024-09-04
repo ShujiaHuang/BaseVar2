@@ -99,7 +99,8 @@ struct BaseTypeARGS {
 
 /// Header for VCF
 std::string vcf_header_define(const std::string &ref_file_path, const std::vector<std::string> &addition_info, 
-                              const std::vector<std::string> samples);
+                              const std::vector<std::string> &samples);
+std::string cvg_header_define(const std::vector<std::string> &group_info, const std::vector<char> &BASES);
 void merge_file_by_line(const std::vector<std::string> & infiles, const std::string &outfile, 
                         std::string header, bool is_remove_tempfile=false);
 
