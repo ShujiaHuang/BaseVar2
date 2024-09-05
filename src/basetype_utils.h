@@ -96,7 +96,6 @@ struct BaseTypeARGS {
                     smart_rerun(false), filename_has_samplename(false) {}
 };
 
-
 /// Header for VCF
 std::string vcf_header_define(const std::string &ref_file_path, const std::vector<std::string> &addition_info, 
                               const std::vector<std::string> &samples);

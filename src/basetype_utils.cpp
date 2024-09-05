@@ -68,7 +68,11 @@ std::string cvg_header_define(const std::vector<std::string> &group_info, const 
 void merge_file_by_line(const std::vector<std::string> &infiles, const std::string &outfile, 
                         std::string header, bool is_remove_tempfile) 
 {
-    BGZF *OUT = bgzf_open(outfile.c_str(), "w");  // output file
+    size_t si(outfile.find_last_of('.'));
+    std::string suffix = (si != std::string::npos) ? outfile.substr(si) : outfile;
+
+    bool is_compress_out = (suffix == ".gz") ? true : false;
+    BGZF *OUT = bgzf_open(outfile.c_str(), is_compress_out ? "w" : "uw");  // output file
     if (!OUT) throw std::runtime_error("[ERROR] " + outfile + " open failure.");
 
     header += "\n";
