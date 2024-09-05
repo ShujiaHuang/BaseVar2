@@ -8,7 +8,7 @@
  */
 
 #include <numeric>  // use std::accumulate function
-#include <cctype>   // use topper()
+#include <cctype>   // use toupper()
 
 #include <htslib/kfunc.h>
 
@@ -188,7 +188,7 @@ void BaseType::lrt(const std::vector<char> &specific_bases) {
 
     double chi_sqrt_value = 0;
     std::vector<double> active_bases_freq = var.bp[0];
-    double lr_alt   = var.lr[0];  // f4
+    double lr_alt = var.lr[0];  // f4
 
     // Find candinate altnative alleles
     for (size_t n = active_bases.size() - 1; n > 0; --n) {
@@ -219,8 +219,8 @@ std::cout << "After:  " << ngslib::join(active_bases, ",") << "\n";
         }
     }
 
-std::cout << "- The 'active_bases': " << ngslib::join(active_bases, ",") << "\n";
-std::cout << "- The size of 'active_bases_freq' must be 4, and we get: " << active_bases_freq.size() << "\n";
+std::cout << "- The 'active_bases': " << ngslib::join(active_bases, ",") << " - Ref: " << this->_ref_base << "\n";
+std::cout << "ngslib::join(active_bases_freq): " << ngslib::join(active_bases_freq) << " - " << active_bases_freq.size() << "\n";
     char upper_ref_base = toupper(this->_ref_base[0]);  // Only call SNP: only get the first base for SNP
     for (auto b: active_bases) {
         if (b != upper_ref_base) {
@@ -242,6 +242,7 @@ std::cout << "- The size of 'active_bases_freq' must be 4, and we get: " << acti
             this->_var_qual = (chi_prob) ? -10 * log10(chi_prob) : 10000.0;
         }
     }
+std::cout << "- The size of 'active_bases_freq' must be 4, and we get: " << active_bases_freq.size() << std::endl;
 
     return;
 }

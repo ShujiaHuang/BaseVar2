@@ -231,9 +231,11 @@ void EM(const std::vector<std::vector<double>> &ind_allele_likelihood, // n x 4 
         }
         
         // Todo: too big? be careful here!!!
-std::cout << "EM: Iter num " << iter_num << " - delta: " << delta << "\n";
+// std::cout << "EM: Iter num " << iter_num << " - delta: " << delta << " - lh: " << ngslib::join(marginal_likelihood, ",") << "\n";
         if (delta < epsilon) break;
     }
+// 数量不对
+std::cout << "EM: Iter num " << iter_num << " - lh: " << ngslib::join(marginal_likelihood, ",") << " -- SS: " << ind_allele_likelihood.size() << "\n";
 
     return;
 }

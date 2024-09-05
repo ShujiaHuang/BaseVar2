@@ -174,7 +174,6 @@ void BaseTypeRunner::_variant_caller_process() {
         ///////////////////////////////////////////////////////////
         std::string prefix = cache_outdir + "/" + stem_bn + "." + regstr;     
         batchfiles = _create_batchfiles(_calling_intervals[i], prefix);
-std::cout << i <<" Starting _variants_discovery\n";
         std::cout << "[INFO] Done for creating all " << i << " - " << batchfiles.size() 
                   << " batchfiles and start to call variants.\n";
         
@@ -185,13 +184,27 @@ std::cout << i <<" Starting _variants_discovery\n";
         std::string sub_cvg_fn = prefix + ".cvg.gz";
 
         _variants_discovery(batchfiles, _calling_intervals[i], sub_vcf_fn, sub_cvg_fn);
-        std::cout << "[INFO] Do for calling variants in " + regstr  + " and "
-                     "save in temporary files: [" + sub_vcf_fn + ", " + 
-                     sub_cvg_fn + "]\n";
+        std::cout << "[INFO] Done for calling variants in : " + regstr  + "\n";
 
         vcffiles.push_back(sub_vcf_fn);
         cvgfiles.push_back(sub_cvg_fn);
     }
+
+    // Merge all VCF subfiles
+    std::vector<std::string> add_group_info, group_name;
+    std::map<std::string, std::vector<size_t>>::iterator it = _groups_idx.begin();
+    for(; it != _groups_idx.end(); ++it) {
+        group_name.push_back(it->first);
+        add_group_info.push_back("##INFO=<ID=" + it->first + "_AF,Number=A,Type=Float,Description="
+                                 "\"Allele frequency in the " + it->first + " populations calculated "
+                                 "base on LRT, in the range (0,1)\">");
+    }
+    std::string header = vcf_header_define(_args->reference, add_group_info, _samples_id);
+    merge_file_by_line(vcffiles, _args->output_vcf, header, true);
+
+    // Merge all CVG subfiles
+    header = cvg_header_define(group_name, BASES);
+    merge_file_by_line(cvgfiles, _args->output_cvg, header, true);
 
     return;
 }
@@ -426,7 +439,7 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
                                          const std::string out_vcf_fn,
                                          const std::string out_cvg_fn) 
 {
-    static const uint32_t STEP_REGION_LEN = 10; // 10 for test, should set to be large than 1000000
+    static const uint32_t STEP_REGION_LEN = 1000000; // 10 for test, should set to be large than 1000000
 
     // get region information
     std::string ref_id; uint32_t reg_start, reg_end, sub_reg_start, sub_reg_end;
@@ -471,20 +484,10 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
         }
     }
 
-    // Merge all VCF subfiles
-    std::vector<std::string> add_group_info, group_name;
-    std::map<std::string, std::vector<size_t>>::iterator it = _groups_idx.begin();
-    for(; it != _groups_idx.end(); ++it) {
-        group_name.push_back(it->first);
-        add_group_info.push_back("##INFO=<ID=" + it->first + "_AF,Number=A,Type=Float,Description="
-                           "\"Allele frequency in the " + it->first + " populations calculated "
-                           "base on LRT, in the range (0,1)\">");
-    }
-    std::string header = vcf_header_define(_args->reference, add_group_info, _samples_id);
+    std::string header = "## No need header here";
     merge_file_by_line(subvcfs, out_vcf_fn, header, true);
 
-    // Merge all CVG subfiles
-    header = cvg_header_define(group_name, BASES);
+    // Merge all CVG subfiles without header
     merge_file_by_line(subcvgs, out_cvg_fn, header, true);
     
     return;
@@ -587,7 +590,7 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
         
         ++n;  // line number
         if (n % 10000 == 0) {
-            std::cout << "[INFO] Have been loaded " << n << "lines.\n";
+            std::cout << "[INFO] Have been loaded " << n << " lines.\n";
         }
 
         // Samples' data for each poistion is ready and calling variants now
@@ -751,7 +754,7 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // 
 {   
 // 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
     // This value affected the computing memory, could be set larger than 500000, 20 just for test
-    static const uint32_t STEP_REGION_LEN = 20;
+    static const uint32_t STEP_REGION_LEN = 500000;
     clock_t start_time = clock();
 
     std::string ref_id; uint32_t reg_start, reg_end;
@@ -1169,11 +1172,6 @@ void _out_cvg_line(const BatchInfo *smp_bi,
                    const std::map<std::string, std::vector<size_t>> & group_smp_idx, 
                    BGZF *cvg_hd) 
 {
-    std::map<char, int> base_depth;
-    std::string indel_string;
-    // coverage info for each position
-    std::tie(indel_string, base_depth) = __base_depth_and_indel(smp_bi->align_bases);
-
     // base depth and indels for each subgroup
     std::map<std::string, IndelTuple> group_cvg;
     // Call BaseType for each group
@@ -1181,8 +1179,12 @@ void _out_cvg_line(const BatchInfo *smp_bi,
     for (; it != group_smp_idx.end(); ++it) {
         const BatchInfo g_smp_bi = __get_group_batchinfo(smp_bi, it->second);
         group_cvg[it->first] = __base_depth_and_indel(g_smp_bi.align_bases);
+    } // group_cvg 信息计算了，但是未用上（2024-09-05）
 
-    }
+    std::map<char, int> base_depth;
+    std::string indel_string;
+    // coverage info for each position
+    std::tie(indel_string, base_depth) = __base_depth_and_indel(smp_bi->align_bases);
 
     std::vector<char> align_bases;  // used in ranksumtest
     for (size_t i(0); i < smp_bi->n; ++i) {
@@ -1206,11 +1208,12 @@ void _out_cvg_line(const BatchInfo *smp_bi,
     if (total_depth > 0) {
         std::vector<int> dd;
         for (auto b : BASES) dd.push_back(base_depth[b]);
-        std::string out = smp_bi->ref_id + "\t" + std::to_string(smp_bi->ref_pos)         + "\t" + 
-                          std::to_string(total_depth) + "\t" + ngslib::join(dd, "\t")     + "\t" +
-                          std::to_string(sbi.fs) + "\t" + std::to_string(sbi.sor)         + "\t" +
-                          std::to_string(sbi.ref_fwd) + "," + std::to_string(sbi.ref_rev) + "," +
-                          std::to_string(sbi.alt_fwd) + "," + std::to_string(sbi.alt_rev) + "\n";
+        std::string out = smp_bi->ref_id              + "\t" + std::to_string(smp_bi->ref_pos) + "\t" + 
+                          smp_bi->ref_base            + "\t" + std::to_string(total_depth)     + "\t" + 
+                          ngslib::join(dd, "\t")      + "\t" + indel_string                    + "\t" +
+                          std::to_string(sbi.fs)      + "\t" + std::to_string(sbi.sor)         + "\t" +
+                          std::to_string(sbi.ref_fwd) + ","  + std::to_string(sbi.ref_rev)     + "," +
+                          std::to_string(sbi.alt_fwd) + ","  + std::to_string(sbi.alt_rev)     + "\n";
         if (bgzf_write(cvg_hd, out.c_str(), out.length()) != out.length())
             throw std::runtime_error("[ERROR] fail to write data");
     }
@@ -1221,6 +1224,7 @@ void _out_cvg_line(const BatchInfo *smp_bi,
 
 IndelTuple __base_depth_and_indel(const std::vector<std::string> &align_bases)
 {
+// bug: indel 没被正常输出，而是被跳过了 (原因是在 batchfile 时，优先输出了 snp，而不是 indels 怎被设为 0 覆盖)
     std::map<char, int> base_depth;
     std::string indel_string;
 
@@ -1243,7 +1247,6 @@ IndelTuple __base_depth_and_indel(const std::vector<std::string> &align_bases)
     for (std::map<std::string, int>::iterator it(indel_depth.begin()); it != indel_depth.end(); ++it) {
         indels.push_back(it->first + "|" + std::to_string(it->second));
     }
-    indel_string = (!base_depth.empty()) ? ngslib::join(indels, ",") : ".";
-
+    indel_string = (!indels.empty()) ? ngslib::join(indels, ",") : ".";
     return std::make_tuple(indel_string, base_depth);
 }
