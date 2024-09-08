@@ -3,7 +3,7 @@
 #include <string>
 #include <algorithm>
 
-
+#include <array>
 #include <vector>
 #include "utils.h"
 
@@ -22,6 +22,13 @@ std::cout << "Before sort: " << ngslib::join(cc, " - ") <<"\n";
 
 std::sort(cc.begin(), cc.end());
 std::cout << "After sort : " << ngslib::join(cc, " - ") <<"\n";
+
+    std::array<int, 7> numbers{ 2, 4, 8, 0, 6, -1, 3};
+	int minIndex = ngslib::argmin(numbers.begin(), numbers.end());
+	std::cout << "MinIndex: " << minIndex << '\n';
+	std::vector<float> prices = { 12.5f, 8.9f, 100.0f, 24.5f, 30.0f };
+	float maxIndex = ngslib::argmax(prices.begin(), prices.end());
+	std::cout << "MaxIndex: " <<  maxIndex << '\n';
 
 exit(1);
 

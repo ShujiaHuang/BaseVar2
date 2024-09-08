@@ -3,6 +3,7 @@
 #ifndef __INCLUDE_NGSLIB_UTILS_H__
 #define __INCLUDE_NGSLIB_UTILS_H__
 
+#include <algorithm>
 #include <sstream>
 #include <string>
 #include <cstring>  // use the 'strlen' function
@@ -142,6 +143,16 @@ namespace ngslib {
 
         // Return the results
         return new_v;
+    }
+
+    template<class ForwardIterator>
+    inline size_t argmin(ForwardIterator first, ForwardIterator last) {
+	    return std::distance(first, std::min_element(first, last));
+    }
+
+    template<class ForwardIterator>
+    inline size_t argmax(ForwardIterator first, ForwardIterator last) {
+        return std::distance(first, std::max_element(first, last));
     }
 
 }  // namespace ngslib
