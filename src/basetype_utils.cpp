@@ -8,16 +8,6 @@
 std::string vcf_header_define(const std::string &ref_file_path, const std::vector<std::string> &addition_info, 
                               const std::vector<std::string> &samples)
 {
-    ngslib::Fasta fa = ref_file_path;
-    std::vector<std::string> contigs;
-    for (size_t i(0); i < fa.nseq(); ++i) {
-        std::string seqname = fa.iseq_name(i);
-        uint32_t seqlen = fa.seq_length(seqname);
-
-        contigs.push_back("##contig=<ID=" + seqname + ",length=" + std::to_string(seqlen) + 
-                          ",assembly=" + ref_file_path + ">");
-    }
-    
     std::vector<std::string> header = {
         "##fileformat=VCFv4.2",
         "##FILTER=<ID=LowQual,Description=\"Low quality (QUAL < 60)\">",
@@ -38,10 +28,18 @@ std::string vcf_header_define(const std::string &ref_file_path, const std::vecto
         "##INFO=<ID=ReadPosRankSum,Number=1,Type=Float,Description=\"Phred-score from Wilcoxon rank sum test of Alt vs. Ref read position bias\">",
         "##INFO=<ID=QD,Number=1,Type=Float,Description=\"Variant Confidence Quality by Depth\">"
     };  // initial by common information of header
-    if (!addition_info.empty()) 
-        header.insert(header.end(), addition_info.begin(), addition_info.end());
+    if (!addition_info.empty()) header.insert(header.end(), addition_info.begin(), addition_info.end());
 
+    ngslib::Fasta fa = ref_file_path;
+    std::vector<std::string> contigs;
+    for (size_t i(0); i < fa.nseq(); ++i) {
+        std::string seqname = fa.iseq_name(i);
+        uint32_t seqlen = fa.seq_length(seqname);
+        contigs.push_back("##contig=<ID=" + seqname + ",length=" + std::to_string(seqlen) + 
+                          ",assembly=" + ref_file_path + ">");
+    }
     header.insert(header.end(), contigs.begin(), contigs.end());
+
     header.push_back("##reference=file://" + ngslib::abspath(ref_file_path));
     header.push_back("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" + ngslib::join(samples, "\t"));
 
@@ -52,8 +50,9 @@ std::string cvg_header_define(const std::vector<std::string> &group_info, const 
 
     std::string h = "#CHROM\tPOS\tREF\tDepth\t" + ngslib::join(BASES, "\t") + "\t" +
                     "Indels\tFS\tSOR\tStrand_Coverage(REF_FWD,REF_REV,ALT_FWD,ALT_REV)";
-    if (!group_info.empty())
-        h += "\t" + ngslib::join(group_info, "\t");
+    // group cvg 的计算有 bug， 暂时不输出
+    // if (!group_info.empty())
+    //     h += "\t" + ngslib::join(group_info, "\t");
 
     std::vector<std::string> header = {
         "##fileformat=CVGv1.0",
