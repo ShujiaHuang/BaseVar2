@@ -18,7 +18,7 @@
 static const std::vector<char> BASES = {'A', 'C', 'G', 'T'}; // 定义这个值，限定 likelihood 数组中碱基似然值的存放顺序
 static const double MLN10TO10   = -0.23025850929940458;      // ln(10)/10，把 phred-value 换成 e 为底，方便调用 exp()
 static const int LRT_THRESHOLD  = 24;                        // 24 corresponding to a chi-pvalue of 10^-6
-static const int QUAL_THRESHOLD = 60;                        // -10 * lg(10^-6)
+static const int QUAL_THRESHOLD = 20;                        // -10 * lg(10^-2)
 
 // Mainly use for basevar variant callling
 struct BatchInfo {

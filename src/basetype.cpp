@@ -149,8 +149,7 @@ AA BaseType::_f(const std::vector<char> &bases, int n) {
     for (size_t i = 0; i < cbs_v.size(); i++) {      // 循环该位点每一种可能的碱基组合
 
         std::vector<double> obs_allele_freq = this->_set_allele_initial_freq(cbs_v[i]);
-        double sum_freq = ngslib::sum(obs_allele_freq);
-        if (sum_freq == 0) // Empty coverage for this type of combination, skip.
+        if (ngslib::sum(obs_allele_freq) == 0) // Empty coverage for this type of combination, skip.
             throw std::runtime_error("The sum of frequence of active bases must always > 0. Check: " + 
                                      ngslib::join(cbs_v[i], ",") + " - " + ngslib::join(obs_allele_freq, ","));
         
@@ -182,7 +181,6 @@ void BaseType::lrt(const std::vector<char> &specific_bases) {
         // Get active bases which count frequence > _min_af
         if (_depth[b] / _total_depth >= _min_af)
             active_bases.push_back(b);
-std::cout << b << " : " << _depth[b] << "/" << _total_depth << " = " << _depth[b] / _total_depth << "\n"; 
     }
 
     if (active_bases.size() == 0) return;
@@ -197,17 +195,6 @@ std::cout << b << " : " << _depth[b] << "/" << _total_depth << " = " << _depth[b
     // Find candinate altnative alleles
     for (size_t n = active_bases.size() - 1; n > 0; --n) {
         var = _f(active_bases, n);
-        // size_t i_min = 0;
-        // double lrt_chivalue = 2 * (lr_alt - var.lr[0]);
-        // double min_chi_sqrt_value = lrt_chivalue;
-        // for (size_t j(1); j < var.lr.size(); ++j) {
-        //     lrt_chivalue = 2 * (lr_alt - var.lr[j]);
-        //     if (lrt_chivalue < min_chi_sqrt_value) {
-        //         min_chi_sqrt_value = lrt_chivalue;
-        //         i_min = j;
-        //     }
-        // }
-
         std::vector<double> lrt_chivalue;
         for (size_t j(0); j < var.lr.size(); ++j) {
             lrt_chivalue.push_back(2 * (lr_alt - var.lr[j]));
@@ -218,10 +205,8 @@ std::cout << b << " : " << _depth[b] << "/" << _total_depth << " = " << _depth[b
         chi_sqrt_value = lrt_chivalue[i_min];
         if (chi_sqrt_value < LRT_THRESHOLD) {
             // Take the null hypothesis and continue
-std::cout << "Before: " << ngslib::join(active_bases, ",") << "\n";
             active_bases = var.bc[i_min];
             active_bases_freq = var.bp[i_min];
-std::cout << "After:  " << ngslib::join(active_bases, ",") << " - " << ngslib::join(active_bases_freq, ",") << "\n";
         } else {
             // Take the alternate hypothesis
             break;
@@ -239,18 +224,21 @@ std::cout << "ngslib::join(active_bases_freq): " << ngslib::join(active_bases_fr
     }
 
     // Todo: improve the calculation method for var_qual
-    if (this->_alt_bases.size()) {
+    if (!this->_alt_bases.empty()) {
+
         double r = this->_depth[active_bases[0]] / (double)(this->_total_depth);
         if ((active_bases.size() == 1) && (this->_total_depth > 10) && (r > 0.5)) {
+            // mono-allelelic
             this->_var_qual = 5000.0;
         } else {
             // 'chi2_test' may return nan, which is caused by 'chi_sqrt_value' <= 0 and means p value is 1.0.
             double chi_prob = chi2_test(chi_sqrt_value, 1);  // Python: chi_prob = chi2.sf(chi_sqrt_value, 1)
-std::cout << "chi_sqrt_value: " << chi_sqrt_value << " - " << chi_prob << "\n";
             if (std::isnan(chi_prob)) chi_prob = 1.0;
 
             this->_var_qual = (chi_prob) ? -10 * log10(chi_prob) : 10000.0;
+            // _var_qual will been setted as -0.0 instand of 0.0 if it's 0, because of the phred-scale formular
             if (this->_var_qual == -0.0) this->_var_qual = 0.0;
+std::cout << "chi_sqrt_value: " << chi_sqrt_value << " - " << chi_prob << " - " << this->_var_qual << "\n";
         }
     }
 

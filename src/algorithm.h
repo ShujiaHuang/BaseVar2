@@ -128,10 +128,8 @@ double wilcoxon_ranksum_test(const std::vector<double>& sample1, const std::vect
  * @param marginal_likelihood    n x 1 matrix. maginal likelihood for each sample.
  * 
  */
-
 void e_step(const std::vector<double> &obs_allele_freq,
             const std::vector<std::vector<double>> &ind_allele_likelihood, 
-
             std::vector<std::vector<double>> &ind_allele_post_prob,  // return value, calculate this value in this function  
             std::vector<double> &marginal_likelihood)                // return value, calculate this value in this function 
 {
@@ -234,10 +232,11 @@ std::cout << "The size of input ind_allele_likelihood: " << ind_allele_likelihoo
         }
         
         // Todo: too big? be careful here!!!
-// std::cout << "EM: Iter num " << iter_num << " - delta: " << delta << " - lh: " << ngslib::join(marginal_likelihood, ",") << "\n";
+std::cout << "EM: Iter num " << iter_num << " - delta: " << delta << " - lh: " << ngslib::join(marginal_likelihood, ",") << "\n";
         if (delta < epsilon) break;
     }
-std::cout << "EM: Iter num " << iter_num << " - lh: " << ngslib::join(marginal_likelihood, ",") << " -- SS: " << ind_allele_likelihood.size() << "\n";
+    // update the lastest expect_allele_freq
+    m_step(ind_allele_post_prob, obs_allele_freq);
 std::cout << "Obs allele freq: " << ngslib::join(obs_allele_freq, ",") << "\n";
 
     return;
