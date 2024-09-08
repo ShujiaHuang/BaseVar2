@@ -50,17 +50,16 @@ std::string vcf_header_define(const std::string &ref_file_path, const std::vecto
 
 std::string cvg_header_define(const std::vector<std::string> &group_info, const std::vector<char> &BASES) {
 
-    std::string h = "#CHROM\tPOS\tREF\tDepth\t" + ngslib::join(BASES, "\t") + "\t"
+    std::string h = "#CHROM\tPOS\tREF\tDepth\t" + ngslib::join(BASES, "\t") + "\t" +
                     "Indels\tFS\tSOR\tStrand_Coverage(REF_FWD,REF_REV,ALT_FWD,ALT_REV)";
+    if (!group_info.empty())
+        h += "\t" + ngslib::join(group_info, "\t");
+
     std::vector<std::string> header = {
         "##fileformat=CVGv1.0",
-        "##Group information is the depth of A:C:G:T:Indel",
+        "##Group information is the depth of A:C:G:T:Indel", 
         h
     };
-
-    if (!group_info.empty()) {
-        header.push_back(ngslib::join(group_info, "\t"));
-    }
 
     return ngslib::join(header, "\n");
 }

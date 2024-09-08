@@ -64,6 +64,16 @@ namespace ngslib {
     std::string get_last_modification_file(std::string directory_path);
 
     template<typename T>
+    T sum(const std::vector<T> &value) {
+        T d(0);
+        for (auto x: value) {
+            d += x;
+        }
+
+        return d;
+    }
+
+    template<typename T>
     std::string join(const std::vector<T> &input, const std::string delim="\t") {
         if (input.empty()) 
             return "";

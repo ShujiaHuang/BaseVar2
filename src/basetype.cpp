@@ -7,7 +7,6 @@
  * 
  */
 
-#include <numeric>  // use std::accumulate function
 #include <cctype>   // use toupper()
 
 #include <htslib/kfunc.h>
@@ -16,7 +15,7 @@
 #include "algorithm.h"
 #include "external/combinations.h"
 
-#include "utils.h"  // join()
+#include "utils.h"  // join(), sum()
 
 //////////////////////////////////////////////////////////////
 //// The codes for the member function of BaseType class /////
@@ -47,6 +46,7 @@ BaseType::BaseType(const BatchInfo *smp_bi, double min_af) : _only_call_snp(true
     for (size_t i(0); i < smp_bi->n; ++i) {
 
         fb = smp_bi->align_bases[i][0];  // a string, get first base
+std::cout << "smp_bi->align_bases: " << smp_bi->align_bases.size() << " - " << ngslib::join(smp_bi->align_bases, ",") << "\n";
         if (fb != 'N' && ((fb != '+' && fb != '-') || !_only_call_snp)) { 
             // ignore all the 'N' bases and indels if only call snp
 
@@ -64,7 +64,10 @@ BaseType::BaseType(const BatchInfo *smp_bi, double min_af) : _only_call_snp(true
                 // convert the quality phred scale to be the base confident probabilty value
                 allele_lh[j] = (fb == BASES[j]) ? 1.0 - epsilon : epsilon / 3;
             }
-            _ind_allele_likelihood.push_back(allele_lh); // A 2d-array, n x 4 matrix, n is sample size.
+
+            // A 2d-array, n x 4 matrix, n is the non-N and non-Indels' sample size. (n maybe not equality to smp_bi->n)
+            // 也就是说这个 likelihood 数组将只保留有覆盖的位点信息，避免无效计算
+            _ind_allele_likelihood.push_back(allele_lh);
         }
     }
 }
@@ -142,19 +145,18 @@ AA BaseType::_f(const std::vector<char> &bases, int n) {
 
     Combinations<char> c(bases, n);
     std::vector<std::vector<char>> cbs_v = c.get();  // combination bases vector
-    for (size_t i = 0; i < cbs_v.size(); i++) {      // 计算该位点每一种可能的碱基组合
+    for (size_t i = 0; i < cbs_v.size(); i++) {      // 循环该位点每一种可能的碱基组合
 
         std::vector<double> obs_allele_freq = this->_set_allele_frequence(cbs_v[i]);
-        double sum_freq = std::accumulate(obs_allele_freq.begin(), obs_allele_freq.end(), 0);
+        double sum_freq = ngslib::sum(obs_allele_freq);
         if (sum_freq == 0) // Empty coverage for this type of combination, skip.
-            continue;
+            throw std::runtime_error("The sum of frequence of active bases must always > 0. Check: " + 
+                                     ngslib::join(cbs_v[i], ",") + " - " + ngslib::join(obs_allele_freq, ","));
         
         std::vector<double> log10_marginal_likelihood;
-        // 'obs_allele_freq' and 'log10_marginal_likelihood' are updated in EM.
+        // The value of 'obs_allele_freq' and 'log10_marginal_likelihood' will be updated in EM process.
         EM(_ind_allele_likelihood, obs_allele_freq, log10_marginal_likelihood);
-
-        double sum_log10_marginal_likelihood = std::accumulate(log10_marginal_likelihood.begin(), 
-                                                               log10_marginal_likelihood.end(), 0);
+        double sum_log10_marginal_likelihood = ngslib::sum(log10_marginal_likelihood);
 
         data.bc.push_back(cbs_v[i]);
         data.bp.push_back(obs_allele_freq);
@@ -197,7 +199,6 @@ void BaseType::lrt(const std::vector<char> &specific_bases) {
         size_t i_min = 0;
         double lrt_chivalue = 2 * (lr_alt - var.lr[i_min]);
         double chi_sqrt_value = lrt_chivalue;
-
         for (size_t j(1); j < var.lr.size(); ++j) {
             lrt_chivalue = 2 * (lr_alt - var.lr[j]);
             if (lrt_chivalue < chi_sqrt_value) {
@@ -220,7 +221,7 @@ std::cout << "After:  " << ngslib::join(active_bases, ",") << "\n";
     }
 
 std::cout << "- The 'active_bases': " << ngslib::join(active_bases, ",") << " - Ref: " << this->_ref_base << "\n";
-std::cout << "ngslib::join(active_bases_freq): " << ngslib::join(active_bases_freq) << " - " << active_bases_freq.size() << "\n";
+std::cout << "ngslib::join(active_bases_freq): " << ngslib::join(active_bases_freq, ",") << " - " << active_bases_freq.size() << "\n\n";
     char upper_ref_base = toupper(this->_ref_base[0]);  // Only call SNP: only get the first base for SNP
     for (auto b: active_bases) {
         if (b != upper_ref_base) {
@@ -279,11 +280,9 @@ double ref_vs_alt_ranksumtest(const char ref_base,
             alt.push_back(values[i]);
         }
     }
-std::cout << "ref_vs_alt_ranksumtest: Ref - " << ref_base << " - " << ngslib::join(ref, ",") << "\n";
-std::cout << "ref_vs_alt_ranksumtest: ALT - " << alt_bases_string << " - " << ngslib::join(alt, ",") << "\n";
     
     double p_phred_scale_value;
-    if (ref.size() > 0 && alt.size()) { // not empty
+    if (ref.size() > 0 && alt.size() > 0) { // not empty
         double p_value = wilcoxon_ranksum_test(ref, alt);
         p_phred_scale_value = -10 * log10(p_value);
         if (std::isinf(p_phred_scale_value)) {
@@ -301,9 +300,7 @@ double ref_vs_alt_ranksumtest(const char ref_base,
                               const std::vector<char> &bases,
                               const std::vector<char> &values) 
 {
-std::cout << "Before convert char      : " << ngslib::join(values, ",") << "\n";
     std::vector<int> v(values.begin(), values.end()); 
-std::cout << "After convert char -> int: " << ngslib::join(v, ",") << "\n\n";
     return ref_vs_alt_ranksumtest(ref_base, alt_bases_string, bases, v);
 }
 

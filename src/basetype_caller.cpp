@@ -683,6 +683,8 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector,
         throw std::runtime_error("[ERROR] Something is wrong in batchfiles.");
     }
     
+    _out_cvg_line(&samples_bi, group_smp_idx, cvg_hd);  // output coverage first
+
     BaseType bt(&samples_bi, min_af);
     bt.lrt();
 
@@ -703,11 +705,9 @@ std::cout << "For Group: basecombination: " << ngslib::join(basecombination, ","
                 popgroup_bt[it->first] = __gb(&samples_bi, it->second, basecombination, min_af);
             }
         }
-
         _out_vcf_line(bt, popgroup_bt, &samples_bi, vcf_hd);
     }
 
-    _out_cvg_line(&samples_bi, group_smp_idx, cvg_hd);
     return !bt.get_alt_bases().empty() && bt.is_only_snp();  // has SNP
 }
 
@@ -1147,7 +1147,9 @@ void _out_vcf_line(const BaseType &bt,
             for (auto b : it->second.get_alt_bases()) {
                 af.push_back(it->second.get_lrt_af(b));
             }
-            group_af_info.push_back(it->first + "_AF=" + ngslib::join(af, ",")); // groupID_AF=xxx,xxx
+
+            if (!af.empty())  // has group AF
+                group_af_info.push_back(it->first + "_AF=" + ngslib::join(af, ",")); // groupID_AF=xxx,xxx
         }
         info.insert(info.end(), group_af_info.begin(), group_af_info.end());
     }

@@ -186,8 +186,8 @@ void m_step(const std::vector<std::vector<double>> &ind_allele_post_prob, std::v
 /**
  * @brief EM algorithm
  * 
+ * @param ind_allele_likelihood  n x 4 matrix, n is non-N and non-Indel's sample size (same below), 4 for [A, C, G, T]
  * @param obs_allele_freq        1 x 4 vector, Observed allele frequence for [A, C, G, T]
- * @param ind_allele_likelihood  n x 4 matrix, n is sample size, 4 for [A, C, G, T]
  * @param iter_num integer, optional.  The lager EM iteration times. default: 100
  * @param epsilon  float, optional. The threshold of likelihood different for EM 
  *                 process. default 0.001.
@@ -198,6 +198,7 @@ void EM(const std::vector<std::vector<double>> &ind_allele_likelihood, // n x 4 
         std::vector<double> &log10_marginal_likelihood, // return value
         int iter_num=100, const float epsilon=0.001) 
 {
+std::cout << "The size of input ind_allele_likelihood: " << ind_allele_likelihood.size() << " - " << ind_allele_likelihood[0].size() << "\n";
     // n x 4 matrix, the same shape as 'ind_allele_likelihood'.
     std::vector<std::vector<double>> ind_allele_post_prob = std::vector<std::vector<double>>(
         ind_allele_likelihood.size(), std::vector<double>(obs_allele_freq.size(), 0));
@@ -236,6 +237,7 @@ void EM(const std::vector<std::vector<double>> &ind_allele_likelihood, // n x 4 
     }
 // 数量不对
 std::cout << "EM: Iter num " << iter_num << " - lh: " << ngslib::join(marginal_likelihood, ",") << " -- SS: " << ind_allele_likelihood.size() << "\n";
+std::cout << "Obs allele freq: " << ngslib::join(obs_allele_freq, ",") << "\n";
 
     return;
 }
