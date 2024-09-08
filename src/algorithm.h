@@ -172,13 +172,15 @@ void m_step(const std::vector<std::vector<double>> &ind_allele_post_prob, std::v
 
     // Reset data
     obs_allele_freq = std::vector<double>(allele_num, 0);
-    for (size_t i(0); i < sample_size; ++i) {
-        for (size_t j(0); j < allele_num; ++j)
+    for (size_t j(0); j < allele_num; ++j)
+        for (size_t i(0); i < sample_size; ++i) {
             obs_allele_freq[j] += ind_allele_post_prob[i][j];
-    }
+        
+std::cout << "obs_allele_freq - " << j + 1  << " - " << obs_allele_freq[j] << "/" << sample_size << "=";
+        obs_allele_freq[j] /= (double)(sample_size);  // average.
+std::cout << obs_allele_freq[j] << "\n";
 
-    for (size_t i(0); i < allele_num; ++i) 
-        obs_allele_freq[i] /= sample_size;
+    }
 
     return;
 }
@@ -235,7 +237,6 @@ std::cout << "The size of input ind_allele_likelihood: " << ind_allele_likelihoo
 // std::cout << "EM: Iter num " << iter_num << " - delta: " << delta << " - lh: " << ngslib::join(marginal_likelihood, ",") << "\n";
         if (delta < epsilon) break;
     }
-// 数量不对
 std::cout << "EM: Iter num " << iter_num << " - lh: " << ngslib::join(marginal_likelihood, ",") << " -- SS: " << ind_allele_likelihood.size() << "\n";
 std::cout << "Obs allele freq: " << ngslib::join(obs_allele_freq, ",") << "\n";
 

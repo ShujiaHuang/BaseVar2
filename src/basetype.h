@@ -84,7 +84,7 @@ private:
     std::map<char, double> _depth;  // allele depth of [A, C, G, T], double 是为了方便做除法
 
     // init the base likelihood by input bases
-    std::vector<double> _set_allele_frequence(const std::vector<char> &bases);
+    std::vector<double> _set_allele_initial_freq(const std::vector<char> &bases);
 
     // Calculate population likelihood for all the combination of bases
     AA _f(const std::vector<char> &bases, int n);

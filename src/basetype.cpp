@@ -45,6 +45,9 @@ BaseType::BaseType(const BatchInfo *smp_bi, double min_af) : _only_call_snp(true
     char fb;
     for (size_t i(0); i < smp_bi->n; ++i) {
 
+        epsilon = exp((smp_bi->align_base_quals[i] - 33) * MLN10TO10);
+        _qual_pvalue.push_back(1.0 - epsilon);
+
         fb = smp_bi->align_bases[i][0];  // a string, get first base
 std::cout << "smp_bi->align_bases: " << smp_bi->align_bases.size() << " - " << ngslib::join(smp_bi->align_bases, ",") << "\n";
         if (fb != 'N' && ((fb != '+' && fb != '-') || !_only_call_snp)) { 
@@ -57,16 +60,14 @@ std::cout << "smp_bi->align_bases: " << smp_bi->align_bases.size() << " - " << n
             _depth[fb]++;  // record the depth for read base: [A, C, G, T]
             _total_depth++;
 
-            epsilon = exp((smp_bi->align_base_quals[i] - 33) * MLN10TO10);
-            _qual_pvalue.push_back(1.0 - epsilon);
-
             for(size_t j(0); j < BASES.size(); ++j) {
                 // convert the quality phred scale to be the base confident probabilty value
                 allele_lh[j] = (fb == BASES[j]) ? 1.0 - epsilon : epsilon / 3;
             }
 
             // A 2d-array, n x 4 matrix, n is the non-N and non-Indels' sample size. (n maybe not equality to smp_bi->n)
-            // 也就是说这个 likelihood 数组将只保留有覆盖的位点信息，避免无效计算
+            // 也就是说这个 likelihood 数组将只保留有覆盖的位点信息，避免无效计算。因此 _ind_allele_likelihood 的长度较小
+            // 但无所谓，因为除了该值不会传到 basetype classe 之外，仅仅只用于计算突变 
             _ind_allele_likelihood.push_back(allele_lh);
         }
     }
@@ -113,17 +114,18 @@ BaseType::BaseType(const BaseType &b) {
 //     return *this;
 // }
 
-std::vector<double> BaseType::_set_allele_frequence(const std::vector<char> &bases) {
+std::vector<double> BaseType::_set_allele_initial_freq(const std::vector<char> &bases) {
     // bases 数组中 A,C,G,T 这四个碱基最多只能各出现一次
     
-    double total_depth = 0;
-    for (auto b: bases) total_depth += this->_depth[b];
+    // 2024-09-08 21:14:17 不是用局部总深度作分母了
+    // double total_depth = 0;
+    // for (auto b: bases) total_depth += this->_depth[b]; 
 
     // Initialized the array to {0, 0, 0, 0}, which set initial observed allele likelihood for [A, C, G, T]
     std::vector<double> obs_allele_freq(BASES.size(), 0);
-    if (total_depth > 0) {
+    if (this->_total_depth > 0) {
         // computed by base count
-        for (auto b: bases) obs_allele_freq[_B_IDX[b]] = this->_depth[b] / total_depth;
+        for (auto b: bases) obs_allele_freq[_B_IDX[b]] = this->_depth[b] / (double)(this->_total_depth);
     }
 
     return obs_allele_freq;  // 1 x 4 vector. The allele frequence of [A, C, G, T]
@@ -142,12 +144,11 @@ std::vector<double> BaseType::_set_allele_frequence(const std::vector<char> &bas
 AA BaseType::_f(const std::vector<char> &bases, int n) {
 
     AA data;
-
     Combinations<char> c(bases, n);
     std::vector<std::vector<char>> cbs_v = c.get();  // combination bases vector
     for (size_t i = 0; i < cbs_v.size(); i++) {      // 循环该位点每一种可能的碱基组合
 
-        std::vector<double> obs_allele_freq = this->_set_allele_frequence(cbs_v[i]);
+        std::vector<double> obs_allele_freq = this->_set_allele_initial_freq(cbs_v[i]);
         double sum_freq = ngslib::sum(obs_allele_freq);
         if (sum_freq == 0) // Empty coverage for this type of combination, skip.
             throw std::runtime_error("The sum of frequence of active bases must always > 0. Check: " + 
@@ -181,6 +182,7 @@ void BaseType::lrt(const std::vector<char> &specific_bases) {
         // Get active bases which count frequence > _min_af
         if (_depth[b] / _total_depth >= _min_af)
             active_bases.push_back(b);
+std::cout << b << " : " << _depth[b] << "/" << _total_depth << " = " << _depth[b] / _total_depth << "\n"; 
     }
 
     if (active_bases.size() == 0) return;
@@ -195,25 +197,31 @@ void BaseType::lrt(const std::vector<char> &specific_bases) {
     // Find candinate altnative alleles
     for (size_t n = active_bases.size() - 1; n > 0; --n) {
         var = _f(active_bases, n);
+        // size_t i_min = 0;
+        // double lrt_chivalue = 2 * (lr_alt - var.lr[0]);
+        // double min_chi_sqrt_value = lrt_chivalue;
+        // for (size_t j(1); j < var.lr.size(); ++j) {
+        //     lrt_chivalue = 2 * (lr_alt - var.lr[j]);
+        //     if (lrt_chivalue < min_chi_sqrt_value) {
+        //         min_chi_sqrt_value = lrt_chivalue;
+        //         i_min = j;
+        //     }
+        // }
 
-        size_t i_min = 0;
-        double lrt_chivalue = 2 * (lr_alt - var.lr[i_min]);
-        double chi_sqrt_value = lrt_chivalue;
-        for (size_t j(1); j < var.lr.size(); ++j) {
-            lrt_chivalue = 2 * (lr_alt - var.lr[j]);
-            if (lrt_chivalue < chi_sqrt_value) {
-                chi_sqrt_value = lrt_chivalue;
-                i_min = j;
-            }
+        std::vector<double> lrt_chivalue;
+        for (size_t j(0); j < var.lr.size(); ++j) {
+            lrt_chivalue.push_back(2 * (lr_alt - var.lr[j]));
         }
+        size_t i_min = ngslib::argmin(lrt_chivalue.begin(), lrt_chivalue.end());
 
         lr_alt = var.lr[i_min];
+        chi_sqrt_value = lrt_chivalue[i_min];
         if (chi_sqrt_value < LRT_THRESHOLD) {
             // Take the null hypothesis and continue
 std::cout << "Before: " << ngslib::join(active_bases, ",") << "\n";
             active_bases = var.bc[i_min];
             active_bases_freq = var.bp[i_min];
-std::cout << "After:  " << ngslib::join(active_bases, ",") << "\n";
+std::cout << "After:  " << ngslib::join(active_bases, ",") << " - " << ngslib::join(active_bases_freq, ",") << "\n";
         } else {
             // Take the alternate hypothesis
             break;
@@ -232,18 +240,19 @@ std::cout << "ngslib::join(active_bases_freq): " << ngslib::join(active_bases_fr
 
     // Todo: improve the calculation method for var_qual
     if (this->_alt_bases.size()) {
-        double r = this->_depth[active_bases[0]] / this->_total_depth;
+        double r = this->_depth[active_bases[0]] / (double)(this->_total_depth);
         if ((active_bases.size() == 1) && (this->_total_depth > 10) && (r > 0.5)) {
             this->_var_qual = 5000.0;
         } else {
             // 'chi2_test' may return nan, which is caused by 'chi_sqrt_value' <= 0 and means p value is 1.0.
             double chi_prob = chi2_test(chi_sqrt_value, 1);  // Python: chi_prob = chi2.sf(chi_sqrt_value, 1)
+std::cout << "chi_sqrt_value: " << chi_sqrt_value << " - " << chi_prob << "\n";
             if (std::isnan(chi_prob)) chi_prob = 1.0;
 
             this->_var_qual = (chi_prob) ? -10 * log10(chi_prob) : 10000.0;
+            if (this->_var_qual == -0.0) this->_var_qual = 0.0;
         }
     }
-std::cout << "- The size of 'active_bases_freq' must be 4, and we get: " << active_bases_freq.size() << std::endl;
 
     return;
 }

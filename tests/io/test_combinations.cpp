@@ -18,7 +18,7 @@ int main() {
     Combinations<char> a(b, 3);
     std::vector<std::vector<char>> ba = a.get();
     // iterate over all combinations
-    for (auto x : a) { for (auto ii : x) std::cout << ii << ", "; std::cout << "\n"; }
+    for (auto x : a) { std::cout << ngslib::join(x, ",") << "\n"; }
     std::cout << "\n1 - "  + ngslib::join(ba[0], "-") << "\n";
 
     std::cout << "\n\n";

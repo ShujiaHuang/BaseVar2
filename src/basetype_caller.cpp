@@ -672,19 +672,20 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector,
         (samples_bi.map_strands.size()      != n_sample) || 
         (samples_bi.base_pos_ranks.size()   != n_sample))
     {
-        std::cerr << "Total samples size is : "    << n_sample << "\n" + samples_bi.ref_id           << " " 
+        std::cerr << "Total samples size is: "     << n_sample << "\n" + samples_bi.ref_id           << " " 
                   << samples_bi.ref_pos << " "                 << samples_bi.ref_base                << "\n" 
                   << "bt.samples_bi.mapqs.size():            " << samples_bi.mapqs.size()            << "\n"
                   << "bt.samples_bi.align_bases.size():      " << samples_bi.align_bases.size()      << "\n"
                   << "bt.samples_bi.align_base_quals.size(): " << samples_bi.align_base_quals.size() << "\n"
                   << "bt.samples_bi.map_strands.size():      " << samples_bi.map_strands.size()      << "\n"
                   << "bt.samples_bi.base_pos_ranks.size():   " << samples_bi.base_pos_ranks.size()   << "\n";
-
         throw std::runtime_error("[ERROR] Something is wrong in batchfiles.");
     }
     
-    _out_cvg_line(&samples_bi, group_smp_idx, cvg_hd);  // output coverage first
+    // output coverage first
+    _out_cvg_line(&samples_bi, group_smp_idx, cvg_hd);
 
+    // Detect variant and output
     BaseType bt(&samples_bi, min_af);
     bt.lrt();
 
@@ -695,9 +696,9 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector,
 
             std::vector<char> basecombination;
             basecombination.push_back(toupper(bt.get_ref_base()[0]));  // push upper reference base. 
-            // do not sort, keep the order with 'alt_bases'
+            // do not sort, keep the original order as the same as 'alt_bases'
             basecombination.insert(basecombination.end(), bt.get_alt_bases().begin(), bt.get_alt_bases().end());
-std::cout << "For Group: basecombination: " << ngslib::join(basecombination, ",") << "\n";
+std::cout << "For Group basecombination: " << ngslib::join(basecombination, ",") << "\n";
             
             // Call BaseType for each group
             std::map<std::string, std::vector<size_t>>::const_iterator it = group_smp_idx.begin();
@@ -729,7 +730,7 @@ const BatchInfo __get_group_batchinfo(const BatchInfo *smp_bi, const std::vector
     g_smp_bi.ref_id   = smp_bi->ref_id;
     g_smp_bi.ref_pos  = smp_bi->ref_pos;
     g_smp_bi.ref_base = smp_bi->ref_base;
-    g_smp_bi.depth    = smp_bi->depth;    // 这个深度肯定不是 group samples 的深度，但没关系，反正不会用到
+    g_smp_bi.depth    = smp_bi->depth;    // 这个深度肯定不是 group samples 的深度，但没关系，不会用到
     g_smp_bi.n        = group_idx.size(); // sample size for speific group
 
     for (auto i : group_idx) {
@@ -742,7 +743,6 @@ const BatchInfo __get_group_batchinfo(const BatchInfo *smp_bi, const std::vector
 
     return g_smp_bi;
 }
-
 
 
 bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // Not a modifiable value
@@ -1090,6 +1090,7 @@ void _out_vcf_line(const BaseType &bt,
 
         char fb = smp_bi->align_bases[i][0];  // a string, get first base
         align_bases.push_back(fb);            // only get the first base, suit for SNPs
+
         if (fb != 'N' && fb != '+' && fb != '-') {
             // For the base which not in bt.get_alt_bases()
             if (alt_gt.find(fb) == alt_gt.end()) alt_gt[fb] = "./.";
@@ -1159,10 +1160,11 @@ void _out_vcf_line(const BaseType &bt,
 //           << ngslib::join(info, ";") << "\n";
     
     std::string sample_format = "GT:AB:SO:BP";
-    std::string qs  = (bt.get_var_qual() > QUAL_THRESHOLD) ? std::to_string(bt.get_var_qual()) : "LowQual";
-    std::string out = bt.get_ref_id() + "\t" + std::to_string(bt.get_ref_pos()) + "\t" + bt.get_ref_base() + "\t" + 
-                      ngslib::join(bt.get_alt_bases(), ",") + "\t"  + qs + "\t" + ngslib::join(info, ";")  + "\t" + 
-                      sample_format + "\t" + ngslib::join(samples, "\t") + "\n";
+    std::string qs  = (bt.get_var_qual() > QUAL_THRESHOLD) ? "." : "LowQual";
+    std::string out = bt.get_ref_id() + "\t" + std::to_string(bt.get_ref_pos()) + "\t.\t" + bt.get_ref_base() + "\t" + 
+                      ngslib::join(bt.get_alt_bases(), ",") + "\t" + std::to_string(bt.get_var_qual()) + "\t" + 
+                      qs + "\t" + ngslib::join(info, ";")   + "\t" + sample_format + "\t" + 
+                      ngslib::join(samples, "\t") + "\n";
     // write to file and check is successful or not.
     if (bgzf_write(vcf_hd, out.c_str(), out.length()) != out.length())
         throw std::runtime_error("[ERROR] fail to write data");
@@ -1181,7 +1183,7 @@ void _out_cvg_line(const BatchInfo *smp_bi,
     for (; it != group_smp_idx.end(); ++it) {
         const BatchInfo g_smp_bi = __get_group_batchinfo(smp_bi, it->second);
         group_cvg[it->first] = __base_depth_and_indel(g_smp_bi.align_bases);
-    } // group_cvg 信息计算了，但是未用上（2024-09-05）
+    } // group_cvg 信息计算了，因为有 bug 未用上（2024-09-05）
 
     std::map<char, int> base_depth;
     std::string indel_string;
