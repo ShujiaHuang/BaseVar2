@@ -174,7 +174,7 @@ void BaseTypeRunner::_variant_caller_process() {
         ///////////////////////////////////////////////////////////
         std::string prefix = cache_outdir + "/" + stem_bn + "." + regstr;     
         batchfiles = _create_batchfiles(_calling_intervals[i], prefix);
-        std::cout << "[INFO] Done for creating all " << i << " - " << batchfiles.size() 
+        std::cout << "[INFO] Done for creating " << regstr << " - " << batchfiles.size() 
                   << " batchfiles and start to call variants.\n";
         
         ///////////////////////////////////////////////////////////
@@ -184,7 +184,7 @@ void BaseTypeRunner::_variant_caller_process() {
         std::string sub_cvg_fn = prefix + ".cvg.gz";
 
         _variants_discovery(batchfiles, _calling_intervals[i], sub_vcf_fn, sub_cvg_fn);
-        std::cout << "[INFO] Done for calling variants in : " + regstr  + "\n";
+        std::cout << "[INFO] Done for calling variants in : " + regstr  + "\n" << std::endl;
 
         vcffiles.push_back(sub_vcf_fn);
         cvgfiles.push_back(sub_cvg_fn);
@@ -501,7 +501,7 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
                            const double min_af,
                            const std::string region,  // genome region format like samtools
                            const std::string tmp_vcf_fn,
-                           const std::string tmp_cvg_fn)
+                           const std::string tmp_cvg_fn) 
 {
     /*************** Preparing for reading data **************/
     std::vector<BGZF*> batch_file_hds;
@@ -511,8 +511,7 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
     for (size_t i(0); i < batchfiles.size(); ++i) {
 
         BGZF *f = bgzf_open(batchfiles[i].c_str(), "r");
-        kstring_t s; 
-        s.s = 0; s.l = s.m = 0;
+        kstring_t s; s.s = NULL; s.l = s.m = 0;
         
         // get all the samples' id from the header of batchfiles.
         while (bgzf_getline(f, '\n', &s) >= 0) {
@@ -529,7 +528,6 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
                 break;  // complete fetching the sample ids, end the loop
             }
         }
-
         free(s.s);
         if ((bgzf_close(f)) < 0) throw std::runtime_error("[ERROR] " + batchfiles[i] + " fail close.");
 
@@ -647,6 +645,7 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector,
             samples_bi.ref_id   = col_info[0];             // chromosome id
             samples_bi.ref_pos  = std::stoi(col_info[1]);  // string to int type
             samples_bi.ref_base = col_info[2];
+            
         } else if ((samples_bi.ref_id   != col_info[0])            || 
                    (samples_bi.ref_pos  != std::stoi(col_info[1])) || 
                    (samples_bi.ref_base != col_info[2])) 
@@ -698,7 +697,6 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector,
             basecombination.push_back(toupper(bt.get_ref_base()[0]));  // push upper reference base. 
             // do not sort, keep the original order as the same as 'alt_bases'
             basecombination.insert(basecombination.end(), bt.get_alt_bases().begin(), bt.get_alt_bases().end());
-std::cout << "For Group basecombination: " << ngslib::join(basecombination, ",") << "\n";
             
             // Call BaseType for each group
             std::map<std::string, std::vector<size_t>>::const_iterator it = group_smp_idx.begin();
@@ -751,8 +749,7 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // 
                           const ngslib::GenomeRegionTuple &genome_region,    // [chr, start, end]
                           const int mapq_thd,                                // mapping quality threshold
                           const std::string output_batch_file)               // output batchfile name
-{   
-// 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
+{// 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
     // This value affected the computing memory, could be set larger than 500000, 20 just for test
     static const uint32_t STEP_REGION_LEN = 500000;
     clock_t start_time = clock();
@@ -782,8 +779,6 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // 
         // Cut smaller regions to save computing memory.
         sub_reg_start = i;
         sub_reg_end = sub_reg_start + STEP_REGION_LEN - 1 > reg_end ? reg_end : sub_reg_start + STEP_REGION_LEN - 1;
-std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end << "\n";
-
         is_not_empty = __fetch_base_in_region(batch_align_files, fa_seq, mapq_thd, 
                                               std::make_tuple(ref_id, sub_reg_start, sub_reg_end),
                                               batchsamples_posinfomap_vector);  // 传引用，省内存，得数据
@@ -816,8 +811,7 @@ std::cout << j << " - " << ref_id << ":" << sub_reg_start << "-" << sub_reg_end 
     ct.pop_back();  // rm the trailing '\n' put by `asctime`
 
     std::cout << "[INFO] " + ct + ". Done for creating batchfile " << output_batch_file << ", " 
-              << (double)(clock() - start_time) / CLOCKS_PER_SEC   << " seconds elapsed.\n"
-              << std::endl;
+              << (double)(clock() - start_time) / CLOCKS_PER_SEC   << " seconds elapsed.\n";
 
     return has_data;
 }
@@ -847,13 +841,13 @@ bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
         PosMap sample_posinfo_map;
 
         if (bf.fetch(exp_regstr)) { // Set 'bf' only fetch alignment reads in 'exp_regstr'.
-uint32_t read_count = 0;
+// uint32_t read_count = 0;
             hts_pos_t map_ref_start, map_ref_end;  // hts_pos_t is uint64_t
             std::vector<ngslib::BamRecord> sample_target_reads; 
             ngslib::BamRecord al;       // alignment read
 
             while (bf.next(al) >= 0) {  // -1 => hit the end of alignement file.
-++read_count;
+// ++read_count;
                 if (al.mapq() < mapq_thd || al.is_duplicate() || al.is_qc_fail()) continue;
                 map_ref_start = al.map_ref_start_pos() + 1;  // al.map_ref_start_pos() is 0-based, convert to 1-based
                 map_ref_end   = al.map_ref_end_pos();        // al.map_ref_end_pos() is 1-based
@@ -870,7 +864,7 @@ uint32_t read_count = 0;
                 // get alignment information of [i] sample.
                 __seek_position(sample_target_reads, fa_seq, genome_region, sample_posinfo_map);
             }
-std::cout << "* " + exp_regstr + " total read count: " << read_count << ". Hit read count: " << sample_target_reads.size() << "\n\n";
+// std::cout << "* " + exp_regstr + " total read count: " << read_count << ". Hit read count: " << sample_target_reads.size() << "\n\n";
         }
 
         if (!is_not_empty && !sample_posinfo_map.empty()) { 
@@ -908,7 +902,7 @@ void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,
     std::vector<ngslib::ReadAlignedPair> aligned_pairs;
     for(size_t i(0); i < sample_map_reads.size(); ++i) {
 
-std::cout << sample_map_reads[i] << "\n";
+// std::cout << sample_map_reads[i] << "\n";
         align_base_info.map_strand = sample_map_reads[i].map_strand();  // '*', '-' or '+'
         align_base_info.mapq = sample_map_reads[i].mapq();
 
@@ -972,12 +966,12 @@ std::cout << sample_map_reads[i] << "\n";
                 sample_posinfo_map.insert({map_ref_pos, align_base_info});
             }
 
-std::cout 
-<< " - "  << aligned_pairs[i].op << " - [" << ref_id << ", " << align_base_info.ref_pos << ", " 
-<< align_base_info.map_strand    << ", "   << align_base_info.ref_base << "-" << align_base_info.read_base << "] - [" 
-<< aligned_pairs[i].qpos << ", " << aligned_pairs[i].read_base << ", " << aligned_pairs[i].read_qual << "]\n";
+// std::cout 
+// << " - "  << aligned_pairs[i].op << " - [" << ref_id << ", " << align_base_info.ref_pos << ", " 
+// << align_base_info.map_strand    << ", "   << align_base_info.ref_base << "-" << align_base_info.read_base << "] - [" 
+// << aligned_pairs[i].qpos << ", " << aligned_pairs[i].read_base << ", " << aligned_pairs[i].read_qual << "]\n";
         }
-std::cout << "\n";
+// std::cout << "\n";
     }
 
     return;
@@ -1216,7 +1210,7 @@ void _out_cvg_line(const BatchInfo *smp_bi,
                           smp_bi->ref_base            + "\t" + std::to_string(total_depth)     + "\t" + 
                           ngslib::join(dd, "\t")      + "\t" + indel_string                    + "\t" +
                           std::to_string(sbi.fs)      + "\t" + std::to_string(sbi.sor)         + "\t" +
-                          std::to_string(sbi.ref_fwd) + ","  + std::to_string(sbi.ref_rev)     + "," +
+                          std::to_string(sbi.ref_fwd) + ","  + std::to_string(sbi.ref_rev)     + ","  +
                           std::to_string(sbi.alt_fwd) + ","  + std::to_string(sbi.alt_rev)     + "\n";
         if (bgzf_write(cvg_hd, out.c_str(), out.length()) != out.length())
             throw std::runtime_error("[ERROR] fail to write data");
@@ -1226,8 +1220,7 @@ void _out_cvg_line(const BatchInfo *smp_bi,
 }
 
 
-IndelTuple __base_depth_and_indel(const std::vector<std::string> &align_bases)
-{
+IndelTuple __base_depth_and_indel(const std::vector<std::string> &align_bases) {
 // bug: indel 没被正常输出，而是被跳过了 (原因是在 batchfile 时，优先输出了 snp，而不是 indels 怎被设为 0 覆盖)
     std::map<char, int> base_depth;
     std::string indel_string;

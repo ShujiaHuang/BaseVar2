@@ -49,7 +49,6 @@ BaseType::BaseType(const BatchInfo *smp_bi, double min_af) : _only_call_snp(true
         _qual_pvalue.push_back(1.0 - epsilon);
 
         fb = smp_bi->align_bases[i][0];  // a string, get first base
-std::cout << "smp_bi->align_bases: " << smp_bi->align_bases.size() << " - " << ngslib::join(smp_bi->align_bases, ",") << "\n";
         if (fb != 'N' && ((fb != '+' && fb != '-') || !_only_call_snp)) { 
             // ignore all the 'N' bases and indels if only call snp
 
@@ -116,11 +115,6 @@ BaseType::BaseType(const BaseType &b) {
 
 std::vector<double> BaseType::_set_allele_initial_freq(const std::vector<char> &bases) {
     // bases 数组中 A,C,G,T 这四个碱基最多只能各出现一次
-    
-    // 2024-09-08 21:14:17 不是用局部总深度作分母了
-    // double total_depth = 0;
-    // for (auto b: bases) total_depth += this->_depth[b]; 
-
     // Initialized the array to {0, 0, 0, 0}, which set initial observed allele likelihood for [A, C, G, T]
     std::vector<double> obs_allele_freq(BASES.size(), 0);
     if (this->_total_depth > 0) {
@@ -153,14 +147,14 @@ AA BaseType::_f(const std::vector<char> &bases, int n) {
             throw std::runtime_error("The sum of frequence of active bases must always > 0. Check: " + 
                                      ngslib::join(cbs_v[i], ",") + " - " + ngslib::join(obs_allele_freq, ","));
         
-        std::vector<double> log10_marginal_likelihood;
-        // The value of 'obs_allele_freq' and 'log10_marginal_likelihood' will be updated in EM process.
-        EM(_ind_allele_likelihood, obs_allele_freq, log10_marginal_likelihood);
-        double sum_log10_marginal_likelihood = ngslib::sum(log10_marginal_likelihood);
+        std::vector<double> log_marginal_likelihood;
+        // The value of 'obs_allele_freq' and 'log_marginal_likelihood' will be updated in EM process.
+        EM(_ind_allele_likelihood, obs_allele_freq, log_marginal_likelihood);
+        double sum_log_marginal_likelihood = ngslib::sum(log_marginal_likelihood);
 
         data.bc.push_back(cbs_v[i]);
         data.bp.push_back(obs_allele_freq);
-        data.lr.push_back(sum_log10_marginal_likelihood);
+        data.lr.push_back(sum_log_marginal_likelihood);
     }
     
     return data;
@@ -213,8 +207,6 @@ void BaseType::lrt(const std::vector<char> &specific_bases) {
         }
     }
 
-std::cout << "- The 'active_bases': " << ngslib::join(active_bases, ",") << " - Ref: " << this->_ref_base << "\n";
-std::cout << "ngslib::join(active_bases_freq): " << ngslib::join(active_bases_freq, ",") << " - " << active_bases_freq.size() << "\n\n";
     char upper_ref_base = toupper(this->_ref_base[0]);  // Only call SNP: only get the first base for SNP
     for (auto b: active_bases) {
         if (b != upper_ref_base) {
@@ -233,12 +225,12 @@ std::cout << "ngslib::join(active_bases_freq): " << ngslib::join(active_bases_fr
         } else {
             // 'chi2_test' may return nan, which is caused by 'chi_sqrt_value' <= 0 and means p value is 1.0.
             double chi_prob = chi2_test(chi_sqrt_value, 1);  // Python: chi_prob = chi2.sf(chi_sqrt_value, 1)
-            if (std::isnan(chi_prob)) chi_prob = 1.0;
+            if (std::isnan(chi_prob)) 
+                chi_prob = 1.0;
 
             this->_var_qual = (chi_prob) ? -10 * log10(chi_prob) : 10000.0;
             // _var_qual will been setted as -0.0 instand of 0.0 if it's 0, because of the phred-scale formular
             if (this->_var_qual == -0.0) this->_var_qual = 0.0;
-std::cout << "chi_sqrt_value: " << chi_sqrt_value << " - " << chi_prob << " - " << this->_var_qual << "\n";
         }
     }
 
