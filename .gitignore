@@ -6,6 +6,8 @@
 *.html
 *.o
 *.fai
+*.vcf*
+*.cvg*
 
 CMakeCache.txt
 cmake_install.cmake
