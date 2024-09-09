@@ -25,6 +25,9 @@ namespace ngslib {
     
     // Get file name from a path
     std::string basename(const std::string file_path);
+
+    // Get filename suffix
+    std::string suffix_name(const std::string file_path);
     
     // remove the filename extension
     std::string remove_filename_extension(const std::string filename);

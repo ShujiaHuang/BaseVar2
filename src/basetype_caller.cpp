@@ -199,12 +199,24 @@ void BaseTypeRunner::_variant_caller_process() {
                                  "\"Allele frequency in the " + it->first + " populations calculated "
                                  "base on LRT, in the range (0,1)\">");
     }
+
+    // Merge VCF
     std::string header = vcf_header_define(_args->reference, add_group_info, _samples_id);
     merge_file_by_line(vcffiles, _args->output_vcf, header, true);
 
-    // Merge all CVG subfiles
+    const tbx_conf_t bf_tbx_conf = {1, 1, 2, 0, '#', 0};  // {preset, seq col, beg col, end col, header-char, skip-line}
+    if ((ngslib::suffix_name(_args->output_vcf) == ".gz") &&  // create index 
+        tbx_index_build(_args->output_vcf.c_str(), 0, &bf_tbx_conf))  // file suffix is ".tbi"
+        throw std::runtime_error("tbx_index_build failed: Is the file bgzip-compressed? "
+                                 "Check this file: " + _args->output_vcf + "\n");
+
+    // Merge CVG
     header = cvg_header_define(group_name, BASES);
     merge_file_by_line(cvgfiles, _args->output_cvg, header, true);
+    if ((ngslib::suffix_name(_args->output_cvg) == ".gz") &&   // create index
+        tbx_index_build(_args->output_cvg.c_str(), 0, &bf_tbx_conf))  // file suffix is ".tbi"
+        throw std::runtime_error("tbx_index_build failed: Is the file bgzip-compressed? "
+                                 "Check this file: " + _args->output_cvg + "\n");
 
     return;
 }
@@ -486,8 +498,6 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
 
     std::string header = "## No need header here";
     merge_file_by_line(subvcfs, out_vcf_fn, header, true);
-
-    // Merge all CVG subfiles without header
     merge_file_by_line(subcvgs, out_cvg_fn, header, true);
     
     return;
@@ -802,7 +812,7 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // 
     // Create a Tabix index for 'output_batch_file'
     const tbx_conf_t bf_tbx_conf = {1, 1, 2, 0, '#', 0};  // {preset, seq col, beg col, end col, header-char, skip-line}
     if (tbx_index_build(output_batch_file.c_str(), 0, &bf_tbx_conf))  // file suffix is ".tbi"
-        throw std::runtime_error("bx_index_build failed: Is the file bgzip-compressed? "
+        throw std::runtime_error("tbx_index_build failed: Is the file bgzip-compressed? "
                                  "Check this file: " + output_batch_file + "\n");
 
     // Time information

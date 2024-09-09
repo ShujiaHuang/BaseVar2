@@ -29,8 +29,13 @@ namespace ngslib {
     }
 
     std::string basename(const std::string file_path) {
-        // return std::filesystem::path(file_path).filename().string();  // only work for linux filesystem
         return file_path.substr(file_path.find_last_of("/\\") + 1);
+    }
+
+    std::string suffix_name(const std::string file_path) {
+        size_t si(file_path.find_last_of('.'));
+        std::string suffix = (si != std::string::npos) ? file_path.substr(si) : file_path;
+        return suffix;
     }
     
     std::string remove_filename_extension(const std::string filename) {
