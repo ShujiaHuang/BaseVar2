@@ -12,6 +12,7 @@
 #include <iterator>
 
 #include <iostream>
+#include <cstdint>  // uint32_t
 
 namespace ngslib {
     // define a genome region data style

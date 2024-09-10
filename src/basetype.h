@@ -10,7 +10,8 @@
 #define __INCLUDE_BASETYPE_H__
 
 #include <iostream>
-#include <cmath>  // use exp() function
+#include <cstdint> // uint32_t
+#include <cmath>   // use exp() function
 #include <string>
 #include <vector>
 #include <map>

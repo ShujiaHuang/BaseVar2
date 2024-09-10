@@ -13,7 +13,7 @@
 
 #include <map>
 
-#include "Fasta.h"
+#include "fasta.h"
 #include "bam.h"
 #include "utils.h"
 #include "external/robin_hood.h"

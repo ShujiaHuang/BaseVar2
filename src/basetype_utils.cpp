@@ -2,7 +2,7 @@
 #include <htslib/kstring.h>
 
 #include "basetype_utils.h"
-#include "Fasta.h"
+#include "fasta.h"
 #include "utils.h"
 
 std::string vcf_header_define(const std::string &ref_file_path, const std::vector<std::string> &addition_info, 
