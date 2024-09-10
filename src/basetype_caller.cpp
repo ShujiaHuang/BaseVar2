@@ -188,6 +188,13 @@ void BaseTypeRunner::_variant_caller_process() {
 
         vcffiles.push_back(sub_vcf_fn);
         cvgfiles.push_back(sub_cvg_fn);
+
+        if (IS_DELETE_CACHE_BATCHFILE) {
+            for (auto bf: batchfiles) {
+                ngslib::safe_remove(bf);
+                ngslib::safe_remove(bf+".tbi");
+            }
+        }
     }
 
     // Merge all VCF subfiles
@@ -218,6 +225,9 @@ void BaseTypeRunner::_variant_caller_process() {
         throw std::runtime_error("tbx_index_build failed: Is the file bgzip-compressed? "
                                  "Check this file: " + _args->output_cvg + "\n");
 
+    if (IS_DELETE_CACHE_BATCHFILE) {
+        ngslib::safe_remove(cache_outdir);
+    }
     return;
 }
 

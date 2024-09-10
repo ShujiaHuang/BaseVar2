@@ -21,6 +21,7 @@
 #include "basetype.h"
 #include "basetype_utils.h"
 
+static const bool IS_DELETE_CACHE_BATCHFILE = true;
 
 // Mainly use for create batchfile
 struct AlignBaseInfo {

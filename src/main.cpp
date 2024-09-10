@@ -24,11 +24,11 @@ static int usage() {
         "Usage: basevar <command> [options]\n\n" 
         "Commands:\n"
         "    basetype            Variants Caller\n"
-        "    VQSR                Variants Recalibrator\n"
-        "    coverage            Calculating coverage depth for the whole genome or given regions/positions\n"
-        "    merge               Merge bed/vcf files\n"
-        "    NearByIndel         Calculating and adding Nearby Indel density and indel type information for each variants in VCF.\n"
-        "    popmatrix           Create population matrix from bamfiles in specific positions.\n"
+        // "    VQSR                Variants Recalibrator\n"
+        // "    coverage            Calculating coverage depth for the whole genome or given regions/positions\n"
+        // "    merge               Merge bed/vcf files\n"
+        // "    NearByIndel         Calculating and adding Nearby Indel density and indel type information for each variants in VCF.\n"
+        // "    popmatrix           Create population matrix from bamfiles in specific positions.\n"
         << "\n" << std::endl;
 
     return 1;
