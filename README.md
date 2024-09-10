@@ -44,8 +44,25 @@ $ make
 
 ```
 
+ignore this error.
+
+```bash
+test/test_khash.c: In function 'write_stats_str2int':
+test/test_khash.c:53:9: warning: implicit declaration of function 'kh_stats' [-Wimplicit-function-declaration]
+   53 |     if (kh_stats(str2int, h, &empty, &deleted, &hist_size, &hist) == 0) {
+      |         ^~~~~~~~
+test/test_khash.c:53:18: error: 'str2int' undeclared (first use in this function)
+   53 |     if (kh_stats(str2int, h, &empty, &deleted, &hist_size, &hist) == 0) {
+      |                  ^~~~~~~
+test/test_khash.c:53:18: note: each undeclared identifier is reported only once for each function it appears in
+make: *** [test/test_khash.o] Error 1
+```
 
 
+Compute resource
+----------------
+
+3G-4G for each threah if set -B 200.
 
 
 
