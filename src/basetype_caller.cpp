@@ -117,7 +117,7 @@ void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
 
     if (!_args->in_bamfilelist.empty()) _get_bamfile_list();
     std::cout << "[INFO] Finish loading arguments and we have " << _args->input_bf.size()
-              << " BAM/CRAM files for variants calling.\n";
+              << " BAM/CRAM files for variants calling.\n"      << std::endl;
 
     // Setting the resolution of AF
     _args->min_af = std::min(float(100)/_args->input_bf.size(), _args->min_af);
@@ -252,6 +252,8 @@ void BaseTypeRunner::_get_bamfile_list() {
 }
 
 void BaseTypeRunner::_get_sample_id_from_bam() {
+    clock_t start_time = clock();
+
     // Loading sample ID in BAM/CRMA files from RG tag.
     if (_args->filename_has_samplename)
         std::cout << "[INFO] loading samples' id from filename becuase you set "
@@ -262,8 +264,8 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
     for (size_t i(0); i < _args->input_bf.size(); ++i) {
 
         if ((i+1) % 1000 == 0)
-            std::cout << "[INFO] loading " << i+1 << "/" << _args->input_bf.size() 
-                      << " alignment files.\n";
+            std::cout << "[INFO] loading "   << i+1 << "/" << _args->input_bf.size() 
+                      << " alignment files." << std::endl;
         
         if (_args->filename_has_samplename) {
             filename = ngslib::remove_filename_extension(ngslib::basename(_args->input_bf[i]));
@@ -282,7 +284,14 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
                                         _args->input_bf[i] + " sample ID not found.\n");
         }
     }
-    std::cout << "[INFO] Done for loading all samples' id from alignment files.\n\n";
+
+    // Time information
+    time_t now = time(0);
+    std::string ct(ctime(&now));
+    ct.pop_back();  // rm the trailing '\n' put by `asctime`
+    std::cout << "[INFO] " + ct + ". Done for loading all samples' id from alignment files, " 
+              << (double)(clock() - start_time) / CLOCKS_PER_SEC << " seconds elapsed.\n" 
+              << std::endl;
 
     return;
 }
@@ -576,7 +585,7 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
                                      "Sample ids in bamfiles  : " + ngslib::join(sample_ids, ",") + "\n");
 
     /************* Done for reading data prepare *************/
-
+    
     // Start calling variants
     BGZF *VCF = bgzf_open(tmp_vcf_fn.c_str(), "w"); // output vcf file
     if (!VCF) throw std::runtime_error("[ERROR] " + tmp_vcf_fn + " open failure.");
@@ -829,9 +838,8 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // 
     time_t now = time(0);
     std::string ct(ctime(&now));
     ct.pop_back();  // rm the trailing '\n' put by `asctime`
-
-    std::cout << "[INFO] " + ct + ". Done for creating batchfile " << output_batch_file << ", " 
-              << (double)(clock() - start_time) / CLOCKS_PER_SEC   << " seconds elapsed.\n";
+    std::cout << "[INFO] " + ct + ". Done for creating batchfile " << output_batch_file   << ", " 
+              << (double)(clock() - start_time) / CLOCKS_PER_SEC   << " seconds elapsed." << std::endl;
 
     return has_data;
 }

@@ -75,16 +75,18 @@ def creat_basetype_pipe():
 
             outfile_prefix = chr_id + '_' + str(start) + '_' + str(end)
             if opt.pop_group:
-                print(f'time python {exe_prog} -t {opt.n_thread} -R {opt.reference} -L {opt.infilelist} '
-                      f'-G {opt.pop_group} --regions {reg} --min-af={opt.min_af} '
+                print(f'time {exe_prog} -t {opt.n_thread} -R {opt.reference} -L {opt.infilelist} '
+                      f'-G {opt.pop_group} -r {reg} --min-af={opt.min_af} '
                       f'--output-vcf {opt.outdir}/{outfile_prefix}.vcf.gz '
-                      f'--output-cvg {opt.outdir}/{outfile_prefix}.cvg.tsv.gz --smart-rerun && '
+                      f'--output-cvg {opt.outdir}/{outfile_prefix}.cvg.tsv.gz '
+                      f'--smart-rerun > {opt.outdir}/{outfile_prefix}.log && '
                       f'echo "** {outfile_prefix} done **"')
             else:    
-                print(f'time python {exe_prog} -t {opt.n_thread} -R {opt.reference} -L {opt.infilelist} '
-                      f'--regions {reg} --min-af={opt.min_af} '
+                print(f'time {exe_prog} -t {opt.n_thread} -R {opt.reference} -L {opt.infilelist} '
+                      f'-r {reg} --min-af={opt.min_af} '
                       f'--output-vcf {opt.outdir}/{outfile_prefix}.vcf.gz '
-                      f'--output-cvg {opt.outdir}/{outfile_prefix}.cvg.tsv.gz --smart-rerun && '
+                      f'--output-cvg {opt.outdir}/{outfile_prefix}.cvg.tsv.gz '
+                      f'--smart-rerun > {opt.outdir}/{outfile_prefix}.log && '
                       f'echo "** {outfile_prefix} done **"')
 
 

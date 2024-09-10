@@ -9,10 +9,10 @@ Build the source codes step-by-step.
 
 ### How to install htslib
 
-1. Download NGSlib from github:
+1. Download BaseVar from github:
 
 ```bash
-$ git clone --recursive git@github.com:ShujiaHuang/ngslib.git 
+$ git clone --recursive git@github.com:ShujiaHuang/BaseVar2.git
 ```
 
 > WARNING: Please try several times if fail to clone the data causing by 
