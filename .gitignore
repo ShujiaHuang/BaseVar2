@@ -6,6 +6,7 @@
 *.html
 *.o
 *.fai
+*.gzi
 *.vcf*
 *.cvg*
 
