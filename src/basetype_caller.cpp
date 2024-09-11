@@ -53,10 +53,7 @@ void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
 
             case '3': _args->filename_has_samplename = true;     break;  // 恒参
             case '4': _args->smart_rerun             = true;     break;  // 恒参
-            case 'h': 
-                std::cout << usage() << std::endl;
-                exit(1);
-
+            case 'h': std::cout << usage() << std::endl; exit(1);
             default: 
                 std::cerr << "Unknown argument: " << c << std::endl; 
                 exit(1);
@@ -211,7 +208,7 @@ void BaseTypeRunner::_variant_caller_process() {
     merge_file_by_line(vcffiles, _args->output_vcf, header, true);
 
     const tbx_conf_t bf_tbx_conf = {1, 1, 2, 0, '#', 0};  // {preset, seq col, beg col, end col, header-char, skip-line}
-    if ((ngslib::suffix_name(_args->output_vcf) == ".gz") &&  // create index 
+    if ((ngslib::suffix_name(_args->output_vcf) == ".gz") &&          // create index 
         tbx_index_build(_args->output_vcf.c_str(), 0, &bf_tbx_conf))  // file suffix is ".tbi"
         throw std::runtime_error("tbx_index_build failed: Is the file bgzip-compressed? "
                                  "Check this file: " + _args->output_vcf + "\n");
@@ -219,7 +216,7 @@ void BaseTypeRunner::_variant_caller_process() {
     // Merge CVG
     header = cvg_header_define(group_name, BASES);
     merge_file_by_line(cvgfiles, _args->output_cvg, header, true);
-    if ((ngslib::suffix_name(_args->output_cvg) == ".gz") &&   // create index
+    if ((ngslib::suffix_name(_args->output_cvg) == ".gz") &&          // create index
         tbx_index_build(_args->output_cvg.c_str(), 0, &bf_tbx_conf))  // file suffix is ".tbi"
         throw std::runtime_error("tbx_index_build failed: Is the file bgzip-compressed? "
                                  "Check this file: " + _args->output_cvg + "\n");
@@ -443,8 +440,8 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::Genome
         // make Thread Pool
         create_batchfile_processes.emplace_back(
             thread_pool.enqueue(__create_a_batchfile, 
-                                batch_align_files,  // 循环内变量，值会变，只能拷贝，不可传引用，否则多线程执行时将丢失该值
-                                batch_sample_ids,   // 循环内变量，值会变，只能拷贝，不可传引用，否则多线程执行时将丢失该值
+                                batch_align_files,  // 循环内变量，值会变，只能拷贝，不可传引用，否则线程执行时将丢失该值
+                                batch_sample_ids,   // 循环内变量，值会变，只能拷贝，不可传引用，否则线程执行时将丢失该值
                                 std::cref(fa_seq),  // 循环外变量，值不变，可传引用，省内存
                                 std::cref(genome_region),
                                 _args->mapq,
@@ -527,7 +524,7 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
                            const std::vector<std::string> &sample_ids,  // total samples
                            const std::map<std::string, std::vector<size_t>> &group_smp_idx,
                            const double min_af,
-                           const std::string region,  // genome region format like samtools
+                           const std::string region,    // genome region format like samtools
                            const std::string tmp_vcf_fn,
                            const std::string tmp_cvg_fn) 
 {
@@ -535,8 +532,9 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
     std::vector<BGZF*> batch_file_hds;
     std::vector<tbx_t*> batch_file_tbx;
     std::vector<hts_itr_t*> batch_file_itr;
-    std::vector<std::string> bf_smp_ids;  // The sample id in batchfiles.
+    std::vector<std::string> bf_smp_ids;
     for (size_t i(0); i < batchfiles.size(); ++i) {
+        // Get sample id from batchfiles header.
 
         BGZF *f = bgzf_open(batchfiles[i].c_str(), "r");
         kstring_t s; s.s = NULL; s.l = s.m = 0;
@@ -550,8 +548,8 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
                 std::vector<std::string> h;
                 ngslib::split(s.s, h, "=");
 
-                // h[1] is a string of sample ids, like: 'smp1,smp2,smp3,smp4,...'
-                // set 'is_append' to be 'true', which keep pushing back data into 'bf_smp_ids' vector.
+                // `h[1]` is a string of sample ids, like: 'smp1,smp2,smp3,smp4,...'
+                // set 'is_append' to be 'true', which keep pushing back data in 'bf_smp_ids' vector.
                 ngslib::split(h[1], bf_smp_ids, ",", true); 
                 break;  // complete fetching the sample ids, end the loop
             }
