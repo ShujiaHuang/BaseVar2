@@ -935,7 +935,7 @@ void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,
         align_base_info.mapq = sample_map_reads[i].mapq();
 
         aligned_pairs = sample_map_reads[i].get_aligned_pairs(fa_seq);
-        char mean_qqual_char = int(sample_map_reads[i].mean_qqual());
+        char mean_qqual_char = int(sample_map_reads[i].mean_qqual()) + 33; // 33 is the offset of base QUAL
         uint32_t map_ref_pos;
         for (size_t i(0); i < aligned_pairs.size(); ++i) {
             // Todo: The data of 'align_base_info' and 'aligned_pairs[i]' is similar, 
