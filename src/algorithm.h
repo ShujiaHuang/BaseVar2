@@ -20,8 +20,6 @@
 #include <numeric>
 
 #include <htslib/kfunc.h>
-#include "utils.h" // for testing, call ngslib::join() for output data
-
 
 // Function for chi^2 test
 double chi2_test(double chi_sqrt_value, double degree_of_freedom) {

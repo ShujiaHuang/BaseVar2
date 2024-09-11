@@ -88,7 +88,7 @@ void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
 
     // Output the commandline options
     std::cout << 
-        "[INFO] BaseVar commandline and arguments:\n"
+        "[INFO] BaseVar arguments:\n"
         "basevar basetype -R " + _args->reference        + " \\ \n"  + (_args->input_bf.empty() ? "" : 
         "   -I " + ngslib::join(_args->input_bf, " -I ") + " \\ \n") + (_args->in_bamfilelist.empty() ? "" : 
         "   -L " + _args->in_bamfilelist       + " \\ \n") <<
@@ -524,8 +524,8 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
 /// Functions for calling variants outside of 'BaseTypeRunner' class 
 // A unit for calling variants and let it run in a thread.
 bool _variant_calling_unit(const std::vector<std::string> &batchfiles, 
-                           const std::vector<std::string> &sample_ids,
-                           const std::map<std::string, std::vector<size_t>> & group_smp_idx,
+                           const std::vector<std::string> &sample_ids,  // total samples
+                           const std::map<std::string, std::vector<size_t>> &group_smp_idx,
                            const double min_af,
                            const std::string region,  // genome region format like samtools
                            const std::string tmp_vcf_fn,
@@ -560,7 +560,7 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
         if ((bgzf_close(f)) < 0) throw std::runtime_error("[ERROR] " + batchfiles[i] + " fail close.");
 
         f = bgzf_open(batchfiles[i].c_str(), "r"); // open again
-        batch_file_hds.push_back(f);  // record the file handle
+        batch_file_hds.push_back(f);               // record the file handle
 
         tbx_t *tbx = tbx_index_load(batchfiles[i].c_str());
         if (!tbx) {
@@ -593,7 +593,7 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
     if (!CVG) throw std::runtime_error("[ERROR] " + tmp_cvg_fn + " open failure.");
 
     std::vector<std::string> smp_bf_line_vector;
-    smp_bf_line_vector.reserve(batchfiles.size());
+    smp_bf_line_vector.reserve(batchfiles.size());  // size number is as the same as batchfiles.
 
     bool is_eof(false), has_data(false);
     uint32_t n = 0;
@@ -628,7 +628,7 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
     for (size_t i(0); i < batchfiles.size(); ++i) {
         tbx_destroy(batch_file_tbx[i]);
         tbx_itr_destroy(batch_file_itr[i]);
-        if ((bgzf_close(batch_file_hds[i]) < 0)) 
+        if ((bgzf_close(batch_file_hds[i]) < 0))
             throw std::runtime_error("[ERROR] " + batchfiles[i] + " fail close.");
     }
 
