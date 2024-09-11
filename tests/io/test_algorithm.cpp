@@ -15,7 +15,7 @@ int main(int argc, char *argv[]) {
               << p_value << " - " << std::isnan(p_value) << "\n";
 
     // Rank-sum-test
-    std::vector<double> sample1 = {1, 2, 3, 10, 7, 3, 3, 4, 5};
+    std::vector<double> sample1 = {1, 5, 3, 10, 3, 3, 4, 5};
     std::vector<double> sample2 = {6, 7, 2, 2, 8, 9, 10};
     double ranksum_test_p = wilcoxon_ranksum_test(sample1, sample2);
     std::cout << "wilcoxon_ranksum_test: " << ranksum_test_p << std::endl;
