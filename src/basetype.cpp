@@ -8,14 +8,13 @@
  */
 
 #include <cctype>   // use toupper()
-
 #include <htslib/kfunc.h>
 
 #include "basetype.h"
 #include "algorithm.h"
 #include "external/combinations.h"
 
-#include "utils.h"  // join(), sum()
+#include "utils.h"  // join()
 
 //////////////////////////////////////////////////////////////
 //// The codes for the member function of BaseType class /////
@@ -143,14 +142,14 @@ AA BaseType::_f(const std::vector<char> &bases, int n) {
     for (size_t i = 0; i < cbs_v.size(); i++) {      // 循环该位点每一种可能的碱基组合
 
         std::vector<double> obs_allele_freq = this->_set_allele_initial_freq(cbs_v[i]);
-        if (ngslib::sum(obs_allele_freq) == 0) // Empty coverage for this type of combination, skip.
+        if (sum(obs_allele_freq) == 0) // Empty coverage for this type of combination, skip.
             throw std::runtime_error("The sum of frequence of active bases must always > 0. Check: " + 
                                      ngslib::join(cbs_v[i], ",") + " - " + ngslib::join(obs_allele_freq, ","));
         
         std::vector<double> log_marginal_likelihood;
         // The value of 'obs_allele_freq' and 'log_marginal_likelihood' will be updated in EM process.
         EM(_ind_allele_likelihood, obs_allele_freq, log_marginal_likelihood);
-        double sum_log_marginal_likelihood = ngslib::sum(log_marginal_likelihood);
+        double sum_log_marginal_likelihood = sum(log_marginal_likelihood);
 
         data.bc.push_back(cbs_v[i]);
         data.bp.push_back(obs_allele_freq);
@@ -193,7 +192,7 @@ void BaseType::lrt(const std::vector<char> &specific_bases) {
         for (size_t j(0); j < var.lr.size(); ++j) {
             lrt_chivalue.push_back(2 * (lr_alt - var.lr[j]));
         }
-        size_t i_min = ngslib::argmin(lrt_chivalue.begin(), lrt_chivalue.end());
+        size_t i_min = argmin(lrt_chivalue.begin(), lrt_chivalue.end());
 
         lr_alt = var.lr[i_min];
         chi_sqrt_value = lrt_chivalue[i_min];
