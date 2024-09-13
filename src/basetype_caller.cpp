@@ -158,8 +158,8 @@ void BaseTypeRunner::_variant_caller_process() {
         throw std::runtime_error("[ERROR] [" + cache_outdir + "] must be a empty folder. "
                                  "You can delete it manual before execute BaseVar.");
     }
-
     ngslib::safe_mkdir(cache_outdir);  // make cache directory for batchfiles
+
     if (_args->smart_rerun) {
         // Remove and rollback `thread_num` last modification files. 
         // Must do is before calling '_create_batchfiles'
@@ -169,7 +169,6 @@ void BaseTypeRunner::_variant_caller_process() {
 
     // 以区间为单位进行变异检测, 每个区间里调用多线程
     std::vector<std::string> batchfiles, vcffiles, cvgfiles;
-
     std::string ref_id; uint32_t reg_start, reg_end;
     for (size_t i(0); i < _calling_intervals.size(); ++i) {
 
@@ -184,7 +183,7 @@ void BaseTypeRunner::_variant_caller_process() {
         batchfiles = _create_batchfiles(_calling_intervals[i], prefix);
         std::cout << "[INFO] Done for creating " << regstr << " - " << batchfiles.size() 
                   << " batchfiles and start to call variants.\n"    << std::endl;
-        
+if (batchfiles.empty()) continue;
         ///////////////////////////////////////////////////////////
         // Calling variants from batchfiles with mulitple thread //
         ///////////////////////////////////////////////////////////
@@ -825,17 +824,17 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
     PosMapVector batchsamples_posinfomap_vector;
     batchsamples_posinfomap_vector.reserve(batch_align_files.size());  //  pre-set the capacity
 
-    bool is_not_empty = false, has_data = false;
+    bool is_empty = true, has_data = false;
     uint32_t sub_reg_beg, sub_reg_end;
     for (uint32_t i(reg_start), j(0); i < reg_end + 1; i += STEP_REGION_LEN, ++j) {
         // Cut smaller regions to save computing memory.
         sub_reg_beg = i;
         sub_reg_end = sub_reg_beg + STEP_REGION_LEN - 1 > reg_end ? reg_end : sub_reg_beg + STEP_REGION_LEN - 1;
-        is_not_empty = __fetch_base_in_region(batch_align_files, fa_seq, mapq_thd, 
-                                              std::make_tuple(ref_id, sub_reg_beg, sub_reg_end),
-                                              batchsamples_posinfomap_vector);  // 传引用，省内存，得数据
+        is_empty = __fetch_base_in_region(batch_align_files, fa_seq, mapq_thd, 
+                                          std::make_tuple(ref_id, sub_reg_beg, sub_reg_end),
+                                          batchsamples_posinfomap_vector);  // 传引用，省内存，得数据
 
-        if (!has_data && is_not_empty) {
+        if (!has_data && !is_empty) {
             has_data = true;
         }
 
@@ -884,7 +883,7 @@ bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
     std::string exp_regstr = ref_id + ":" + ngslib::tostring(exp_reg_start) + "-" + ngslib::tostring(exp_reg_end);
 
     // Loop all alignment files
-    bool is_not_empty = false;
+    bool is_empty = true;
     for(size_t i(0); i < batch_align_files.size(); ++i) {
         ngslib::Bam bf(batch_align_files[i], "r");  // open bamfile in reading mode (one sample, one bamfile)
 
@@ -892,13 +891,11 @@ bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
         PosMap sample_posinfo_map;
 
         if (bf.fetch(exp_regstr)) { // Set 'bf' only fetch alignment reads in 'exp_regstr'.
-// uint32_t read_count = 0;
             hts_pos_t map_ref_start, map_ref_end;  // hts_pos_t is uint64_t
             std::vector<ngslib::BamRecord> sample_target_reads; 
             ngslib::BamRecord al;       // alignment read
 
             while (bf.next(al) >= 0) {  // -1 => hit the end of alignement file.
-// ++read_count;
                 if (al.mapq() < mapq_thd || al.is_duplicate() || al.is_qc_fail()) continue;
                 map_ref_start = al.map_ref_start_pos() + 1;  // al.map_ref_start_pos() is 0-based, convert to 1-based
                 map_ref_end   = al.map_ref_end_pos();        // al.map_ref_end_pos() is 1-based
@@ -915,12 +912,11 @@ bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
                 // get alignment information of [i] sample.
                 __seek_position(sample_target_reads, fa_seq, genome_region, sample_posinfo_map);
             }
-// std::cout << "* " + exp_regstr + " total read count: " << read_count << ". Hit read count: " << sample_target_reads.size() << "\n\n";
         }
 
-        if (!is_not_empty && !sample_posinfo_map.empty()) { 
+        if (is_empty && !sample_posinfo_map.empty()) { 
             // at least one sample has data in this region
-            is_not_empty = true; 
+            is_empty = false; 
         }
 
         // Push it into 'batchsamples_posinfomap_vector' even if 'sample_posinfo_map' is empty, 
@@ -932,7 +928,7 @@ bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
         throw std::runtime_error("[basetype.cpp::__fetch_base_in_region] 'pos_batchinfo_vector.size()' "
                                  "should be the same as 'batch_align_files.size()'");
 
-    return is_not_empty;  // no cover reads in 'genome_region' if empty.
+    return is_empty;  // no cover reads in 'genome_region' if empty.
 }
 
 void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,

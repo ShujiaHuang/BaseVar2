@@ -1,4 +1,4 @@
-../../bin/basevar basetype --mapq=10 --min-af=0.05 --batch-count=1 --thread=1 --regions=CHROMOSOME_I:900-1200 --pop-group=sample_group.info --output-vcf vz.vcf --output-cvg t.cvg -R ce.fa.gz -I range.bam -I range.bam > log2
+../../bin/basevar basetype --mapq=10 --min-af=0.05 --batch-count=1 --thread=1 --regions=CHROMOSOME_I:900-1200 --pop-group=sample_group.info --output-vcf vz.vcf --output-cvg t.cvg -R ce.fa.gz -I range.bam -I range.cram -I range.bam --filename-has-samplename
 
 #chr11:5246595-5248428,chr13:32890633-32972781,chr16:222869-227506,chr17:41197764-41276135
 # long options
