@@ -153,8 +153,13 @@ void BaseTypeRunner::_variant_caller_process() {
 
     std::string outdir = ngslib::dirname(_args->output_vcf);
     std::string cache_outdir = outdir + "/cache_" + stem_bn;
-    ngslib::safe_mkdir(cache_outdir);  // make cache directory for batchfiles
 
+    if (IS_DELETE_CACHE_BATCHFILE && ngslib::path_exists_and_not_empty(cache_outdir)) {
+        throw std::runtime_error("[ERROR] [" + cache_outdir + "] must be a empty folder. "
+                                 "You can delete it manual before execute BaseVar.");
+    }
+
+    ngslib::safe_mkdir(cache_outdir);  // make cache directory for batchfiles
     if (_args->smart_rerun) {
         // Remove and rollback `thread_num` last modification files. 
         // Must do is before calling '_create_batchfiles'
@@ -178,7 +183,7 @@ void BaseTypeRunner::_variant_caller_process() {
         std::string prefix = cache_outdir + "/" + stem_bn + "." + regstr;     
         batchfiles = _create_batchfiles(_calling_intervals[i], prefix);
         std::cout << "[INFO] Done for creating " << regstr << " - " << batchfiles.size() 
-                  << " batchfiles and start to call variants.\n";
+                  << " batchfiles and start to call variants.\n"    << std::endl;
         
         ///////////////////////////////////////////////////////////
         // Calling variants from batchfiles with mulitple thread //
@@ -187,7 +192,7 @@ void BaseTypeRunner::_variant_caller_process() {
         std::string sub_cvg_fn = prefix + ".cvg.gz";
 
         _variants_discovery(batchfiles, _calling_intervals[i], sub_vcf_fn, sub_cvg_fn);
-        std::cout << "[INFO] Done for calling variants in : " + regstr  + "\n" << std::endl;
+        std::cout << "[INFO] Done for calling variants in: " + regstr  + "\n" << std::endl;
 
         vcffiles.push_back(sub_vcf_fn);
         cvgfiles.push_back(sub_cvg_fn);
@@ -259,8 +264,8 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
 
     // Loading sample ID in BAM/CRMA files from RG tag.
     if (_args->filename_has_samplename)
-        std::cout << "[INFO] loading samples' id from filename becuase you set "
-                     "--filname-has-samplename.\n";
+        std::cout << "[INFO] BaseVar'll load samples id from filename directly, becuase you set "
+                     "--filename-has-samplename.\n";
 
     std::string samplename, filename;
     size_t si;

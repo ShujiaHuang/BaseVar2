@@ -51,6 +51,9 @@ namespace ngslib {
     bool is_readable(const char *name);
     inline bool is_readable(const std::string &name) { return is_readable(name.c_str()); }
 
+    // check a fold path is empty or not
+    bool path_exists_and_not_empty(std::string folder_path);
+
     /**
      * @brief Make a folder if it doesn't exist, handling concurrent race conditions.
      * @param path  The directry path

@@ -43,6 +43,10 @@ namespace ngslib {
         return p > 0 && p != std::string::npos ? filename.substr(0, p) : filename;
     }
 
+    bool path_exists_and_not_empty(std::string folder_path) {
+        return std::filesystem::exists(folder_path) && !std::filesystem::is_empty(folder_path);
+    }
+
     bool safe_mkdir(std::string folder_path) {
         // set the folder_path tobe 'filesystem::path'
         return std::filesystem::create_directories(folder_path);
