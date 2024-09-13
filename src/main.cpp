@@ -19,8 +19,9 @@ static const std::string VERSION = "version 1.0.0";
 static int usage() {
     // Usage discription
     std::cout << 
-        "Author:  " + AUTHOR  + "\n"
-        "Version: " + VERSION + "\n\n"
+        "Program: basevar (Variant calling and allele frequency estimation from ultra low-pass WGS data)\n"
+        "Version: " + VERSION + "\n"
+        "Author:  " + AUTHOR  + "\n\n"
         "Usage: basevar <command> [options]\n\n" 
         "Commands:\n"
         "    basetype            Variants Caller\n"
@@ -52,8 +53,6 @@ int main(int argc, char *argv[]) {
     clock_t cpu_start_time = clock();
     time_t real_start_time = time(0);
     
-    std::cout << "BaseVar: A software for calling variants efficiently "
-              << "from low-pass whole genome sequencing data.\n\n";
     if (argc < 2) {
         return usage();
     }
