@@ -8,7 +8,7 @@
  */
 #include <sstream>
 #include <fstream>
-#include <ctime>
+#include <ctime>      // clock
 #include <algorithm>  // std::min
 
 #include <htslib/bgzf.h>
@@ -146,6 +146,9 @@ void BaseTypeRunner::run() {
 
 void BaseTypeRunner::_variant_caller_process() {
 
+    clock_t cpu_start_time = clock();
+    time_t real_start_time = time(0);
+
     // Get filepath and stem name first.
     std::string _bname = ngslib::basename(_args->output_vcf);
     size_t si = _bname.find(".vcf");
@@ -181,17 +184,31 @@ void BaseTypeRunner::_variant_caller_process() {
         ///////////////////////////////////////////////////////////
         std::string prefix = cache_outdir + "/" + stem_bn + "." + regstr;     
         batchfiles = _create_batchfiles(_calling_intervals[i], prefix);
-        std::cout << "[INFO] Done for creating " << regstr << " - " << batchfiles.size() 
-                  << " batchfiles and start to call variants.\n"    << std::endl;
-if (batchfiles.empty()) continue;
+
+        // Time information
+        time_t now = time(0);
+        std::string ct(ctime(&now)); 
+        ct.pop_back();
+        std::cout << "[INFO] "+ ct +". Done for creating all " << batchfiles.size() << " batchfiles in " 
+                  << regstr + " and start to call variants, "  << difftime(now, real_start_time)
+                  << " (CPU time: " << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC 
+                  << ") seconds elapsed in total.\n" << std::endl;
+
         ///////////////////////////////////////////////////////////
         // Calling variants from batchfiles with mulitple thread //
         ///////////////////////////////////////////////////////////
         std::string sub_vcf_fn = prefix + ".vcf.gz";
         std::string sub_cvg_fn = prefix + ".cvg.gz";
-
         _variants_discovery(batchfiles, _calling_intervals[i], sub_vcf_fn, sub_cvg_fn);
-        std::cout << "[INFO] Done for calling variants in: " + regstr  + "\n" << std::endl;
+
+        // Time information
+        now = time(0);
+        ct  = ctime(&now); 
+        ct.pop_back();
+        std::cout << "\n" << "[INFO] "+ ct +". Done for calling all variants in " + regstr + ": "
+                  << "[" + sub_vcf_fn + "," + sub_cvg_fn + "], " << difftime(now, real_start_time)
+                  << " (CPU time: " << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC 
+                  << ") seconds elapsed in total.\n" << std::endl;
 
         vcffiles.push_back(sub_vcf_fn);
         cvgfiles.push_back(sub_cvg_fn);
@@ -259,7 +276,7 @@ void BaseTypeRunner::_get_bamfile_list() {
 }
 
 void BaseTypeRunner::_get_sample_id_from_bam() {
-    clock_t start_time = clock();
+    time_t real_start_time = time(0);
 
     // Loading sample ID in BAM/CRMA files from RG tag.
     if (_args->filename_has_samplename)
@@ -297,7 +314,7 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
     std::string ct(ctime(&now));
     ct.pop_back();  // rm the trailing '\n' put by `asctime`
     std::cout << "[INFO] " + ct + ". Done for loading all samples' id from alignment files, " 
-              << (double)(clock() - start_time) / CLOCKS_PER_SEC << " seconds elapsed.\n" 
+              << difftime(real_start_time, now) << " seconds elapsed.\n" 
               << std::endl;
 
     return;
@@ -421,8 +438,8 @@ void BaseTypeRunner::_get_popgroup_info() {
 std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::GenomeRegionTuple &genome_region, 
                                                             const std::string bf_prefix) 
 {
-    std::string ref_id;
-    std::tie(ref_id, std::ignore, std::ignore) = genome_region;
+    std::string ref_id; uint32_t reg_beg, reg_end;
+    std::tie(ref_id, reg_beg, reg_end) = genome_region;
     std::string fa_seq = reference[ref_id];  // use the whole sequence of ``ref_id`` for simply
 
     int bn = _args->input_bf.size() / _args->batchcount;  // number of batchfiles
@@ -471,6 +488,7 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::Genome
         }
     }
     create_batchfile_processes.clear();  // release the thread
+
     return batchfiles;  // done for batchfiles created and return
 }
 
@@ -482,11 +500,11 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     static const uint32_t STEP_REGION_LEN = 100000; // 10 for test, should set to be large than 100000
 
     // get region information
-    std::string ref_id; uint32_t reg_start, reg_end, sub_reg_start, sub_reg_end;
-    std::tie(ref_id, reg_start, reg_end) = genome_region;
+    std::string ref_id; uint32_t reg_beg, reg_end, sub_reg_start, sub_reg_end;
+    std::tie(ref_id, reg_beg, reg_end) = genome_region;
 
-    int bn = (reg_end - reg_start + 1) / STEP_REGION_LEN;
-    if ((reg_end - reg_start + 1) % STEP_REGION_LEN > 0)
+    int bn = (reg_end - reg_beg + 1) / STEP_REGION_LEN;
+    if ((reg_end - reg_beg + 1) % STEP_REGION_LEN > 0)
         bn++;
 
     // prepare multiple-thread
@@ -494,7 +512,7 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     std::vector<std::future<bool>> call_variants_processes;
 
     std::vector<std::string> subvcfs, subcvgs;
-    for (uint32_t i(reg_start), j(1); i < reg_end + 1; i += STEP_REGION_LEN, ++j) {
+    for (uint32_t i(reg_beg), j(1); i < reg_end + 1; i += STEP_REGION_LEN, ++j) {
 
         std::string tmp_vcf_fn = out_vcf_fn + "." + ngslib::tostring(j) + "_" + ngslib::tostring(bn);
         std::string tmp_cvg_fn = out_cvg_fn + "." + ngslib::tostring(j) + "_" + ngslib::tostring(bn);
@@ -528,7 +546,7 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     std::string header = "## No need header here";
     merge_file_by_line(subvcfs, out_vcf_fn, header, true);
     merge_file_by_line(subcvgs, out_cvg_fn, header, true);
-    
+
     return;
 }
 
@@ -542,6 +560,9 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
                            const std::string tmp_vcf_fn,
                            const std::string tmp_cvg_fn) 
 {
+    clock_t cpu_start_time = clock();
+    time_t real_start_time = time(0);
+
     /*************** Preparing for reading data **************/
     std::vector<std::string> bf_smp_ids = _get_sampleid_from_batchfiles(batchfiles);
     // Check smaples id
@@ -626,6 +647,15 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
     // close VCF and CVG file
     if (bgzf_close(VCF) < 0) throw std::runtime_error("[ERROR] " + tmp_vcf_fn + " fail close.");
     if (bgzf_close(CVG) < 0) throw std::runtime_error("[ERROR] " + tmp_cvg_fn + " fail close.");
+
+    // Time information
+    time_t now = time(0);
+    std::string ct(ctime(&now));
+    ct.pop_back();
+    std::cout << "[INFO] " + ct + ". Done for creating VCF file " 
+              << tmp_vcf_fn << ", " << difftime(now, real_start_time) 
+              << " (CPU time: " << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC << ") seconds elapsed." 
+              << std::endl;
 
     return has_data;
 }
@@ -801,10 +831,12 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
                           const int mapq_thd,                              // mapping quality threshold
                           const std::string output_batch_file)             // output batchfile name
 {   // 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
+    clock_t cpu_start_time = clock();
+    time_t real_start_time = time(0);
+
     // This value affected the computing memory, could be set larger than 500000, 20 just for test
     // 这个参数是为了限制存入 `batchsamples_posinfomap_vector` 的最大读取区间，从而控制内存消耗不要太大
     static const uint32_t STEP_REGION_LEN = 500000;  
-    clock_t start_time = clock();
 
     std::string ref_id; uint32_t reg_start, reg_end;
     std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
@@ -852,17 +884,20 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
     }
 
     // Create a Tabix index for 'output_batch_file'
-    const tbx_conf_t bf_tbx_conf = {1, 1, 2, 0, '#', 0};  // {preset, seq col, beg col, end col, header-char, skip-line}
+    // conf: {preset, seq col, beg col, end col, header-char, skip-line}
+    const tbx_conf_t bf_tbx_conf = {1, 1, 2, 0, '#', 0};
     if (tbx_index_build(output_batch_file.c_str(), 0, &bf_tbx_conf))  // file suffix is ".tbi"
         throw std::runtime_error("tbx_index_build failed: Is the file bgzip-compressed? "
                                  "Check this file: " + output_batch_file + "\n");
 
     // Time information
     time_t now = time(0);
-    std::string ct(ctime(&now));
+    std::string ct(ctime(&now)); 
     ct.pop_back();  // rm the trailing '\n' put by `asctime`
-    std::cout << "[INFO] " + ct + ". Done for creating batchfile " << output_batch_file   << ", " 
-              << (double)(clock() - start_time) / CLOCKS_PER_SEC   << " seconds elapsed." << std::endl;
+    std::cout << "[INFO] " + ct + ". Done for creating batchfile " 
+              << output_batch_file << ", " << difftime(now, real_start_time) 
+              << " (CPU time: " << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC << ") seconds elapsed." 
+              << std::endl;
 
     return has_data;
 }

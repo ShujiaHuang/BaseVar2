@@ -49,7 +49,9 @@ int basetype(int argc, char *argv[]) {
 }
 
 int main(int argc, char *argv[]) {
-    clock_t start_time = clock();
+    clock_t cpu_start_time = clock();
+    time_t real_start_time = time(0);
+    
     std::cout << "BaseVar: A software for calling variants efficiently "
               << "from low-pass whole genome sequencing data.\n\n";
     if (argc < 2) {
@@ -67,15 +69,13 @@ int main(int argc, char *argv[]) {
         return usage();
     }
 
-    /* Coding here */
-
-    
     now = time(0);
     std::string ct(ctime(&now));
     ct.pop_back();  // rm the trailing '\n' put by `asctime`
-    std::cout << "\n** " + ct + ". Processing all done, "
-              << (double)(clock() - start_time) / CLOCKS_PER_SEC 
-              << " seconds elapsed in total. **\n" << std::endl;
+    std::cout << "\n** " + ct + ". Processes are all done, "
+              << difftime(now, real_start_time) << " (CPU time: "
+              << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC 
+              << ") seconds elapsed in total. **\n" << std::endl;
 
     return 0;
 }
