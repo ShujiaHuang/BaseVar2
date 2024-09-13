@@ -312,6 +312,7 @@ void BaseTypeRunner::_get_calling_interval() {
         ngslib::split(_args->regions, rg_v, ",");
 
         for (size_t i(0); i < rg_v.size(); ++i) {
+            if (rg_v[i].length() == 0) continue; // ignore empty string 
             _calling_intervals.push_back(_make_gregion_tuple(rg_v[i]));
         }
     } else {
@@ -956,9 +957,8 @@ void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,
         char mean_qqual_char = int(sample_map_reads[i].mean_qqual()) + 33; // 33 is the offset of base QUAL
         uint32_t map_ref_pos;
         for (size_t i(0); i < aligned_pairs.size(); ++i) {
-            // Todo: The data of 'align_base_info' and 'aligned_pairs[i]' is similar, 
-            // could we just use 'aligned_pairs[i]' to replace 'align_base_info'?
-
+            // Todo: data of 'align_base_info' and 'aligned_pairs[i]' is similar, 
+            // just use 'aligned_pairs[i]' to replace 'align_base_info'?
             map_ref_pos = aligned_pairs[i].ref_pos + 1;  // ref_pos is 0-based, convert to 1-based;
 
             if (reg_end < map_ref_pos) break;
@@ -1011,13 +1011,7 @@ void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,
                 // {ref_pos (no need to add ref_id in the key) => map info}
                 sample_posinfo_map.insert({map_ref_pos, align_base_info});
             }
-
-// std::cout 
-// << " - "  << aligned_pairs[i].op << " - [" << ref_id << ", " << align_base_info.ref_pos << ", " 
-// << align_base_info.map_strand    << ", "   << align_base_info.ref_base << "-" << align_base_info.read_base << "] - [" 
-// << aligned_pairs[i].qpos << ", " << aligned_pairs[i].read_base << ", " << aligned_pairs[i].read_qual << "]\n";
         }
-// std::cout << "\n";
     }
 
     return;
@@ -1246,9 +1240,7 @@ void _out_cvg_line(const BatchInfo *smp_bi,
         }
     }
 
-    std::string alt_bases_string = ngslib::join(alt_bases, "");
-    StrandBiasInfo sbi = strand_bias(upper_ref_base, alt_bases_string, align_bases, smp_bi->map_strands);
-
+    StrandBiasInfo sbi = strand_bias(upper_ref_base, ngslib::join(alt_bases, ""), align_bases, smp_bi->map_strands);
     if (total_depth > 0) {
         std::vector<int> dd;
         for (auto b : BASES) dd.push_back(base_depth[b]);
