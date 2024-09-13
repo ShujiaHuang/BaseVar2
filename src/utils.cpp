@@ -74,7 +74,6 @@ namespace ngslib {
         return lmf.string();
     }
 
-
     void split(const std::string &in_str, std::vector<std::string> &out, const char *delim, bool is_append) {
 
         if (!is_append) { out.clear(); }

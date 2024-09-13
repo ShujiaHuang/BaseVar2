@@ -69,16 +69,6 @@ namespace ngslib {
     std::string get_last_modification_file(std::string directory_path);
 
     template<typename T>
-    T sum(const std::vector<T> &value) {
-        T d(0);
-        for (auto x: value) {
-            d += x;
-        }
-
-        return d;
-    }
-
-    template<typename T>
     std::string join(const std::vector<T> &input, const std::string delim="\t") {
         if (input.empty()) 
             return "";
@@ -164,16 +154,6 @@ namespace ngslib {
         }
 
         return duplicates;
-    }
-
-    template<class ForwardIterator>
-    inline size_t argmin(ForwardIterator first, ForwardIterator last) {
-	    return std::distance(first, std::min_element(first, last));
-    }
-
-    template<class ForwardIterator>
-    inline size_t argmax(ForwardIterator first, ForwardIterator last) {
-        return std::distance(first, std::max_element(first, last));
     }
 
     // 把 genome_region 切分为 num 个小区间并返回

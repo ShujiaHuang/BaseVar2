@@ -21,6 +21,25 @@
 
 #include <htslib/kfunc.h>
 
+template<class ForwardIterator>
+inline size_t argmin(ForwardIterator first, ForwardIterator last) {
+    return std::distance(first, std::min_element(first, last));
+}
+
+template<class ForwardIterator>
+inline size_t argmax(ForwardIterator first, ForwardIterator last) {
+    return std::distance(first, std::max_element(first, last));
+}
+
+// sum the value for all the data which could call '+' operator
+template<typename T>
+T sum(const std::vector<T> &value) {
+    T d(0);
+    for (auto x: value) { d += x; }
+    
+    return d;
+}
+
 // Function for chi^2 test
 double chi2_test(double chi_sqrt_value, double degree_of_freedom) {
     return kf_gammaq(degree_of_freedom/2.0, chi_sqrt_value/2.0);
