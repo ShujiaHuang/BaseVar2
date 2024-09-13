@@ -159,6 +159,8 @@ namespace ngslib {
         return std::distance(first, std::max_element(first, last));
     }
 
+    std::vector<GenomeRegionTuple> region_slice(const GenomeRegionTuple &genome_region, int num=1);
+
 }  // namespace ngslib
 
 #endif

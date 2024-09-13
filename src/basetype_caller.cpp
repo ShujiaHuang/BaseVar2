@@ -413,7 +413,7 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::Genome
     std::tie(ref_id, std::ignore, std::ignore) = genome_region;
     std::string fa_seq = reference[ref_id];  // use the whole sequence of ``ref_id`` for simply
 
-    int bn = _args->input_bf.size() / _args->batchcount;
+    int bn = _args->input_bf.size() / _args->batchcount;  // number of batchfiles
     if (_args->input_bf.size() % _args->batchcount > 0)
         bn++;
 
@@ -433,6 +433,7 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::Genome
             continue;
         }
 
+        // slicing bamfiles for a batchfile.
         size_t x(i), y(i + _args->batchcount);
         std::vector<std::string> batch_align_files = ngslib::vector_slicing(_args->input_bf, x, y);
         std::vector<std::string> batch_sample_ids  = ngslib::vector_slicing(_samples_id, x, y);
@@ -499,9 +500,9 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
                                 std::cref(_samples_id),
                                 std::cref(_groups_idx),
                                 _args->min_af,
-                                regstr,        // 局部变量必须拷贝，会变的 
-                                tmp_vcf_fn,    // 局部变量必须拷贝，会变的 
-                                tmp_cvg_fn));  // 局部变量必须拷贝，会变的 
+                                regstr,        // 局部变量必须拷贝，会变 
+                                tmp_vcf_fn,    // 局部变量必须拷贝，会变 
+                                tmp_cvg_fn));  // 局部变量必须拷贝，会变 
     }
 
     // Run and make sure all processes could be finished.
@@ -770,15 +771,16 @@ const BatchInfo __get_group_batchinfo(const BatchInfo *smp_bi, const std::vector
 }
 
 
-bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  // Not a modifiable value
-                          const std::vector<std::string> batch_sample_ids,   // Not a modifiable value
-                          const std::string &fa_seq,                         // Not a modifiable value
-                          const ngslib::GenomeRegionTuple &genome_region,    // [chr, start, end]
-                          const int mapq_thd,                                // mapping quality threshold
-                          const std::string output_batch_file)               // output batchfile name
+bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  
+                          const std::vector<std::string> batch_sample_ids,   
+                          const std::string &fa_seq,                         
+                          const ngslib::GenomeRegionTuple &genome_region,  // [chr, start, end]
+                          const int mapq_thd,                              // mapping quality threshold
+                          const std::string output_batch_file)             // output batchfile name
 {// 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
     // This value affected the computing memory, could be set larger than 500000, 20 just for test
-    static const uint32_t STEP_REGION_LEN = 500000;
+    // 这个参数是为了限制存入 `batchsamples_posinfomap_vector` 的最大读取区间，从而控制内存消耗不要太大
+    static const uint32_t STEP_REGION_LEN = 500000;  
     clock_t start_time = clock();
 
     std::string ref_id; uint32_t reg_start, reg_end;
@@ -848,7 +850,7 @@ bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
                             const ngslib::GenomeRegionTuple genome_region,
                             PosMapVector &batchsamples_posinfomap_vector)  
 {
-    // only using here, In case of missing the overlap reads, 200bp would be enough
+    // only using here, In case of missing the overlap reads on side position, 200bp would be enough
     static const uint32_t REG_EXPEND_SIZE = 200;
 
     std::string ref_id; uint32_t reg_start, reg_end;
@@ -928,7 +930,6 @@ void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,
     std::vector<ngslib::ReadAlignedPair> aligned_pairs;
     for(size_t i(0); i < sample_map_reads.size(); ++i) {
 
-// std::cout << sample_map_reads[i] << "\n";
         align_base_info.map_strand = sample_map_reads[i].map_strand();  // '*', '-' or '+'
         align_base_info.mapq = sample_map_reads[i].mapq();
 

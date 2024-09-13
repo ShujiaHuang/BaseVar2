@@ -11,17 +11,17 @@ static const double MLN10TO10 = -0.23025850929940458;  // 换底，把 10 换为
 
 int main(int argc, char *argv[]) {
 
-std::vector<double> tt{1,2,3,4};
-std::cout << ngslib::join(tt, ",") <<"\n";
-tt = std::vector<double> (3, 0); 
-std::cout << ngslib::join(tt, ",") <<"\n";
-tt.clear();
+    std::vector<double> tt{1,2,3,4};
+    std::cout << ngslib::join(tt, ",") <<"\n";
+    tt = std::vector<double> (3, 0); 
+    std::cout << ngslib::join(tt, ",") <<"\n";
+    tt.clear();
 
-std::vector<char> cc = {'z', 'c', 'y', 'a', 'G', 'C', 'T', 'A'};
-std::cout << "Before sort: " << ngslib::join(cc, " - ") <<"\n";
+    std::vector<char> cc = {'z', 'c', 'y', 'a', 'G', 'C', 'T', 'A'};
+    std::cout << "Before sort: " << ngslib::join(cc, " - ") <<"\n";
 
-std::sort(cc.begin(), cc.end());
-std::cout << "After sort : " << ngslib::join(cc, " - ") <<"\n";
+    std::sort(cc.begin(), cc.end());
+    std::cout << "After sort : " << ngslib::join(cc, " - ") <<"\n";
 
     std::array<int, 7> numbers{ 2, 4, 8, 0, 6, -1, 3};
 	int minIndex = ngslib::argmin(numbers.begin(), numbers.end());
@@ -29,6 +29,15 @@ std::cout << "After sort : " << ngslib::join(cc, " - ") <<"\n";
 	std::vector<float> prices = { 12.5f, 8.9f, 100.0f, 24.5f, 30.0f };
 	float maxIndex = ngslib::argmax(prices.begin(), prices.end());
 	std::cout << "MaxIndex: " <<  maxIndex << '\n';
+
+    ngslib::GenomeRegionTuple reg = std::make_tuple("chr1", 5, 200);
+    std::vector<ngslib::GenomeRegionTuple> regs = ngslib::region_slice(reg, 7);
+    for (size_t i(0); i < regs.size(); ++i) {
+        std::string ref_id; uint32_t reg_start, reg_end;
+        std::tie(ref_id, reg_start, reg_end) = regs[i];
+
+        std::cout << "slicing regions: - " << i+1 << " " << ref_id << ": " << reg_start << " - " << reg_end << "\n";
+    }
 
 exit(1);
 
