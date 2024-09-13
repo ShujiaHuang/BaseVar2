@@ -2,6 +2,8 @@
 #include <iostream>
 #include <cmath>
 #include <string>
+#include <vector>
+#include <array>
 
 #include "algorithm.h"
 
@@ -28,6 +30,13 @@ int main(int argc, char *argv[]) {
     std::cout << "Fisher exact test: " << fisher_exact_test(3, 4, 4, 5) << "\n";
     std::cout << "Fisher exact test: " << fisher_exact_test(1, 1, 1, 1) << "\n";
 
-    // how to test EM?
 
+    std::array<int, 7> numbers{ 2, 4, 8, 0, 6, -1, 3};
+	int minIndex = argmin(numbers.begin(), numbers.end());
+	std::cout << "MinIndex: " << minIndex << '\n';
+	std::vector<float> prices = { 12.5f, 8.9f, 100.0f, 24.5f, 30.0f };
+	float maxIndex = argmax(prices.begin(), prices.end());
+	std::cout << "MaxIndex: " <<  maxIndex << '\n';
+
+    // how to test EM?
 }
