@@ -126,6 +126,9 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
                            const std::string tmp_vcf_fn,
                            const std::string tmp_cvg_fn);
 
+// Get sample id from batchfiles header.
+std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::string> &batchfiles);
+
 bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, 
                      const std::map<std::string, std::vector<size_t>> &group_smp_idx,
                      double min_af,

@@ -467,7 +467,7 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
                                          const std::string out_vcf_fn,
                                          const std::string out_cvg_fn) 
 {
-    static const uint32_t STEP_REGION_LEN = 1000000; // 10 for test, should set to be large than 1000000
+    static const uint32_t STEP_REGION_LEN = 100000; // 10 for test, should set to be large than 100000
 
     // get region information
     std::string ref_id; uint32_t reg_start, reg_end, sub_reg_start, sub_reg_end;
@@ -511,6 +511,7 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
             bool x = p.get();
         }
     }
+    call_variants_processes.clear();  // release the thread
 
     std::string header = "## No need header here";
     merge_file_by_line(subvcfs, out_vcf_fn, header, true);
@@ -530,34 +531,21 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
                            const std::string tmp_cvg_fn) 
 {
     /*************** Preparing for reading data **************/
+    std::vector<std::string> bf_smp_ids = _get_sampleid_from_batchfiles(batchfiles);
+    // Check smaples id
+    if (ngslib::join(bf_smp_ids, ",") != ngslib::join(sample_ids, ","))
+        throw std::runtime_error("[BUG] The order of sample ids in batchfiles must be the same as "
+                                 "input bamfiles.\n" 
+                                 "Sample ids in batchfiles: " + ngslib::join(bf_smp_ids, ",") + "\n" 
+                                 "Sample ids in bamfiles  : " + ngslib::join(sample_ids, ",") + "\n");
+
     std::vector<BGZF*> batch_file_hds;
     std::vector<tbx_t*> batch_file_tbx;
     std::vector<hts_itr_t*> batch_file_itr;
-    std::vector<std::string> bf_smp_ids;
     for (size_t i(0); i < batchfiles.size(); ++i) {
-        // Get sample id from batchfiles header.
 
+        // Get and check the sample id from batchfiles header.
         BGZF *f = bgzf_open(batchfiles[i].c_str(), "r");
-        kstring_t s; s.s = NULL; s.l = s.m = 0;
-        
-        // get all the samples' id from the header of batchfiles.
-        while (bgzf_getline(f, '\n', &s) >= 0) {
-            if (s.s[0] != '#') { // head char is '#' in batchfile.
-                break;
-            } else if (strncmp(s.s, "##SampleIDs=", 12) == 0) {
-                // Header looks like: ##SampleIDs=smp1,smp2,smp3,...
-                std::vector<std::string> h;
-                ngslib::split(s.s, h, "=");
-
-                // `h[1]` is a string of sample ids, like: 'smp1,smp2,smp3,smp4,...'
-                // set 'is_append' to be 'true', which keep pushing back data in 'bf_smp_ids' vector.
-                ngslib::split(h[1], bf_smp_ids, ",", true); 
-                break;  // complete fetching the sample ids, end the loop
-            }
-        }
-        free(s.s);
-        if ((bgzf_close(f)) < 0) throw std::runtime_error("[ERROR] " + batchfiles[i] + " fail close.");
-
         f = bgzf_open(batchfiles[i].c_str(), "r"); // open again
         batch_file_hds.push_back(f);               // record the file handle
 
@@ -574,14 +562,6 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
         }
         batch_file_itr.push_back(itr);
     }
-
-    // Check smaples
-    if (ngslib::join(bf_smp_ids, ",") != ngslib::join(sample_ids, ","))
-            throw std::runtime_error("[BUG] The order of sample ids in batchfiles must be the same as "
-                                     "input bamfiles.\n" 
-                                     "Sample ids in batchfiles: " + ngslib::join(bf_smp_ids, ",") + "\n" 
-                                     "Sample ids in bamfiles  : " + ngslib::join(sample_ids, ",") + "\n");
-
     /************* Done for reading data prepare *************/
 
     // Start calling variants
@@ -636,6 +616,37 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
     if (bgzf_close(CVG) < 0) throw std::runtime_error("[ERROR] " + tmp_cvg_fn + " fail close.");
 
     return has_data;
+}
+
+std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::string> &batchfiles) {
+    // Get sample id from batchfiles header.
+
+    std::vector<std::string> bf_smp_ids;
+    for (size_t i(0); i < batchfiles.size(); ++i) {
+
+        BGZF *f = bgzf_open(batchfiles[i].c_str(), "r");
+        kstring_t s; s.s = NULL; s.l = s.m = 0;
+
+        // get all the samples' id from the header of batchfiles.
+        while (bgzf_getline(f, '\n', &s) >= 0) {
+            if (s.s[0] != '#') { // head char is '#' in batchfile.
+                break;
+            } else if (strncmp(s.s, "##SampleIDs=", 12) == 0) {
+                // Header looks like: ##SampleIDs=smp1,smp2,smp3,...
+                std::vector<std::string> h;
+                ngslib::split(s.s, h, "=");
+
+                // `h[1]` is a string of sample ids, like: 'smp1,smp2,smp3,smp4,...'
+                // set 'is_append' to be 'true', which keep pushing back data in 'bf_smp_ids' vector.
+                ngslib::split(h[1], bf_smp_ids, ",", true); 
+                break;  // complete fetching the sample ids, end the loop
+            }
+        }
+        free(s.s);
+        if ((bgzf_close(f)) < 0) throw std::runtime_error("[ERROR] " + batchfiles[i] + " fail close.");
+    }
+
+    return bf_smp_ids;
 }
 
 bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, 
