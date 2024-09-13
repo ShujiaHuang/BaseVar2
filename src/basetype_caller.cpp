@@ -421,10 +421,7 @@ void BaseTypeRunner::_get_popgroup_info() {
             }
         }
     }
-    // test
-    // for(std::map<std::string, std::vector<size_t>>::iterator it(_groups_idx.begin()); it != _groups_idx.end(); ++it){
-    //     std::cout << " - " << it->first << " " << it->second.size() << " : " << ngslib::join(it->second, ",") << std::endl;
-    // }
+
     return;
 }
 
@@ -470,9 +467,9 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::Genome
         // make Thread Pool
         create_batchfile_processes.emplace_back(
             thread_pool.enqueue(__create_a_batchfile, 
-                                batch_align_files,  // 循环内变量，值会变，只能拷贝，不可传引用，否则线程执行时将丢失该值
-                                batch_sample_ids,   // 循环内变量，值会变，只能拷贝，不可传引用，否则线程执行时将丢失该值
-                                std::cref(fa_seq),  // 循环外变量，值不变，可传引用，省内存
+                                batch_align_files,  // 局部变量，会变，必拷贝，不可传引用，否则线程执行时将丢失该值
+                                batch_sample_ids,   // 局部变量，会变，必拷贝，不可传引用，否则线程执行时将丢失该值
+                                std::cref(fa_seq),  // 外部变量，不变，传引用，省内存
                                 std::cref(genome_region),
                                 _args->mapq,
                                 batchfile));
@@ -652,10 +649,10 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
     time_t now = time(0);
     std::string ct(ctime(&now));
     ct.pop_back();
-    std::cout << "[INFO] " + ct + ". Done for creating VCF file " 
-              << tmp_vcf_fn << ", " << difftime(now, real_start_time) 
-              << " (CPU time: " << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC << ") seconds elapsed." 
-              << std::endl;
+    std::cout << "[INFO] " + ct + ". Done for creating [" + tmp_vcf_fn + ", " + tmp_cvg_fn + "], "
+              << difftime(now, real_start_time) 
+              << " (CPU time: " << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC 
+              << ") seconds elapsed." << std::endl;
 
     return has_data;
 }
@@ -838,13 +835,11 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
     // 这个参数是为了限制存入 `batchsamples_posinfomap_vector` 的最大读取区间，从而控制内存消耗不要太大
     static const uint32_t STEP_REGION_LEN = 500000;  
 
-    std::string ref_id; uint32_t reg_start, reg_end;
-    std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
+    std::string ref_id; uint32_t reg_beg, reg_end;
+    std::tie(ref_id, reg_beg, reg_end) = genome_region;  // 1-based
 
     BGZF *obf = bgzf_open(output_batch_file.c_str(), "w"); // output file handle of output_batch_file
-    if (!obf) {
-        throw std::runtime_error("[ERROR] " + output_batch_file + " open failure.");
-    }
+    if (!obf) throw std::runtime_error("[ERROR] " + output_batch_file + " open failure.");
 
     // Header of batchfile
     std::string bf_header = "##fileformat=BaseVarBatchFile_v1.0\n" 
@@ -859,7 +854,7 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
 
     bool is_empty = true, has_data = false;
     uint32_t sub_reg_beg, sub_reg_end;
-    for (uint32_t i(reg_start), j(0); i < reg_end + 1; i += STEP_REGION_LEN, ++j) {
+    for (uint32_t i(reg_beg), j(0); i < reg_end + 1; i += STEP_REGION_LEN, ++j) {
         // Cut smaller regions to save computing memory.
         sub_reg_beg = i;
         sub_reg_end = sub_reg_beg + STEP_REGION_LEN - 1 > reg_end ? reg_end : sub_reg_beg + STEP_REGION_LEN - 1;
@@ -878,7 +873,7 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
         batchsamples_posinfomap_vector.clear();  // 必须清空，为下个循环做准备
     }
 
-    int is_cl = bgzf_close(obf);  // 关闭文件
+    int is_cl = bgzf_close(obf);  // close file
     if (is_cl < 0) {
         throw std::runtime_error("[ERROR] " + output_batch_file + " fail close.");
     }
@@ -896,8 +891,8 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
     ct.pop_back();  // rm the trailing '\n' put by `asctime`
     std::cout << "[INFO] " + ct + ". Done for creating batchfile " 
               << output_batch_file << ", " << difftime(now, real_start_time) 
-              << " (CPU time: " << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC << ") seconds elapsed." 
-              << std::endl;
+              << " (CPU time: " << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC 
+              << ") seconds elapsed." << std::endl;
 
     return has_data;
 }
@@ -1224,10 +1219,6 @@ void _out_vcf_line(const BaseType &bt,
         info.insert(info.end(), group_af_info.begin(), group_af_info.end());
     }
 
-// std::cout << "Calling _out_vcf_line: "<< bt.get_ref_id() << " - " << bt.get_ref_pos() 
-//           << " - " << bt.get_ref_base() << " - " << ngslib::join(bt.get_alt_bases(), ",") << " - "
-//           << ngslib::join(info, ";") << "\n";
-    
     std::string sample_format = "GT:AB:SO:BP";
     std::string qs  = (bt.get_var_qual() > QUAL_THRESHOLD) ? "." : "LowQual";
     std::string out = bt.get_ref_id() + "\t" + std::to_string(bt.get_ref_pos()) + "\t.\t" + bt.get_ref_base() + "\t" + 
