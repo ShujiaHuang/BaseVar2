@@ -116,7 +116,6 @@ namespace ngslib {
         }
 
         return regions;
-
     }
-
+    
 }  // namespae ngslib

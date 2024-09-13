@@ -39,6 +39,12 @@ int main(int argc, char *argv[]) {
         std::cout << "slicing regions: - " << i+1 << " " << ref_id << ": " << reg_start << " - " << reg_end << "\n";
     }
 
+    std::vector<std::string> vs = {"welcome", "to", "geeks", "to", "geeks"};
+    std::cout << "Duplicates: " << ngslib::join(vs, ",") << " : " << ngslib::join(ngslib::find_duplicates(vs), ",") << "\n";
+    std::vector<int> vi = {4,2,3,5,3,4,5,1};
+    std::cout << "Duplicates: " << ngslib::join(vi, ",") << " : " << ngslib::join(ngslib::find_duplicates(vi), ",") << "\n";
+    std::cout << "Duplicates: " << ngslib::join(cc, ",") << " : " << ngslib::join(ngslib::find_duplicates(cc), ",") << "\n";
+
 exit(1);
 
     std::cout << "phred 'a': " << exp(('a'-33) * MLN10TO10) << "\n";

@@ -149,6 +149,23 @@ namespace ngslib {
         return new_v;
     }
 
+    // Template function to discover and return all duplicated elements as a vector
+    template <typename T>
+    std::vector<T> find_duplicates(std::vector<T> input) { // do not pass reference or pointer to the 'input'
+
+        std::sort(input.begin(), input.end());  // The order of 'input' will be changed here
+        std::vector<T> duplicates;
+        for (size_t i(1); i < input.size(); ++i) {
+            if (input[i] == input[i-1]) {
+                if (duplicates.empty() || (input[i] != duplicates.back())) {
+                    duplicates.push_back(input[i]);
+                }
+            }
+        }
+
+        return duplicates;
+    }
+
     template<class ForwardIterator>
     inline size_t argmin(ForwardIterator first, ForwardIterator last) {
 	    return std::distance(first, std::min_element(first, last));
@@ -159,6 +176,7 @@ namespace ngslib {
         return std::distance(first, std::max_element(first, last));
     }
 
+    // 把 genome_region 切分为 num 个小区间并返回
     std::vector<GenomeRegionTuple> region_slice(const GenomeRegionTuple &genome_region, int num=1);
 
 }  // namespace ngslib

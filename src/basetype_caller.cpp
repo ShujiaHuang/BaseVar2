@@ -123,8 +123,15 @@ void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
 
     _get_calling_interval();
     print_calling_interval();
+    _get_sample_id_from_bam();  // keep the order of '_samples_id' as the same as input 'aligne_files'
 
-    _get_sample_id_from_bam();  // '_samples_id' has the same order with input aligne_files
+    // check the input bamfiles have duplicate or not
+    std::vector<std::string> duplicate_samples = ngslib::find_duplicates(_samples_id);
+    if (!duplicate_samples.empty()) {
+        std::cout << "[WARNING] Find sample duplications within the input bamfiles: " 
+                  << ngslib::join(duplicate_samples, ",") << std::endl;
+    }
+
     if (!_args->pop_group_file.empty()) 
         _get_popgroup_info();
 
@@ -822,6 +829,7 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
         is_not_empty = __fetch_base_in_region(batch_align_files, fa_seq, mapq_thd, 
                                               std::make_tuple(ref_id, sub_reg_beg, sub_reg_end),
                                               batchsamples_posinfomap_vector);  // 传引用，省内存，得数据
+
         if (!has_data && is_not_empty) {
             has_data = true;
         }
