@@ -10,6 +10,8 @@
 *.vcf*
 *.cvg*
 
+bin/basevar
+
 CMakeCache.txt
 cmake_install.cmake
 
