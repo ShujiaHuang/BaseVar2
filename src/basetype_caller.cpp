@@ -788,7 +788,7 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
                           const ngslib::GenomeRegionTuple &genome_region,  // [chr, start, end]
                           const int mapq_thd,                              // mapping quality threshold
                           const std::string output_batch_file)             // output batchfile name
-{// 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
+{   // 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
     // This value affected the computing memory, could be set larger than 500000, 20 just for test
     // 这个参数是为了限制存入 `batchsamples_posinfomap_vector` 的最大读取区间，从而控制内存消耗不要太大
     static const uint32_t STEP_REGION_LEN = 500000;  
@@ -814,13 +814,13 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
     batchsamples_posinfomap_vector.reserve(batch_align_files.size());  //  pre-set the capacity
 
     bool is_not_empty = false, has_data = false;
-    uint32_t sub_reg_start, sub_reg_end;
+    uint32_t sub_reg_beg, sub_reg_end;
     for (uint32_t i(reg_start), j(0); i < reg_end + 1; i += STEP_REGION_LEN, ++j) {
         // Cut smaller regions to save computing memory.
-        sub_reg_start = i;
-        sub_reg_end = sub_reg_start + STEP_REGION_LEN - 1 > reg_end ? reg_end : sub_reg_start + STEP_REGION_LEN - 1;
+        sub_reg_beg = i;
+        sub_reg_end = sub_reg_beg + STEP_REGION_LEN - 1 > reg_end ? reg_end : sub_reg_beg + STEP_REGION_LEN - 1;
         is_not_empty = __fetch_base_in_region(batch_align_files, fa_seq, mapq_thd, 
-                                              std::make_tuple(ref_id, sub_reg_start, sub_reg_end),
+                                              std::make_tuple(ref_id, sub_reg_beg, sub_reg_end),
                                               batchsamples_posinfomap_vector);  // 传引用，省内存，得数据
         if (!has_data && is_not_empty) {
             has_data = true;
@@ -828,9 +828,8 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
 
         /* Output batchfile, no matter 'batchsamples_posinfomap_vector' is empty or not. */
         __write_record_to_batchfile(batchsamples_posinfomap_vector, fa_seq,
-                                    std::make_tuple(ref_id, sub_reg_start, sub_reg_end), 
+                                    std::make_tuple(ref_id, sub_reg_beg, sub_reg_end), 
                                     obf);
-
         batchsamples_posinfomap_vector.clear();  // 必须清空，为下个循环做准备
     }
 
