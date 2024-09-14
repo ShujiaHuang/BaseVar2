@@ -111,7 +111,10 @@ void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
                      "************************************************\n\n";
     }
 
-    if (!_args->in_bamfilelist.empty()) _get_bamfile_list();
+    if (!_args->in_bamfilelist.empty()) {
+        std::vector<std::string> filelist = get_firstcolumn_from_file(_args->in_bamfilelist);
+        _args->input_bf.insert(_args->input_bf.end(), filelist.begin(), filelist.end());
+    }
     std::cout << "[INFO] Finish loading arguments and we have " << _args->input_bf.size()
               << " BAM/CRAM files for variants calling.\n"      << std::endl;
 
@@ -128,8 +131,9 @@ void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
     // check the input bamfiles have duplicate or not
     std::vector<std::string> duplicate_samples = ngslib::find_duplicates(_samples_id);
     if (!duplicate_samples.empty()) {
-        std::cout << "[WARNING] Find sample duplications within the input bamfiles: " 
-                  << ngslib::join(duplicate_samples, ",") << std::endl;
+        std::cout << "[WARNING] Find " << duplicate_samples.size() << " duplicated samples within " 
+                  << "the input bamfiles: " + ngslib::join(duplicate_samples, ",") + "\n" 
+                  << std::endl;
     }
 
     if (!_args->pop_group_file.empty()) 
@@ -255,26 +259,6 @@ void BaseTypeRunner::_variant_caller_process() {
     return;
 }
 
-void BaseTypeRunner::_get_bamfile_list() {
-    std::ifstream i_fn(_args->in_bamfilelist.c_str());
-    if (!i_fn) {
-        std::cerr << "[ERROR] Cannot open file: " + _args->in_bamfilelist << std::endl;
-        exit(1);
-    }
-
-    std::string tmp, fn;
-    while (1) {
-        i_fn >> fn;
-        if (i_fn.eof()) break;
-
-        _args->input_bf.push_back(fn);
-        std::getline(i_fn, tmp, '\n');
-    }
-    i_fn.close();
-
-    return;
-}
-
 void BaseTypeRunner::_get_sample_id_from_bam() {
     time_t real_start_time = time(0);
 
@@ -394,14 +378,14 @@ void BaseTypeRunner::_get_popgroup_info() {
     }
 
     std::map<std::string, std::string> sample2group;
-    std::string tmp, sn, gn;
+    std::string skip, sn, gn;
     while (1) {
         // Only two columns: sample_id and group_id
         i_fn >> sn >> gn;
         if (i_fn.eof()) break;
         
         sample2group[sn] = gn;
-        std::getline(i_fn, tmp, '\n');
+        std::getline(i_fn, skip, '\n');  // skip the rest information of line.
     }
     i_fn.close();
 
@@ -425,13 +409,6 @@ void BaseTypeRunner::_get_popgroup_info() {
     return;
 }
 
-/**
- * @brief Create a batch of temp files for variant discovery (could be deleted when the jobs done).
- * 
- * @param genome_region 
- * @return std::vector<std::string> 
- * 
- */
 std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::GenomeRegionTuple &genome_region, 
                                                             const std::string bf_prefix) 
 {
@@ -672,11 +649,10 @@ std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::st
                 break;
             } else if (strncmp(s.s, "##SampleIDs=", 12) == 0) {
                 // Header looks like: ##SampleIDs=smp1,smp2,smp3,...
-                std::vector<std::string> h;
-                ngslib::split(s.s, h, "=");
+                std::vector<std::string> h; ngslib::split(s.s, h, "=");
 
                 // `h[1]` is a string of sample ids, like: 'smp1,smp2,smp3,smp4,...'
-                // set 'is_append' to be 'true', which keep pushing back data in 'bf_smp_ids' vector.
+                // set 'is_append' to be 'true', keep pushing data back in 'bf_smp_ids' vector.
                 ngslib::split(h[1], bf_smp_ids, ",", true); 
                 break;  // complete fetching the sample ids, end the loop
             }

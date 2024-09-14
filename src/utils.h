@@ -86,7 +86,7 @@ namespace ngslib {
 
     void split(const std::string &in_str, std::vector<std::string> &out, const char *delim, bool is_append=false);
     
-    // 重载了除 vector<string> 之外的所有其他基础数据类型，包括：int，double，float
+    // 重载了除 vector<string> 之外的所有其他基础数据类型(string 的操作和它们不同)，包括：int，double，float
     template<typename T>
     void split(const std::string &in_str, std::vector<T> &out, const char *delim, bool is_append=false) {
         
