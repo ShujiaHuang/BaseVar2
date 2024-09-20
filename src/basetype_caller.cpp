@@ -143,15 +143,7 @@ void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
 }
 
 // Run the processes of calling variant and output files.
-void BaseTypeRunner::run() {
-    _variant_caller_process();
-    return;
-}
-
 void BaseTypeRunner::_variant_caller_process() {
-
-    clock_t cpu_start_time = clock();
-    time_t real_start_time = time(0);
 
     // Get filepath and stem name first.
     std::string _bname = ngslib::basename(_args->output_vcf);
@@ -179,6 +171,9 @@ void BaseTypeRunner::_variant_caller_process() {
     std::string ref_id; uint32_t reg_start, reg_end;
     for (size_t i(0); i < _calling_intervals.size(); ++i) {
 
+        clock_t cpu_start_time = clock();
+        time_t real_start_time = time(0);
+
         // Region information
         std::tie(ref_id, reg_start, reg_end) = _calling_intervals[i];
         std::string regstr = ref_id + "_" + ngslib::tostring(reg_start) + "-" + ngslib::tostring(reg_end);
@@ -201,6 +196,9 @@ void BaseTypeRunner::_variant_caller_process() {
         ///////////////////////////////////////////////////////////
         // Calling variants from batchfiles with mulitple thread //
         ///////////////////////////////////////////////////////////
+        real_start_time = time(0);
+        cpu_start_time  = clock();
+
         std::string sub_vcf_fn = prefix + ".vcf.gz";
         std::string sub_cvg_fn = prefix + ".cvg.gz";
         _variants_discovery(batchfiles, _calling_intervals[i], sub_vcf_fn, sub_cvg_fn);
@@ -298,7 +296,7 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
     std::string ct(ctime(&now));
     ct.pop_back();  // rm the trailing '\n' put by `asctime`
     std::cout << "[INFO] " + ct + ". Done for loading all samples' id from alignment files, " 
-              << difftime(real_start_time, now) << " seconds elapsed.\n" 
+              << difftime(now, real_start_time) << " seconds elapsed.\n" 
               << std::endl;
 
     return;
