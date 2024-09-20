@@ -75,7 +75,7 @@ masked them:
 then type `make` again to contiune the following processes.
 
 
-#### Method 2. Manual install processes (Optional)
+#### Method 2. Manually install processes (Optional)
 
 **1. Download BaseVar from github**
 
@@ -133,7 +133,7 @@ Feel free to proceed with your installation tasks despite encountering this erro
 
 Navigate into `bin/` folder (`cd basevar/bin`) first and execute the following commands:
 
-**Manual install in Linux**
+**Manually install in Linux**
 
 ```bash
 $ cd bin/
@@ -141,7 +141,7 @@ $ g++ -O3 -fPIC ../src/main.cpp ../src/basetype.h ../src/basetype.cpp ../src/bas
 
 ```
 
-**Manual install in MacOS**
+**Manually install in MacOS**
 
 ```bash
 $ cd bin/
