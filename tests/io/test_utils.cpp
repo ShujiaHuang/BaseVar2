@@ -41,7 +41,6 @@ int main(int argc, char *argv[]) {
     std::cout << "The path is empty or not: " << ngslib::path_exists_and_not_empty("a") << "\n";
     std::cout << "The path is empty or not: " << ngslib::path_exists_and_not_empty("./") << "\n";
 
-exit(1);
 
     std::cout << "phred 'a': " << exp(('a'-33) * MLN10TO10) << "\n";
 
@@ -73,6 +72,7 @@ exit(1);
     ngslib::split("hello::world", b, "h", false);
     std::cout << b[0] << ": " << ngslib::join(b, "--") << std::endl;
 
+exit(1);
     std::vector<int> c = {1,2,3,4};
     std::cout << ngslib::join(c) << std::endl;
     std::cout << ngslib::join(c, ":") << std::endl;
