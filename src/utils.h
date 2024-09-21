@@ -123,6 +123,10 @@ namespace ngslib {
 
         return;
     }
+    template<typename T>
+    void split(const std::string &in_str, std::vector<T> &out, std::string delim, bool is_append=false){
+        split(in_str, out, delim.c_str(), is_append);
+    }
 
     // Template function to slice a vector from range X to Y
     template <typename T>
