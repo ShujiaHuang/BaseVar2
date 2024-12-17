@@ -514,7 +514,8 @@ htscodecs/htscodecs:
 
 # Build the htscodecs/htscodecs/version.h file if necessary
 htscodecs/htscodecs/version.h: force
-	@if test -e $(srcdir)/htscodecs/.git && test -e $(srcdir)/htscodecs/configure.ac ; then \
+#	@if test -e $(srcdir)/htscodecs/.git && test -e $(srcdir)/htscodecs/configure.ac ; then  # Mask by Shujia Huang 2024-12-17 08:53:19
+	@if test -e $(srcdir)/htscodecs/configure.ac ; then \
 	  vers=`cd $(srcdir)/htscodecs && git describe --always --dirty --match 'v[0-9]\.[0-9]*'` && \
 	  case "$$vers" in \
 	    v*) vers=$${vers#v} ;; \
@@ -623,10 +624,9 @@ htslib-uninstalled.pc: htslib.pc.tmp
 DEL_HTSCODECS_VERSION := $(if $(wildcard htscodecs/.git),htscodecs/htscodecs/version.h)
 
 mostlyclean:
-	-rm -f *.o *.pico cram/*.o cram/*.pico test/*.o test/*.dSYM config_vars.h version.h
+	-rm -f *.o *.pico cram/*.o cram/*.pico config_vars.h version.h
 	-rm -f htscodecs/htscodecs/*.o htscodecs/htscodecs/*.pico $(DEL_HTSCODECS_VERSION)
 	-rm -f hts-object-files
-	-rm -f htscodecs/tests/*.o
 
 clean: mostlyclean clean-$(SHLIB_FLAVOUR)
 	-rm -f libhts.a $(BUILT_PLUGINS) $(BUILT_TEST_PROGRAMS) $(BUILT_THRASH_PROGRAMS)
