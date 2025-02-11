@@ -3,9 +3,9 @@
 #include <htslib/bgzf.h>
 #include <htslib/kstring.h>
 
+#include "io/fasta.h"
+#include "io/utils.h"
 #include "basetype_utils.h"
-#include "fasta.h"
-#include "utils.h"
 
 std::vector<std::string> get_firstcolumn_from_file(const std::string fn) {
 

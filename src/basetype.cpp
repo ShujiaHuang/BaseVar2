@@ -7,14 +7,13 @@
  * 
  */
 
-#include <cctype>   // use toupper()
+#include <cctype>                   // use toupper()
 #include <htslib/kfunc.h>
 
 #include "basetype.h"
 #include "algorithm.h"
 #include "external/combinations.h"
-
-#include "utils.h"  // join()
+#include "io/utils.h"              // join()
 
 //////////////////////////////////////////////////////////////
 //// The codes for the member function of BaseType class /////

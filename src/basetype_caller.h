@@ -14,9 +14,9 @@
 #include <getopt.h>
 #include <map>
 
-#include "fasta.h"
-#include "bam.h"
-#include "utils.h"
+#include "io/fasta.h"
+#include "io/bam.h"
+#include "io/utils.h"
 #include "external/robin_hood.h"
 
 #include "basetype.h"

@@ -7,10 +7,10 @@
 
 #include <htslib/sam.h>
 
-#include "Fasta.h"
-#include "bam_header.h"
-#include "bam_record.h"
-#include "utils.h"
+#include "io/fasta.h"
+#include "io/bam_header.h"
+#include "io/bam_record.h"
+#include "io/utils.h"
 
 
 int main() {

@@ -3,7 +3,7 @@
 #include <iostream>
 #include <string>
 
-#include "bam_header.h"
+#include "io/bam_header.h"
 
 int main() {
 

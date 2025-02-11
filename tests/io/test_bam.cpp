@@ -4,8 +4,8 @@
 #include <string>
 #include <ctime>
 
-#include "bam.h"
-#include "bam_record.h"
+#include "io/bam.h"
+#include "io/bam_record.h"
 
 void ret_br(ngslib::Bam &b) {
 

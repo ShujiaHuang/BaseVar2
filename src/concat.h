@@ -20,7 +20,7 @@
 #include <htslib/kstring.h>
 
 #include "basetype_utils.h"
-#include "utils.h"
+#include "io/utils.h"
 
 static const std::string __CONCAT_USAGE = 
     "About: Concatenate or combine BaseVar's VCF/CVG files.\n" 

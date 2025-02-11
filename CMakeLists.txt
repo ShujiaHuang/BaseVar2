@@ -2,7 +2,7 @@
 cmake_minimum_required (VERSION 3.12.0)
 
 # Project information
-project (BaseVar VERSION 1.1.0 LANGUAGES CXX)
+project (BaseVar VERSION 2.1.0 LANGUAGES CXX)
 
 # Set the C++ standard required for the project
 set(CMAKE_CXX_STANDARD 17)  # C++ 17
@@ -14,7 +14,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fPIC -Wl,-no_compact_unwind")
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 
 # find all source codes
-file(GLOB SRC_LIST ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp)
+file(GLOB SRC_LIST ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/io/*.cpp)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/htslib)      # include the header of htslib
 link_libraries(${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a)  # link htslib static lib: htslib.a

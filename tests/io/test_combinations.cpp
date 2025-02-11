@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include "external/combinations.h"
-#include "utils.h"
+#include "io/utils.h"
 
 struct Bla{
     float x, y, z;
