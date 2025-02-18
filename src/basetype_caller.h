@@ -141,8 +141,8 @@ private:
                              const std::string sub_vcf_fn,
                              const std::string sub_cvg_fn);
 
-    BaseTypeRunner(const BaseTypeRunner &b) = delete;             // reject using copy constructor (C++11 style).
-    BaseTypeRunner &operator=(const BaseTypeRunner &b) = delete;  // reject using copy/assignment operator (C++11 style).
+    BaseTypeRunner(const BaseTypeRunner &) = delete;             // reject using copy constructor (C++11 style).
+    BaseTypeRunner &operator=(const BaseTypeRunner &) = delete;  // reject using copy/assignment operator (C++11 style).
 
 public:
     ngslib::Fasta reference;  // public variable

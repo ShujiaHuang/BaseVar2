@@ -37,22 +37,22 @@ void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
         // 字符流解决命令行参数转浮点等类型的问题
         std::stringstream ss(optarg ? optarg: "");  
         switch (c) {
-            case 'I': _args->input_bf.push_back(optarg);         break;  // 恒参 (一直用)
-            case 'L': _args->in_bamfilelist = optarg;            break;  /* 临参 */
-            case 'R': _args->reference      = optarg;            break;  /* 临参 */
+            case 'I': _args->input_bf.push_back(optarg);      break;  // 恒参 (一直用)
+            case 'L': _args->in_bamfilelist = optarg;         break;  /* 临参 */
+            case 'R': _args->reference      = optarg;         break;  /* 临参 */
 
-            case 'm': ss >> _args->min_af;                       break;  // 恒参
-            case 'q': ss >> _args->mapq;                         break;  // 恒参
-            case 'B': ss >> _args->batchcount;                   break;  // 恒参
-            case 't': ss >> _args->thread_num;                   break;  // 恒参
+            case 'm': ss >> _args->min_af;                    break;  // 恒参
+            case 'q': ss >> _args->mapq;                      break;  // 恒参
+            case 'B': ss >> _args->batchcount;                break;  // 恒参
+            case 't': ss >> _args->thread_num;                break;  // 恒参
 
-            case 'r': _args->regions        = optarg;            break;  /* 临参 */
-            case 'G': _args->pop_group_file = optarg;            break;  // 
-            case '1': _args->output_vcf     = optarg;            break;  // 恒参
-            case '2': _args->output_cvg     = optarg;            break;  // 恒参
+            case 'r': _args->regions        = optarg;         break;  /* 临参 */
+            case 'G': _args->pop_group_file = optarg;         break;  // 
+            case '1': _args->output_vcf     = optarg;         break;  // 恒参
+            case '2': _args->output_cvg     = optarg;         break;  // 恒参
 
-            case '3': _args->filename_has_samplename = true;     break;  // 恒参
-            case '4': _args->smart_rerun             = true;     break;  // 恒参
+            case '3': _args->filename_has_samplename = true;  break;  // 恒参
+            case '4': _args->smart_rerun             = true;  break;  // 恒参
             case 'h': std::cout << usage() << std::endl; exit(1);
             default: 
                 std::cerr << "Unknown argument: " << c << std::endl; 
