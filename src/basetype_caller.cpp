@@ -126,15 +126,9 @@ void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
 
     _get_calling_interval();
     print_calling_interval();
-    _get_sample_id_from_bam();  // keep the order of '_samples_id' as the same as input 'aligne_files'
 
-    // check the input bamfiles have duplicate or not
-    std::vector<std::string> duplicate_samples = ngslib::find_duplicates(_samples_id);
-    if (!duplicate_samples.empty()) {
-        std::cout << "[WARNING] Find " << duplicate_samples.size() << " duplicated samples within " 
-                  << "the input bamfiles: " + ngslib::join(duplicate_samples, ",") + "\n" 
-                  << std::endl;
-    }
+    // keep the order of '_samples_id' as the same as input 'aligne_files'
+    _get_sample_id_from_bam();  
 
     if (!_args->pop_group_file.empty()) 
         _get_popgroup_info();
@@ -142,120 +136,6 @@ void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
     return;
 }
 
-// Run the processes of calling variant and output files.
-void BaseTypeRunner::_variant_caller_process() {
-
-    // Get filepath and stem name first.
-    std::string _bname = ngslib::basename(_args->output_vcf);
-    size_t si = _bname.find(".vcf");
-    std::string stem_bn = (si > 0 && si != std::string::npos) ? _bname.substr(0, si) : _bname;
-
-    std::string outdir = ngslib::dirname(_args->output_vcf);
-    std::string cache_outdir = outdir + "/cache_" + stem_bn;
-
-    // if (IS_DELETE_CACHE_BATCHFILE && ngslib::path_exists_and_not_empty(cache_outdir)) {
-    //     throw std::runtime_error("[ERROR] [" + cache_outdir + "] must be an empty folder. "
-    //                              "You can delete it manual before execute BaseVar.");
-    // }
-    ngslib::safe_mkdir(cache_outdir);  // make cache directory for batchfiles
-
-    if (_args->smart_rerun) {
-        // Remove and rollback `thread_num` last modification files. 
-        // Must do this before calling '_create_batchfiles'
-        for (size_t i(0); i < _args->thread_num; ++i)
-            ngslib::safe_remove(ngslib::get_last_modification_file(cache_outdir));
-    }
-
-    // 以区间为单位进行变异检测, 每个区间里调用多线程
-    std::vector<std::string> batchfiles, vcffiles, cvgfiles;
-    std::string ref_id; uint32_t reg_start, reg_end;
-    for (size_t i(0); i < _calling_intervals.size(); ++i) {
-
-        clock_t cpu_start_time = clock();
-        time_t real_start_time = time(0);
-
-        // Region information
-        std::tie(ref_id, reg_start, reg_end) = _calling_intervals[i];
-        std::string regstr = ref_id + "_" + ngslib::tostring(reg_start) + "-" + ngslib::tostring(reg_end);
-
-        ///////////////////////////////////////////////////////////
-        ///////// Create batchfiles with multiple-thread //////////
-        ///////////////////////////////////////////////////////////
-        std::string prefix = cache_outdir + "/" + stem_bn + "." + regstr;     
-        batchfiles = _create_batchfiles(_calling_intervals[i], prefix);
-
-        // Time information
-        time_t now = time(0);
-        std::string ct(ctime(&now)); 
-        ct.pop_back();
-        std::cout << "[INFO] "+ ct +". Done for creating all " << batchfiles.size() << " batchfiles in " 
-                  << regstr + " and start to call variants, "  << difftime(now, real_start_time)
-                  << " (CPU time: " << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC 
-                  << ") seconds elapsed in total.\n" << std::endl;
-
-        ///////////////////////////////////////////////////////////
-        // Calling variants from batchfiles with mulitple thread //
-        ///////////////////////////////////////////////////////////
-        real_start_time = time(0);
-        cpu_start_time  = clock();
-
-        std::string sub_vcf_fn = prefix + ".vcf.gz";
-        std::string sub_cvg_fn = prefix + ".cvg.gz";
-        _variants_discovery(batchfiles, _calling_intervals[i], sub_vcf_fn, sub_cvg_fn);
-
-        // Time information
-        now = time(0);
-        ct  = ctime(&now); 
-        ct.pop_back();
-        std::cout << "\n" << "[INFO] "+ ct +". Done for calling all variants in " + regstr + ": "
-                  << "[" + sub_vcf_fn + "," + sub_cvg_fn + "], " << difftime(now, real_start_time)
-                  << " (CPU time: " << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC 
-                  << ") seconds elapsed in total.\n" << std::endl;
-
-        vcffiles.push_back(sub_vcf_fn);
-        cvgfiles.push_back(sub_cvg_fn);
-
-        if (IS_DELETE_CACHE_BATCHFILE) {
-            for (auto bf: batchfiles) {
-                ngslib::safe_remove(bf);
-                ngslib::safe_remove(bf+".tbi");
-            }
-        }
-    }
-
-    // Merge all VCF subfiles
-    std::vector<std::string> add_group_info, group_name;
-    std::map<std::string, std::vector<size_t>>::iterator it = _groups_idx.begin();
-    for(; it != _groups_idx.end(); ++it) {
-        group_name.push_back(it->first);
-        add_group_info.push_back("##INFO=<ID=" + it->first + "_AF,Number=A,Type=Float,Description="
-                                 "\"Allele frequency in the " + it->first + " populations calculated "
-                                 "base on LRT, in the range (0,1)\">");
-    }
-
-    // Merge VCF
-    std::string header = vcf_header_define(_args->reference, add_group_info, _samples_id);
-    merge_file_by_line(vcffiles, _args->output_vcf, header, true);
-
-    const tbx_conf_t bf_tbx_conf = {1, 1, 2, 0, '#', 0};  // {preset, seq col, beg col, end col, header-char, skip-line}
-    if ((ngslib::suffix_name(_args->output_vcf) == ".gz") &&          // create index 
-        tbx_index_build(_args->output_vcf.c_str(), 0, &bf_tbx_conf))  // file suffix is ".tbi"
-        throw std::runtime_error("tbx_index_build failed: Is the file bgzip-compressed? "
-                                 "Check this file: " + _args->output_vcf + "\n");
-
-    // Merge CVG
-    header = cvg_header_define(group_name, BASES);
-    merge_file_by_line(cvgfiles, _args->output_cvg, header, true);
-    if ((ngslib::suffix_name(_args->output_cvg) == ".gz") &&          // create index
-        tbx_index_build(_args->output_cvg.c_str(), 0, &bf_tbx_conf))  // file suffix is ".tbi"
-        throw std::runtime_error("tbx_index_build failed: Is the file bgzip-compressed? "
-                                 "Check this file: " + _args->output_cvg + "\n");
-
-    if (IS_DELETE_CACHE_BATCHFILE) {
-        ngslib::safe_remove(cache_outdir);
-    }
-    return;
-}
 
 void BaseTypeRunner::_get_sample_id_from_bam() {
     time_t real_start_time = time(0);
@@ -291,13 +171,20 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
         }
     }
 
+    // check samples duplication
+    std::vector<std::string> duplicate_samples = ngslib::find_duplicates(_samples_id);
+    if (!duplicate_samples.empty()) {
+        std::cout << "[WARNING] Find " << duplicate_samples.size() << " duplicated samples within " 
+                  << "the input bamfiles: " + ngslib::join(duplicate_samples, ",") + "\n" 
+                  << std::endl;
+    }
+
     // Time information
     time_t now = time(0);
     std::string ct(ctime(&now));
     ct.pop_back();  // rm the trailing '\n' put by `asctime`
     std::cout << "[INFO] " + ct + ". Done for loading all samples' id from alignment files, " 
-              << difftime(now, real_start_time) << " seconds elapsed.\n" 
-              << std::endl;
+              << difftime(now, real_start_time) << " seconds elapsed.\n" << std::endl;
 
     return;
 }
@@ -404,6 +291,121 @@ void BaseTypeRunner::_get_popgroup_info() {
         }
     }
 
+    return;
+}
+
+// Run the processes of calling variant and output files.
+void BaseTypeRunner::_variant_caller_process() {
+
+    // Get filepath and stem name first.
+    std::string _bname = ngslib::basename(_args->output_vcf);
+    size_t si = _bname.find(".vcf");
+    std::string stem_bn = (si > 0 && si != std::string::npos) ? _bname.substr(0, si) : _bname;
+
+    std::string outdir = ngslib::dirname(_args->output_vcf);
+    std::string cache_outdir = outdir + "/cache_" + stem_bn;
+
+    // if (IS_DELETE_CACHE_BATCHFILE && ngslib::path_exists_and_not_empty(cache_outdir)) {
+    //     throw std::runtime_error("[ERROR] [" + cache_outdir + "] must be an empty folder. "
+    //                              "You can delete it manual before execute BaseVar.");
+    // }
+    ngslib::safe_mkdir(cache_outdir);  // make cache directory for batchfiles
+
+    if (_args->smart_rerun) {
+        // Remove and rollback `thread_num` last modification files. 
+        // Must do this before calling '_create_batchfiles'
+        for (size_t i(0); i < _args->thread_num; ++i)
+            ngslib::safe_remove(ngslib::get_last_modification_file(cache_outdir));
+    }
+
+    // 以区间为单位进行变异检测, 每个区间里调用多线程
+    std::vector<std::string> batchfiles, vcffiles, cvgfiles;
+    std::string ref_id; uint32_t reg_start, reg_end;
+    for (size_t i(0); i < _calling_intervals.size(); ++i) {
+
+        clock_t cpu_start_time = clock();
+        time_t real_start_time = time(0);
+
+        // Region information
+        std::tie(ref_id, reg_start, reg_end) = _calling_intervals[i];
+        std::string regstr = ref_id + "_" + ngslib::tostring(reg_start) + "-" + ngslib::tostring(reg_end);
+
+        ///////////////////////////////////////////////////////////
+        ///////// Create batchfiles with multiple-thread //////////
+        ///////////////////////////////////////////////////////////
+        std::string prefix = cache_outdir + "/" + stem_bn + "." + regstr;     
+        batchfiles = _create_batchfiles(_calling_intervals[i], prefix);
+
+        // Time information
+        time_t now = time(0);
+        std::string ct(ctime(&now)); 
+        ct.pop_back();
+        std::cout << "[INFO] "+ ct +". Done for creating all " << batchfiles.size() << " batchfiles in " 
+                  << regstr + " and start to call variants, "  << difftime(now, real_start_time) << "(CPU time: " 
+                  << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC << ") seconds elapsed in total.\n" 
+                  << std::endl;
+
+        ///////////////////////////////////////////////////////////
+        // Calling variants from batchfiles with mulitple thread //
+        ///////////////////////////////////////////////////////////
+        real_start_time = time(0);
+        cpu_start_time  = clock();
+
+        std::string sub_vcf_fn = prefix + ".vcf.gz";
+        std::string sub_cvg_fn = prefix + ".cvg.gz";
+        _variants_discovery(batchfiles, _calling_intervals[i], sub_vcf_fn, sub_cvg_fn);
+
+        // Time information
+        now = time(0);
+        ct  = ctime(&now); 
+        ct.pop_back();
+        std::cout << "\n" << "[INFO] "+ ct +". Done for calling all variants in " + regstr + ": "
+                  << "[" + sub_vcf_fn + "," + sub_cvg_fn + "], " << difftime(now, real_start_time) << "(CPU time: " 
+                  << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC << ") seconds elapsed in total.\n" 
+                  << std::endl;
+
+        vcffiles.push_back(sub_vcf_fn);
+        cvgfiles.push_back(sub_cvg_fn);
+        
+        if (IS_DELETE_CACHE_BATCHFILE) {
+            for (auto bf: batchfiles) {
+                ngslib::safe_remove(bf);
+                ngslib::safe_remove(bf+".tbi");
+            }
+        }
+    }
+
+    // Merge all VCF subfiles
+    std::vector<std::string> add_group_info, group_name;
+    std::map<std::string, std::vector<size_t>>::iterator it = _groups_idx.begin();
+    for(; it != _groups_idx.end(); ++it) {
+        group_name.push_back(it->first);
+        add_group_info.push_back("##INFO=<ID=" + it->first + "_AF,Number=A,Type=Float,Description="
+                                 "\"Allele frequency in the " + it->first + " populations calculated "
+                                 "base on LRT, in the range (0,1)\">");
+    }
+
+    // Merge VCF
+    std::string header = vcf_header_define(_args->reference, add_group_info, _samples_id);
+    merge_file_by_line(vcffiles, _args->output_vcf, header, true);
+
+    const tbx_conf_t bf_tbx_conf = {1, 1, 2, 0, '#', 0};  // {preset, seq col, beg col, end col, header-char, skip-line}
+    if ((ngslib::suffix_name(_args->output_vcf) == ".gz") &&          // create index 
+        tbx_index_build(_args->output_vcf.c_str(), 0, &bf_tbx_conf))  // file suffix is ".tbi"
+        throw std::runtime_error("tbx_index_build failed: Is the file bgzip-compressed? "
+                                 "Check this file: " + _args->output_vcf + "\n");
+
+    // Merge CVG
+    header = cvg_header_define(group_name, BASES);
+    merge_file_by_line(cvgfiles, _args->output_cvg, header, true);
+    if ((ngslib::suffix_name(_args->output_cvg) == ".gz") &&          // create index
+        tbx_index_build(_args->output_cvg.c_str(), 0, &bf_tbx_conf))  // file suffix is ".tbi"
+        throw std::runtime_error("tbx_index_build failed: Is the file bgzip-compressed? "
+                                 "Check this file: " + _args->output_cvg + "\n");
+
+    if (IS_DELETE_CACHE_BATCHFILE) {
+        ngslib::safe_remove(cache_outdir);
+    }
     return;
 }
 

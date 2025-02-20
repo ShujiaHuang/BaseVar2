@@ -43,8 +43,7 @@ static const std::string __BASETYPE_USAGE =
 
     "  -G, --pop-group=FILE         Calculating the allele frequency for specific population.\n" 
     "  -r, --regions=chr:start-end  Skip positions which not in these regions. This parameter could be a list\n"
-    "                               of comma deleimited genome regions(e.g.: chr:start-end) or a file contain\n"
-    "                               the list of regions.\n"
+    "                               of comma deleimited genome regions(e.g.: chr:start-end).\n"
     "  --output-vcf FILE            Output VCF file.\n"
     "  --output-cvg FILE            Output position coverage file.\n\n"
 
