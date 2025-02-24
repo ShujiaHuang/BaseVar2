@@ -98,7 +98,7 @@ int concat_runner(int argc, char *argv[]) {
         throw std::invalid_argument("[ERROR] Missing argument '-O/--output'");
     
     if (!in_filelist.empty()) {
-        std::vector<std::string> filelist = get_firstcolumn_from_file(in_filelist);
+        std::vector<std::string> filelist = ngslib::get_firstcolumn_from_file(in_filelist);
         input_files.insert(input_files.end(), filelist.begin(), filelist.end());
     }
     std::cout << "[INFO] Finish loading arguments and we have " << input_files.size()

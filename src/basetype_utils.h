@@ -14,10 +14,6 @@
 #include <string>
 #include <vector>
 
-// Getting the first column from input file, this it's used for getting 
-// filename from input filelist.
-std::vector<std::string> get_firstcolumn_from_file(const std::string fn);
-
 /// Header for VCF
 std::string vcf_header_define(const std::string &ref_file_path, const std::vector<std::string> &addition_info, 
                               const std::vector<std::string> &samples);

@@ -3,6 +3,10 @@
 #ifndef __INCLUDE_NGSLIB_UTILS_H__
 #define __INCLUDE_NGSLIB_UTILS_H__
 
+#include <iostream>
+#include <fstream>
+#include <unistd.h>
+#include <filesystem>  // Available since C++17
 #include <algorithm>
 #include <sstream>
 #include <string>
@@ -10,8 +14,6 @@
 #include <vector>
 #include <tuple>
 #include <iterator>
-
-#include <iostream>
 #include <cstdint>  // uint32_t
 
 namespace ngslib {
@@ -70,6 +72,15 @@ namespace ngslib {
      * 
      */
     std::string get_last_modification_file(std::string directory_path);
+
+    /**
+     * @brief Get the first column from a file, this is used for getting filename from input filelist.
+     * 
+     * @param fn 
+     * @return std::vector<std::string> 
+     * 
+     */
+    std::vector<std::string> get_firstcolumn_from_file(const std::string fn);
 
     template<typename T>
     std::string join(const std::vector<T> &input, const std::string delim="\t") {

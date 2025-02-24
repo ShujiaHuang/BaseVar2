@@ -1,33 +1,11 @@
 #include <iostream>
-#include <fstream>
+
 #include <htslib/bgzf.h>
 #include <htslib/kstring.h>
 
 #include "io/fasta.h"
 #include "io/utils.h"
 #include "basetype_utils.h"
-
-std::vector<std::string> get_firstcolumn_from_file(const std::string fn) {
-
-    std::ifstream i_fn(fn.c_str());
-    if (!i_fn) {
-        std::cerr << "[ERROR] Cannot open file: " + fn << std::endl;
-        exit(1);
-    }
-
-    std::vector<std::string> first_column;
-    std::string skip, first_col_str;
-    while (1) {
-        i_fn >> first_col_str;
-        if (i_fn.eof()) break;
-        std::getline(i_fn, skip, '\n');  // skip the rest information of line.
-
-        first_column.push_back(first_col_str);
-    }
-    i_fn.close();
-
-    return first_column;
-}
 
 std::string vcf_header_define(const std::string &ref_file_path, const std::vector<std::string> &addition_info, 
                               const std::vector<std::string> &samples)

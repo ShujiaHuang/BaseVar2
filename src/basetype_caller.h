@@ -13,11 +13,19 @@
 
 #include <getopt.h>
 #include <map>
+#include <fstream>
+#include <sstream>
+#include <ctime>      // clock
+#include <algorithm>  // std::min
+
+#include <htslib/bgzf.h>
+#include <htslib/tbx.h>
 
 #include "io/fasta.h"
 #include "io/bam.h"
 #include "io/utils.h"
 #include "external/robin_hood.h"
+#include "external/threadpool.h"
 
 #include "basetype.h"
 #include "basetype_utils.h"

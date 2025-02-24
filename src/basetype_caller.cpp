@@ -6,16 +6,7 @@
  * @date 2018-08-01
  * 
  */
-#include <sstream>
-#include <fstream>
-#include <ctime>      // clock
-#include <algorithm>  // std::min
-
-#include <htslib/bgzf.h>
-#include <htslib/tbx.h>
-
 #include "basetype_caller.h"
-#include "external/threadpool.h"
 
 void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
 
@@ -112,7 +103,7 @@ void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
     }
 
     if (!_args->in_bamfilelist.empty()) {
-        std::vector<std::string> filelist = get_firstcolumn_from_file(_args->in_bamfilelist);
+        std::vector<std::string> filelist = ngslib::get_firstcolumn_from_file(_args->in_bamfilelist);
         _args->input_bf.insert(_args->input_bf.end(), filelist.begin(), filelist.end());
     }
     std::cout << "[INFO] Finish loading arguments and we have " << _args->input_bf.size()
@@ -120,9 +111,7 @@ void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
 
     // Setting the resolution of AF
     _args->min_af = std::min(float(100)/_args->input_bf.size(), _args->min_af);
-
-    // load fasta
-    reference = _args->reference;
+    reference = _args->reference;  // load fasta
 
     _get_calling_interval();
     print_calling_interval();
