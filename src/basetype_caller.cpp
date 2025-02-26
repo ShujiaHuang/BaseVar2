@@ -874,9 +874,9 @@ bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
     std::string ref_id; uint32_t reg_start, reg_end;
     std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
 
-    uint32_t exp_reg_start = reg_start > REG_EXPEND_SIZE ? reg_start - REG_EXPEND_SIZE : 1;
-    uint32_t exp_reg_end   = reg_end + REG_EXPEND_SIZE;
-    std::string exp_regstr = ref_id + ":" + ngslib::tostring(exp_reg_start) + "-" + ngslib::tostring(exp_reg_end);
+    uint32_t extend_start = reg_start > REG_EXPEND_SIZE ? reg_start - REG_EXPEND_SIZE : 1;
+    uint32_t extend_end   = reg_end + REG_EXPEND_SIZE;
+    std::string extend_regstr = ref_id + ":" + ngslib::tostring(extend_start) + "-" + ngslib::tostring(extend_end);
 
     // Loop all alignment files
     bool is_empty = true;
@@ -886,7 +886,7 @@ bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
         // 位点信息存入该变量, 且由于是按区间读取比对数据，key 值无需再包含 ref_id，因为已经不言自明。
         PosMap sample_posinfo_map;
 
-        if (bf.fetch(exp_regstr)) { // Set 'bf' only fetch alignment reads in 'exp_regstr'.
+        if (bf.fetch(extend_regstr)) { // Set 'bf' only fetch alignment reads in 'exp_regstr'.
             hts_pos_t map_ref_start, map_ref_end;  // hts_pos_t is uint64_t
             std::vector<ngslib::BamRecord> sample_target_reads; 
             ngslib::BamRecord al;       // alignment read
