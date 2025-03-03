@@ -11,18 +11,21 @@ struct Bla{
 
 int main() {
 
-    std::vector<char> b{'A', 'C', 'G', 'T'};
-    std::vector<int> s{0,1,2,3,4,5};
-    std::vector<Bla> ss{{1, .4, 5.0},{2, .7, 5.0},{3, .1, 2.0},{4, .66, 99.0}};
+    //std::vector<char> b{'A', 'C', 'G', 'T'};
+    //Combinations<char> a(b, 3);
+    //std::vector<std::vector<char>> ba = a.get();
 
-    Combinations<char> a(b, 3);
-    std::vector<std::vector<char>> ba = a.get();
+    std::vector<std::string> b{"A", "C", "G", "T", "GGTC"};
+    Combinations<std::string> a(b, 3);
+    std::vector<std::vector<std::string>> ba = a.get();
+
     // iterate over all combinations
     for (auto x : a) { std::cout << ngslib::join(x, ",") << "\n"; }
     std::cout << "\n1 - "  + ngslib::join(ba[0], "-") << "\n";
 
     std::cout << "\n\n";
 
+    std::vector<int> s{0,1,2,3,4,5};
     Combinations<int> c(s,3);
     // iterate over all combinations
     for (auto x : c) { for (auto ii : x) std::cout << ii << ", "; std::cout << "\n"; }
@@ -32,6 +35,7 @@ int main() {
 
     std::cout << "\n\n";
 
+    std::vector<Bla> ss{{1, .4, 5.0},{2, .7, 5.0},{3, .1, 2.0},{4, .66, 99.0}};
     Combinations<Bla> cc(ss, 2);
     // combinations of arbitrary objects
     for (auto x : cc) { for (auto b : x) std::cout << "(" << b.x << ", " << b.y << ", " << b.z << "), "; std::cout << "\n"; }    
