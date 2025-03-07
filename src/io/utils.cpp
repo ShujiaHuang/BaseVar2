@@ -74,6 +74,29 @@ namespace ngslib {
         return lmf.string();
     }
 
+    std::vector<std::string> get_unique_strings(const std::vector<std::string>& strings) {
+        // get unique strings
+        std::set<std::string> unique_set(strings.begin(), strings.end());
+    
+        // convert set to vector
+        std::vector<std::string> unique_strings(unique_set.begin(), unique_set.end());
+        
+        // sort by length and then by ASCII
+        std::sort(unique_strings.begin(), unique_strings.end(), 
+            // lambda function for sorting: sort by length and then by ASCII
+            [](const std::string& a, const std::string& b) {
+                // if length is different, sort by length
+                if (a.length() != b.length()) {
+                    return a.length() < b.length();
+                }
+                // otherwise, sort by ASCII
+                return a < b;
+            }
+        );
+        
+        return unique_strings;
+    }
+
     std::vector<std::string> get_firstcolumn_from_file(const std::string &fn) {
 
         std::ifstream i_fn(fn.c_str());
@@ -115,27 +138,4 @@ namespace ngslib {
         return;
     }
 
-    std::vector<GenomeRegionTuple> region_slice(const GenomeRegionTuple &genome_region, int num) {
-
-        if (num <= 0) {
-            throw std::runtime_error("[ERROR] slice number must be bigger than 0.");
-        }
-
-        std::string ref_id; uint32_t reg_start, reg_end;
-        std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
-
-        size_t reg_len = reg_end - reg_start + 1;
-        size_t delta = (reg_len % num) ? int(reg_len / num) + 1 : int(reg_len / num);
-
-        std::vector<GenomeRegionTuple> regions;
-        uint32_t sub_reg_beg, sub_reg_end;
-        for (size_t i(reg_start); i < reg_end + 1; i += delta) {
-            sub_reg_beg = i;
-            sub_reg_end   = sub_reg_beg + delta - 1 > reg_end ? reg_end : sub_reg_beg + delta - 1;
-            regions.push_back(std::make_tuple(ref_id, sub_reg_beg, sub_reg_end));
-        }
-
-        return regions;
-    }
-    
 }  // namespae ngslib

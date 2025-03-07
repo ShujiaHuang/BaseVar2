@@ -10,16 +10,13 @@
 #include <algorithm>
 #include <sstream>
 #include <string>
-#include <cstring>  // use the 'strlen' function
+#include <cstring>    // use the 'strlen' function
 #include <vector>
-#include <tuple>
+#include <set>
 #include <iterator>
-#include <cstdint>  // uint32_t
+#include <cstdint>    // uint32_t
 
 namespace ngslib {
-    // define a genome region data style
-    typedef std::tuple<std::string, uint32_t, uint32_t> GenomeRegionTuple;
-
     // Get a path that unambiguously identifies the location of a file.
     std::string abspath(const std::string file_path);
 
@@ -72,6 +69,14 @@ namespace ngslib {
      * 
      */
     std::string get_last_modification_file(std::string directory_path);
+
+    /**
+     * @brief Get the unique strings vector: sort by length and then by ASCII
+     * 
+     * @param strings 
+     * @return std::vector<std::string> 
+     */
+    std::vector<std::string> get_unique_strings(const std::vector<std::string>& strings);
 
     /**
      * @brief Get the first column from a file, this is used for getting filename from input filelist.
@@ -169,10 +174,7 @@ namespace ngslib {
 
         return duplicates;
     }
-
-    // 把 genome_region 切分为 num 个小区间并返回
-    std::vector<GenomeRegionTuple> region_slice(const GenomeRegionTuple &genome_region, int num=1);
-
+    
 }  // namespace ngslib
 
 #endif
