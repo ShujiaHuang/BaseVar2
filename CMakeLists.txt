@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)  # C++ 17
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set the project name
-project (BASEVAR VERSION 2.1.0 LANGUAGES CXX)
+project (BASEVAR VERSION 2.0.0 LANGUAGES CXX)
 
 # Add project metadata
 set(PROJECT_AUTHOR "Shujia Huang")
@@ -59,10 +59,3 @@ set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 add_executable(basevar ${SRC_LIST})
 add_dependencies(basevar Buildhts)  # Ensure htslib is built before basevar
 target_link_libraries(basevar ${HTSLIB} ${COMMON_SYS_LIB})
-
-# Install the executable
-# install(TARGETS basevar
-#     RUNTIME DESTINATION bin
-#     LIBRARY DESTINATION lib
-#     ARCHIVE DESTINATION lib
-# )
