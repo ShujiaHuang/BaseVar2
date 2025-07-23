@@ -44,7 +44,7 @@ namespace ngslib {
         uint32_t    qpos;       // read position
         std::string read_base;  // read base
         std::string read_qual;  // read quality base
-    } ReadAlignedPair;             
+    } ReadAlignedPair;
 
     class BamRecord {
 
