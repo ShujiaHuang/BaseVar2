@@ -8,21 +8,75 @@
  */
 #include "basetype_caller.h"
 
-void BaseTypeRunner::set_arguments(int cmd_argc, char *cmd_argv[]) {
+const std::string BaseTypeRunner::usage() const {
+    const std::string BASETYPE_USAGE = 
+        "About: Call variants and estimate allele frequency by BaseVar.\n" 
+        "Usage: basevar basetype [options] <-R Fasta> <--output-vcf> <--output-cvg> [-I input] ...\n\n" 
+        "optional arguments:\n" 
+        "  -I, --input=FILE             BAM/CRAM file containing reads.\n"
+        "  -L, --align-file-list=FILE   BAM/CRAM files list, one file per row.\n"
+        "  -R, --reference FILE         Input reference fasta file.\n\n"
+
+        "  -m, --min-af=float           Setting prior precision of MAF and skip ineffective caller positions,\n"
+        "                               a typical approach involves setting it to min(" + std::to_string(_args->min_af) + ", 100/x), where x \n"
+        "                               represents the number of input BAM files min(" + std::to_string(_args->min_af) + ", 100/x). In most\n"
+        "                               cases, users need not be overly concerned about this parameter, as it \n"
+        "                               is generally handled automatically by the program.\n"
+        "  -q, --mapq=INT               Only include reads with mapping quality >= INT. [" + std::to_string(_args->mapq) + "]\n"
+        "  -B, --batch-count=INT        INT simples per batchfile. [" + std::to_string(_args->batchcount) + "]\n" 
+        "  -t, --thread=INT             Number of threads. [" + std::to_string(_args->thread_num) + "]\n\n"
+
+        "  -G, --pop-group=FILE         Calculating the allele frequency for specific population.\n" 
+        "  -r, --regions=chr:start-end  Skip positions which not in these regions. This parameter could be a list\n"
+        "                               of comma deleimited genome regions(e.g.: chr:start-end).\n"
+        "  --output-vcf FILE            Output VCF file.\n"
+        "  --output-cvg FILE            Output position coverage file.\n\n"
+
+        "  --filename-has-samplename    If the name of bamfile is something like 'SampleID.xxxx.bam', set this\n"
+        "                               argrument could save a lot of time during get the sample id from BAMfile.\n"
+        "  --smart-rerun                Rerun process by checking batchfiles.\n"
+        "  -h, --help                   Show this help message and exit."; 
+        
+    return BASETYPE_USAGE;
+}
+
+BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
+    // Firstly: Initialize a new BasTypeARGS and set default argument.
+    _args = new BaseTypeARGS;
 
     if (cmd_argc < 2) {
         std::cout << usage() << "\n" << std::endl;
         exit(1);
     }
-
-    if (_args) {
-        throw std::runtime_error("[basetype.cpp::BaseTypeRunner:args] 'args' must be "
-                                 "a NULL pointer before it can be assigned a value.");
-    }
-    // Inital a new BasTypeARGS and set defaut argument.
-    _args = new BaseTypeARGS;
     
     // Parsing the commandline options. 
+    static const struct option BASETYPE_CMDLINE_LOPTS[] = {
+        // Optional arguments to long style command line parameters require 'equals sign' (=). 
+        // https://stackoverflow.com/questions/1052746/getopt-does-not-parse-optional-arguments-to-parameters
+        {"input",           optional_argument, NULL, 'I'},
+        {"align-file-list", optional_argument, NULL, 'L'},
+        {"reference",       required_argument, NULL, 'R'},
+
+        {"min-af",      optional_argument, NULL, 'm'},
+        {"mapq",        optional_argument, NULL, 'q'},
+        {"batch-count", optional_argument, NULL, 'B'},
+        {"thread",      optional_argument, NULL, 't'},
+
+        {"regions",     optional_argument, NULL, 'r'},
+        {"positions",   optional_argument, NULL, 'p'},
+        {"pop-group",   optional_argument, NULL, 'G'},  // Special parameter for calculating specific population allele frequence
+        {"output-vcf",  required_argument, NULL, '1'},
+        {"output-cvg",  required_argument, NULL, '2'},
+
+        // {"output-batch-file", required_argument, NULL, 0},  not use?
+        {"filename-has-samplename", no_argument, NULL, '3'},
+        {"smart-rerun",             no_argument, NULL, '4'},
+        {"help",                    no_argument, NULL, 'h'},
+
+        // must set this value
+        {0, 0, 0, 0}
+    };
+
     char c;
     while((c = getopt_long(cmd_argc, cmd_argv, "I:L:R:m:q:B:t:r:G:h", BASETYPE_CMDLINE_LOPTS, NULL)) >= 0) {
         // 字符流解决命令行参数转浮点等类型的问题

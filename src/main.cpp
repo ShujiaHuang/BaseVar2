@@ -39,13 +39,11 @@ static int usage() {
 // call variant
 int basetype(int argc, char *argv[]) {
 
-    BaseTypeRunner bt;
+    BaseTypeRunner bt(argc, argv);
     if (argc < 2) {
         std::cout << bt.usage() << "\n" << std::endl;
         exit(1);
     }
-
-    bt.set_arguments(argc, argv);
     bt.run();
 
     return 0;
