@@ -11,7 +11,7 @@ project (BASEVAR VERSION 2.0.0 LANGUAGES CXX)
 # Add project metadata
 set(PROJECT_AUTHOR "Shujia Huang")
 set(PROJECT_EMAIL "hshujia@qq.com")
-set(PROJECT_DESCRIPTION "BaseVar: Call variants from ultra low-pass (<1x) WGS data")
+set(PROJECT_DESCRIPTION "BaseVar: Call variants and estimate allele frequency from ultra low-pass (<1x) WGS data")
 
 # Configure version header
 configure_file(
