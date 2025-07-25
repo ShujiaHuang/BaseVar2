@@ -29,6 +29,7 @@
 
 #include "basetype.h"
 #include "basetype_utils.h"
+#include "algorithm.h"
 #include "version.h"
 
 static const bool IS_DELETE_CACHE_BATCHFILE = true;

@@ -14,6 +14,7 @@ std::string vcf_header_define(const std::string &ref_file_path, const std::vecto
         "##fileformat=VCFv4.2",
         "##FILTER=<ID=LowQual,Description=\"Low quality (QUAL < 60)\">",
         "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">",
+        "##FORMAT=<ID=PL,Number=G,Type=Integer,Description=\"List of Phred-scaled genotype likelihoods\">",
         "##FORMAT=<ID=AB,Number=1,Type=String,Description=\"Allele Base\">",
         "##FORMAT=<ID=SO,Number=1,Type=String,Description=\"Strand orientation of the mapping base. Marked as + or -\">",
         "##FORMAT=<ID=BP,Number=1,Type=String,Description=\"Base Probability which calculate by base quality\">",

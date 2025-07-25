@@ -118,15 +118,18 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
         throw std::invalid_argument("[ERROR] Missing argument '-I/--input' or '-L/--align-file-list'");
     if (_args->reference.empty())
         throw std::invalid_argument("[ERROR] Missing argument '-R/--reference'");
-
     if (_args->output_vcf.empty())
         throw std::invalid_argument("[ERROR] Missing argument '--output-vcf'");
     if (_args->output_cvg.empty())
         throw std::invalid_argument("[ERROR] Missing argument '--output-cvg'");
     
-    if (_args->min_af <= 0)
+    if (_args->min_af < 0)
         throw std::invalid_argument("[ERROR] '-m/--min-af' argument must be > 0");
-    if (_args->min_mapq <= 0)
+    if (_args->min_baseq < 0)
+        throw std::invalid_argument("[ERROR] '-Q/--min-BQ' argument must be > 0");
+    if (_args->min_baseq > 60)
+        throw std::invalid_argument("[ERROR] '-Q/--min-BQ' argument must be <= 60");
+    if (_args->min_mapq < 0)
         throw std::invalid_argument("[ERROR] '-q/--min-mapq' argument must be > 0");
     if (_args->batchcount <= 0)
         throw std::invalid_argument("[ERROR] '-B/--batch-count' argument must be > 0");
@@ -182,7 +185,6 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
 
     // keep the order of '_samples_id' as the same as input 'aligne_files'
     _get_sample_id_from_bam();  
-
     if (!_args->pop_group_file.empty()) 
         _get_popgroup_info();
 
@@ -243,8 +245,7 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
 
 void BaseTypeRunner::_get_calling_interval() {
 
-    // clear
-    _calling_intervals.clear();
+    _calling_intervals.clear();  // clear the vector of calling intervals
     if (!_args->regions.empty()) {
         std::vector<std::string> rg_v;
         ngslib::split(_args->regions, rg_v, ",");
@@ -293,7 +294,6 @@ ngslib::GenomeRegion BaseTypeRunner::_make_gregion_region(std::string gregion) {
 }
 
 void BaseTypeRunner::print_calling_interval() {
-
     std::string ref_id;
     uint32_t reg_start, reg_end;
     std::cout << "---- Calling Intervals ----\n";
@@ -354,11 +354,6 @@ void BaseTypeRunner::_variant_caller_process() {
 
     std::string outdir = ngslib::dirname(ngslib::abspath(_args->output_vcf));
     std::string cache_outdir = outdir + "/cache_" + stem_bn;
-
-    // if (IS_DELETE_CACHE_BATCHFILE && ngslib::path_exists_and_not_empty(cache_outdir)) {
-    //     throw std::runtime_error("[ERROR] [" + cache_outdir + "] must be an empty folder. "
-    //                              "You can delete it manual before execute BaseVar.");
-    // }
     ngslib::safe_mkdir(cache_outdir);  // make cache directory for batchfiles
 
     if (_args->smart_rerun) {
@@ -507,8 +502,8 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::Genome
             bool x = p.get(); // retrieve the return value of `__create_a_batchfile`
         }
     }
-    create_batchfile_processes.clear();  // release the thread
 
+    create_batchfile_processes.clear();  // release the thread
     return batchfiles;  // done for batchfiles created and return
 }
 
@@ -517,11 +512,7 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
                                          const std::string out_vcf_fn,
                                          const std::string out_cvg_fn) 
 {
-    static const uint32_t STEP_REGION_LEN = 100000; // 10 for test, should set to be large than 100000
-
-    // get region information
-    uint32_t sub_reg_start, sub_reg_end;
-
+    static const uint32_t STEP_REGION_LEN = 10; // 10 for test, should set to be large than 100000
     int bn = (gr.end - gr.start + 1) / STEP_REGION_LEN;
     if ((gr.end - gr.start + 1) % STEP_REGION_LEN > 0)
         bn++;
@@ -531,14 +522,14 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     std::vector<std::future<bool>> call_variants_processes;
 
     std::vector<std::string> subvcfs, subcvgs;
+    uint32_t sub_reg_start, sub_reg_end; // get region information
     for (uint32_t i(gr.start), j(1); i < gr.end + 1; i += STEP_REGION_LEN, ++j) {
-
         std::string tmp_vcf_fn = out_vcf_fn + "." + ngslib::tostring(j) + "_" + ngslib::tostring(bn);
         std::string tmp_cvg_fn = out_cvg_fn + "." + ngslib::tostring(j) + "_" + ngslib::tostring(bn);
         subvcfs.push_back(tmp_vcf_fn);
         subcvgs.push_back(tmp_cvg_fn);
 
-        sub_reg_start = i;
+        sub_reg_start = i;  // 1-based
         sub_reg_end = (sub_reg_start+STEP_REGION_LEN-1) > gr.end ? gr.end : sub_reg_start+STEP_REGION_LEN-1;
         std::string regstr = gr.chrom + ":" + std::to_string(sub_reg_start) + "-" + std::to_string(sub_reg_end);
 
@@ -724,15 +715,15 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector,
     samples_bi.mapqs.reserve(n_sample);
     samples_bi.map_strands.reserve(n_sample);
     samples_bi.base_pos_ranks.reserve(n_sample);
-    samples_bi.n     = n_sample;
     samples_bi.depth = 0;
+    samples_bi.n = n_sample;
 
     std::vector<std::string> col_info;
     bool keep_push_back = true;
     for (size_t i(0); i < smp_bf_line_vector.size(); ++i) {
         // smp_bf_line_vector[i] format is: 
         // [CHROM, POS, REF, Depth, MappingQuality, Readbases, ReadbasesQuality, ReadPositionRank, Strand]
-        // Looks like: chr11   5246595   C   10 37,0,0,0,0    ...
+        // Looks like: chr11   5246595    C    10     37 0 0 0 0    ...
         ngslib::split(smp_bf_line_vector[i], col_info, "\t");
         if (col_info.size() != 9) {  // 9 is the column number of batchfile 
             throw std::runtime_error("[ERROR] batchfile has invalid data:\n" + smp_bf_line_vector[i]);
@@ -787,10 +778,9 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector,
     bt.lrt();
 
     if (bt.get_alt_bases().size() && bt.is_only_snp()) { // only output SNPs in VCF file
-        
+
         std::map<std::string, BaseType> popgroup_bt;
         if (!group_smp_idx.empty()) { // group is not empty
-
             std::vector<char> basecombination;
             basecombination.push_back(toupper(bt.get_ref_base()[0]));  // push upper reference base. 
             // do not sort, keep the original order as the same as 'alt_bases'
@@ -1174,8 +1164,9 @@ void _out_vcf_line(const BaseType &bt,
     std::vector<char> align_bases;  // used in ranksumtest
     std::string gt;
     char upper_ref_base = toupper(bt.get_ref_base()[0]);  // only for SNPs
-    for (size_t i(0); i < smp_bi->n; ++i) {
 
+    for (size_t i(0); i < smp_bi->n; ++i) { // loop all samples
+        // Todo: 因为每个样本只留了一个碱基，先这样 后续要改进
         char fb = smp_bi->align_bases[i][0];  // a string, get first base
         align_bases.push_back(fb);            // only get the first base, suit for SNPs
 
@@ -1185,8 +1176,10 @@ void _out_vcf_line(const BaseType &bt,
             gt = (fb == upper_ref_base) ? "0/." : alt_gt[fb];
 
             double qual = bt.get_qual_pvalue()[i];
-            // GT:AB:SO:BP
-            samples.push_back(gt + ":" + fb + ":" + smp_bi->map_strands[i] + ":" + std::to_string(qual));
+            std::vector<int> pl = calculatePL(fb, upper_ref_base, qual);
+            
+            // GT:PL:AB:SO:BP
+            samples.push_back(gt + ":" + ngslib::join(pl, ",") + ":" + fb + ":" + smp_bi->map_strands[i] + ":" + std::to_string(qual));
         } else {
             samples.push_back("./.");  // 'N' or Indel.
         }
@@ -1243,7 +1236,7 @@ void _out_vcf_line(const BaseType &bt,
         info.insert(info.end(), group_af_info.begin(), group_af_info.end());
     }
 
-    std::string sample_format = "GT:AB:SO:BP";
+    std::string sample_format = "GT:PL:AB:SO:BP";
     std::string qs  = (bt.get_var_qual() > QUAL_THRESHOLD) ? "." : "LowQual";
     std::string out = bt.get_ref_id() + "\t" + std::to_string(bt.get_ref_pos()) + "\t.\t" + bt.get_ref_base() + "\t" + 
                       ngslib::join(bt.get_alt_bases(), ",") + "\t" + std::to_string(bt.get_var_qual()) + "\t" + 

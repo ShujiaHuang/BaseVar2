@@ -9,6 +9,56 @@ double norm_dist(double x) {
     return kf_erfc(double(x / std::sqrt(2.0))) / 2.0;
 }
 
+std::vector<int> calculatePL(char base, char ref_base, double base_quality_prob) {
+    // This function calculates the Genotype likelihoods (PL) for a given base and quality against the reference base.
+    // REF: R, ALT: A. RR is homozygous for the reference base, AR is heterozygous, and AA is homozygous for the alternate base.
+    char ref = ref_base;
+    char alt = base;  // Assuming alt_base is set for biallelic variant
+
+    std::vector<std::pair<char, char>> genotypes = {{ref, ref}, {ref, alt}, {alt, alt}};
+    std::vector<double> log10_L(3, 0.0); // Log-likelihoods for each genotype
+
+    // Iterate over each read in the pileup
+    char B = base; // Observed base
+    double e = 1.0 - base_quality_prob; // Error probability
+    double P_correct = base_quality_prob; // Probability of correct base
+    double P_error = e / 3.0; // Probability of error (uniform across other bases)
+
+    // Compute P(B|X) for X = ref and X = alt
+    double P_B_given_ref = (B == ref) ? P_correct : P_error;
+    double P_B_given_alt = (B == alt) ? P_correct : P_error;
+
+    // For each genotype, compute P(R|G)
+    for (int g = 0; g < 3; ++g) {
+        char allele1 = genotypes[g].first;
+        char allele2 = genotypes[g].second;
+        // Compute P(R|allele1) and P(R|allele2)
+        double P_R_given_allele1 = (allele1 == ref) ? P_B_given_ref : P_B_given_alt;
+        double P_R_given_allele2 = (allele2 == ref) ? P_B_given_ref : P_B_given_alt;
+        // Compute P(R|G) = 0.5 * P(R|allele1) + 0.5 * P(R|allele2)
+        double P_R_given_G = 0.5 * P_R_given_allele1 + 0.5 * P_R_given_allele2;
+        // Compute log10(P(R|G))
+        if (P_R_given_G > 0) {
+            log10_L[g] += log10(P_R_given_G);
+        } else {
+            // Handle potential underflow (should be rare)
+            log10_L[g] += -std::numeric_limits<double>::max();
+        }
+    }
+
+    // Find the maximum log-likelihood across all genotypes
+    double max_log10_L = *std::max_element(log10_L.begin(), log10_L.end());
+
+    // Compute the genotype likelihoods (PL)
+    std::vector<int> pl(3, 0);
+    for (int g = 0; g < 3; ++g) {
+        pl[g] = static_cast<int>(std::round(-10.0 * (log10_L[g] - max_log10_L)));
+    }
+
+    return pl;
+}
+
+
 double fisher_exact_test(int n11, int n12, int n21, int n22, TestSide test_side) {
     // Input validation
     if (n11 < 0 || n12 < 0 || n21 < 0 || n22 < 0) {
