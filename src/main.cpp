@@ -40,10 +40,6 @@ static int usage() {
 int basetype(int argc, char *argv[]) {
 
     BaseTypeRunner bt(argc, argv);
-    if (argc < 2) {
-        std::cout << bt.usage() << "\n" << std::endl;
-        exit(1);
-    }
     bt.run();
 
     return 0;
