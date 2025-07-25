@@ -512,7 +512,7 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
                                          const std::string out_vcf_fn,
                                          const std::string out_cvg_fn) 
 {
-    static const uint32_t STEP_REGION_LEN = 10; // 10 for test, should set to be large than 100000
+    static const uint32_t STEP_REGION_LEN = 100000; // 10 for test, should set to be large than 100000
     int bn = (gr.end - gr.start + 1) / STEP_REGION_LEN;
     if ((gr.end - gr.start + 1) % STEP_REGION_LEN > 0)
         bn++;
@@ -1177,7 +1177,7 @@ void _out_vcf_line(const BaseType &bt,
 
             double qual = bt.get_qual_pvalue()[i];
             std::vector<int> pl = calculatePL(fb, upper_ref_base, qual);
-            
+
             // GT:PL:AB:SO:BP
             samples.push_back(gt + ":" + ngslib::join(pl, ",") + ":" + fb + ":" + smp_bi->map_strands[i] + ":" + std::to_string(qual));
         } else {
