@@ -22,7 +22,8 @@ const std::string BaseTypeRunner::usage() const {
         "                               represents the number of input BAM files min(" + std::to_string(_args->min_af) + ", 100/x). In most\n"
         "                               cases, users need not be overly concerned about this parameter, as it \n"
         "                               is generally handled automatically by the program.\n"
-        "  -q, --mapq=INT               Only include reads with mapping quality >= INT. [" + std::to_string(_args->mapq) + "]\n"
+        "  -Q, --min-BQ INT             Skip bases with base quality < INT [" + std::to_string(_args->min_baseq) + "]\n"
+        "  -q, --mapq=INT               Skip reads with mapping quality < INT [" + std::to_string(_args->min_mapq) + "]\n"
         "  -B, --batch-count=INT        INT simples per batchfile. [" + std::to_string(_args->batchcount) + "]\n" 
         "  -t, --thread=INT             Number of threads. [" + std::to_string(_args->thread_num) + "]\n\n"
 
@@ -58,13 +59,14 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
         {"reference",       required_argument, NULL, 'R'},
 
         {"min-af",      optional_argument, NULL, 'm'},
-        {"mapq",        optional_argument, NULL, 'q'},
+        {"min-mapq",    optional_argument, NULL, 'q'},
+        {"min-BQ",      optional_argument, NULL, 'Q'},
         {"batch-count", optional_argument, NULL, 'B'},
         {"thread",      optional_argument, NULL, 't'},
 
         {"regions",     optional_argument, NULL, 'r'},
         {"positions",   optional_argument, NULL, 'p'},
-        {"pop-group",   optional_argument, NULL, 'G'},  // Special parameter for calculating specific population allele frequence
+        {"pop-group",   optional_argument, NULL, 'G'},  // parameter for calculating allele frequency for specific population-group
         {"output-vcf",  required_argument, NULL, '1'},
         {"output-cvg",  required_argument, NULL, '2'},
 
@@ -77,8 +79,14 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
         {0, 0, 0, 0}
     };
 
+    // Save the complete command line options in VCF header
+    _cmdline_string = "##mitoquest_caller_command=";
+    for (size_t i = 0; i < cmd_argc; ++i) {
+        _cmdline_string += (i > 0) ? " " + std::string(cmd_argv[i]) : std::string(cmd_argv[i]);
+    }
+
     char c;
-    while((c = getopt_long(cmd_argc, cmd_argv, "I:L:R:m:q:B:t:r:G:h", BASETYPE_CMDLINE_LOPTS, NULL)) >= 0) {
+    while((c = getopt_long(cmd_argc, cmd_argv, "I:L:R:m:q:Q:B:t:r:G:h", BASETYPE_CMDLINE_LOPTS, NULL)) >= 0) {
         // 字符流解决命令行参数转浮点等类型的问题
         std::stringstream ss(optarg ? optarg: "");  
         switch (c) {
@@ -87,7 +95,8 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
             case 'R': _args->reference      = optarg;         break;  /* 临参 */
 
             case 'm': ss >> _args->min_af;                    break;  // 恒参
-            case 'q': ss >> _args->mapq;                      break;  // 恒参
+            case 'q': ss >> _args->min_mapq;                  break;  // 恒参
+            case 'Q': ss >> _args->min_baseq;                 break;  // 恒参
             case 'B': ss >> _args->batchcount;                break;  // 恒参
             case 't': ss >> _args->thread_num;                break;  // 恒参
 
@@ -117,8 +126,8 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
     
     if (_args->min_af <= 0)
         throw std::invalid_argument("[ERROR] '-m/--min-af' argument must be > 0");
-    if (_args->mapq <= 0)
-        throw std::invalid_argument("[ERROR] '-q/--mapq' argument must be > 0");
+    if (_args->min_mapq <= 0)
+        throw std::invalid_argument("[ERROR] '-q/--min-mapq' argument must be > 0");
     if (_args->batchcount <= 0)
         throw std::invalid_argument("[ERROR] '-B/--batch-count' argument must be > 0");
     if (_args->thread_num <= 0)
@@ -134,7 +143,8 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
         "basevar basetype -R " + _args->reference        + " \\ \n"  + (_args->input_bf.empty() ? "" : 
         "   -I " + ngslib::join(_args->input_bf, " -I ") + " \\ \n") + (_args->in_bamfilelist.empty() ? "" : 
         "   -L " + _args->in_bamfilelist       + " \\ \n") <<
-        "   -q " << _args->mapq               << " \\ \n"
+        "   -Q " << _args->min_baseq          << " \\ \n"
+        "   -q " << _args->min_mapq           << " \\ \n"
         "   -m " << _args->min_af             << " \\ \n"
         "   -B " << _args->batchcount         << " \\ \n"
         "   -t " << _args->thread_num         << " \\ \n"  << (_args->regions.empty() ? "" : 
@@ -483,7 +493,8 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::Genome
                                 batch_sample_ids,   // 局部变量，会变，必拷贝，不可传引用，否则线程执行时将丢失该值
                                 std::cref(fa_seq),  // 外部变量，不变，传引用，省内存
                                 gr,
-                                _args->mapq,
+                                _args->min_mapq,
+                                _args->min_baseq,
                                 batchfile));
     }
     
@@ -834,7 +845,8 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
                           const std::vector<std::string> batch_sample_ids,   
                           const std::string &fa_seq,                         
                           const ngslib::GenomeRegion gr,        // [chr, start, end]
-                          const int mapq_thd,                   // mapping quality threshold
+                          const int min_mapq,                   // mapping quality threshold
+                          const int min_baseq,                  // base quality threshold
                           const std::string output_batch_file)  // output batchfile name
 {   // 原为 BaseTypeRunner 的成员函数，未掌握如何将该函数指针传入 ThreadPool，遂作罢，后再改。
     clock_t cpu_start_time = clock();
@@ -864,7 +876,10 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
         // Cut smaller regions to save computing memory.
         sub_reg_beg = i;
         sub_reg_end = sub_reg_beg + STEP_REGION_LEN - 1 > gr.end ? gr.end : sub_reg_beg + STEP_REGION_LEN - 1;
-        is_empty = __fetch_base_in_region(batch_align_files, fa_seq, mapq_thd, 
+        is_empty = __fetch_base_in_region(batch_align_files, 
+                                          fa_seq, 
+                                          min_mapq,
+                                          min_baseq,
                                           ngslib::GenomeRegion(gr.chrom, sub_reg_beg, sub_reg_end),
                                           batchsamples_posinfomap_vector);  // 传引用，省内存，得数据
 
@@ -905,7 +920,8 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
 
 bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,  
                             const std::string &fa_seq,  // must be the whole chromosome sequence  
-                            const int mapq_thd,         // mapping quality threshold
+                            const int min_mapq,         // mapping quality threshold
+                            const int min_baseq,        // base quality threshold
                             const ngslib::GenomeRegion gr,
                             PosMapVector &batchsamples_posinfomap_vector)  
 {
@@ -929,7 +945,13 @@ bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
             ngslib::BamRecord al;       // alignment read
 
             while (bf.next(al) >= 0) {  // -1 => hit the end of alignement file.
-                if (al.mapq() < mapq_thd || al.is_duplicate() || al.is_qc_fail()) continue;
+                if (al.mapq() < min_mapq || al.is_duplicate() || al.is_qc_fail()) {
+                    continue;
+                }
+                if (al.is_secondary() || al.is_supplementary()) {
+                    continue;  // skip secondary and supplementary alignments
+                }
+
                 map_ref_start = al.map_ref_start_pos() + 1;  // al.map_ref_start_pos() is 0-based, convert to 1-based
                 map_ref_end   = al.map_ref_end_pos();        // al.map_ref_end_pos() is 1-based
 
@@ -943,7 +965,7 @@ bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
             sample_posinfo_map.clear();  // make sure it's empty
             if (sample_target_reads.size() > 0) {
                 // get alignment information of [i] sample.
-                __seek_position(sample_target_reads, fa_seq, gr, sample_posinfo_map);
+                __seek_position(sample_target_reads, fa_seq, gr, min_baseq, sample_posinfo_map);
             }
         }
 
@@ -967,10 +989,12 @@ bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
 void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,
                      const std::string &fa_seq,   // must be the whole chromosome sequence
                      const ngslib::GenomeRegion gr,
+                     const int min_baseq,
                      PosMap &sample_posinfo_map)
 {
-    if (!sample_posinfo_map.empty())
+    if (!sample_posinfo_map.empty()){
         throw std::runtime_error("[basetype.cpp::__seek_position] 'sample_posinfo_map' must be empty.");
+    }
 
     AlignBaseInfo align_base_info;
     align_base_info.ref_id = gr.chrom;
@@ -1032,6 +1056,10 @@ void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,
 
             // qpos is 0-based, conver to 1-based to set the rank of base on read.
             align_base_info.rpr = aligned_pairs[i].qpos + 1;
+            if (align_base_info.read_base_qual < min_baseq + 33) {
+                // Skip this base if its quality is lower than 'min_baseq'
+                continue;
+            }
 
             if (sample_posinfo_map.find(map_ref_pos) == sample_posinfo_map.end()) {
                 // Just get the base from first read which aligned on this ref_pos,
@@ -1053,9 +1081,6 @@ void __write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vec
                                  BGZF *obf) 
 {
     const static char BASE_Q0_ASCII = '!';  // The ascii code of '!' character is 33
-
-    // std::string ref_id; uint32_t reg_start, reg_end;
-    // std::tie(ref_id, reg_start, reg_end) = genome_region;  // 1-based
 
     // Output columns and set zhe capacity for each vector: 
     // [CHROM, POS, REF, Depth(CoveredSample), MappingQuality, 

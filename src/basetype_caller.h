@@ -40,7 +40,8 @@ struct BaseTypeARGS {
     std::string reference;              // Input reference fasta file
 
     float min_af;                       // Setting prior precision of MAF and skip uneffective caller positions
-    int mapq;                           // mapping quality
+    int min_baseq;                      // minimum base quality
+    int min_mapq;                       // mapping quality
     int batchcount;                     // INT simples per batchfile
     int thread_num;                     // number of threads
 
@@ -54,7 +55,8 @@ struct BaseTypeARGS {
 
     // Set default argument
     BaseTypeARGS(): min_af(0.001), 
-                    mapq(10), 
+                    min_mapq(10), 
+                    min_baseq(5), 
                     batchcount(200), 
                     thread_num(std::thread::hardware_concurrency()), 
                     smart_rerun(false), 
@@ -67,6 +69,7 @@ struct BaseTypeARGS {
 class BaseTypeRunner {
 
 private:
+    std::string _cmdline_string;                             // save the commandline options
     BaseTypeARGS *_args;                                     // Commandline options
     
     std::vector<std::string> _samples_id;                    // sample ID of alignment files (BAM/CRAM/SAM)
@@ -143,18 +146,21 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files, // N
                           const std::vector<std::string> batch_sample_ids,  // Not a modifiable value
                           const std::string &fa_seq,                        // Not a modifiable value
                           const ngslib::GenomeRegion genome_region,         // 切割该区间
-                          const int mapq_thd,                               // mapping quality threshold
+                          const int min_mapq,                               // mapping quality threshold
+                          const int min_baseq,                              // base quality threshold
                           const std::string output_batch_file);             // output batchfile name
 
 bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
                             const std::string &fa_seq,                   
-                            const int mapq_thd,
+                            const int min_mapq,
+                            const int min_baseq,  // minimum base quality
                             const ngslib::GenomeRegion target_genome_region,  // 获取该区间内的 read
                             PosMapVector &batchsamples_posinfomap_vector);    // 信息存入该变量
 
 void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,  // ngslib::BamRecord include by 'bam.h'
                      const std::string &fa_seq,
                      const ngslib::GenomeRegion target_genome_region,         // 获取该区间内所有位点的碱基比对信息，该参数和 '__fetch_base_in_region' 中一样 
+                     const int min_baseq,  // minimum base quality
                      PosMap &sample_posinfo_map);
 
 void __write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vector, 
