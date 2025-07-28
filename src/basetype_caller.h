@@ -34,40 +34,56 @@
 
 static const bool IS_DELETE_CACHE_BATCHFILE = true;
 
-struct BaseTypeARGS {
-    /* Variables for all the commandline options of BaseType */
-    std::vector<std::string> input_bf;  // BAM/SAM/CRAM file, a vector
-    std::string in_bamfilelist;         // BAM/CRAM files list, one file per row
-    std::string reference;              // Input reference fasta file
-
-    float min_af;                       // Setting prior precision of MAF and skip uneffective caller positions
-    int min_baseq;                      // minimum base quality
-    int min_mapq;                       // mapping quality
-    int batchcount;                     // INT simples per batchfile
-    int thread_num;                     // number of threads
-
-    std::string regions;                // Interval regions
-    std::string pop_group_file;         // Specific population
-    std::string output_vcf;             // Output VCF file
-    std::string output_cvg;             // Output coverage file
-
-    bool filename_has_samplename;       // sample name in file name
-    bool smart_rerun;                   // Smart rerun by checking batchfiles
-
-    // Set default argument
-    BaseTypeARGS(): min_af(0.001), 
-                    min_mapq(10), 
-                    min_baseq(5), 
-                    batchcount(200), 
-                    thread_num(std::thread::hardware_concurrency()), 
-                    smart_rerun(false), 
-                    filename_has_samplename(false) {}
-};
-
 /**
  * @brief BaseTypeRunner class
  */
 class BaseTypeRunner {
+public:
+    // Commandline arguments
+    struct BaseTypeARGS {
+        /* Variables for all the commandline options of BaseType */
+        std::vector<std::string> input_bf;  // BAM/SAM/CRAM file, a vector
+        std::string in_bamfilelist;         // BAM/CRAM files list, one file per row
+        std::string reference;              // Input reference fasta file
+
+        float min_af;                       // Setting prior precision of MAF and skip uneffective caller positions
+        int min_baseq;                      // minimum base quality
+        int min_mapq;                       // mapping quality
+        int batchcount;                     // INT simples per batchfile
+        int thread_num;                     // number of threads
+
+        std::string regions;                // Interval regions
+        std::string pop_group_file;         // Specific population
+        std::string output_vcf;             // Output VCF file
+        std::string output_cvg;             // Output coverage file
+
+        bool filename_has_samplename;       // sample name in file name
+        bool smart_rerun;                   // Smart rerun by checking batchfiles
+
+        // Set default argument
+        BaseTypeARGS(): min_af(0.001), 
+                        min_mapq(10), 
+                        min_baseq(5), 
+                        batchcount(200), 
+                        thread_num(std::thread::hardware_concurrency()), 
+                        smart_rerun(false), 
+                        filename_has_samplename(false) {}
+    };
+    ngslib::Fasta reference;  // public variable
+
+    // default constructor
+    BaseTypeRunner() : _args(NULL) {}
+    BaseTypeRunner(int cmdline_argc, char *cmdline_argv[]);
+    
+    // Destroy the malloc'ed BasTypeArgs structure
+    ~BaseTypeRunner(){ if(_args){delete _args; _args = NULL;} }
+
+    // Common functions
+    const std::string usage() const;
+    void print_calling_interval();
+
+    // Run the variant calling process
+    void run() { _variant_caller_process(); }
 
 private:
     std::string _cmdline_string;                             // save the commandline options
@@ -105,23 +121,6 @@ private:
 
     BaseTypeRunner(const BaseTypeRunner &) = delete;             // reject using copy constructor (C++11 style).
     BaseTypeRunner &operator=(const BaseTypeRunner &) = delete;  // reject using copy/assignment operator (C++11 style).
-
-public:
-    ngslib::Fasta reference;  // public variable
-
-    // default constructor
-    BaseTypeRunner() : _args(NULL) {}
-    BaseTypeRunner(int cmdline_argc, char *cmdline_argv[]);
-    
-    // Destroy the malloc'ed BasTypeArgs structure
-    ~BaseTypeRunner(){ if(_args){delete _args; _args = NULL;} }
-
-    // Common functions
-    const std::string usage() const;
-    void print_calling_interval();
-
-    // Run the variant calling process
-    void run() { _variant_caller_process(); }
 
 };  // BaseTypeRunner class
 
