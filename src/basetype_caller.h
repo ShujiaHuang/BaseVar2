@@ -59,9 +59,9 @@ public:
 
         // Set default argument
         BaseTypeARGS(): min_af(0.001), 
-                        min_mapq(10), 
-                        min_baseq(5), 
-                        batchcount(200), 
+                        min_mapq(5), 
+                        min_baseq(10), 
+                        batchcount(500), 
                         thread_num(std::thread::hardware_concurrency()), 
                         smart_rerun(false), 
                         filename_has_samplename(false) {}
