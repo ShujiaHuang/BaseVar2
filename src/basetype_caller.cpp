@@ -11,7 +11,7 @@
 const std::string BaseTypeRunner::usage() const {
     const std::string BASETYPE_USAGE = 
         "About: Call variants and estimate allele frequency by BaseVar.\n" 
-        "Usage: basevar basetype [options] <-R Fasta> <--output-vcf> [-L bam.list] in1.bam [in2.bam ...] ...\n\n" 
+        "Usage: basevar caller [options] <-R Fasta> <--output-vcf> [-L bam.list] in1.bam [in2.bam ...] ...\n\n" 
 
         "Required arguments:\n" 
         "  -R, --reference FILE         Input reference fasta file.\n"
@@ -147,7 +147,7 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
     // Output the commandline options
     std::cout << 
         "[INFO] BaseVar arguments:\n"
-        "basevar basetype -R " + _args->reference        + " \\ \n" <<
+        "basevar caller -R "+ _args->reference + " \\ \n"
         "   -Q " << _args->min_baseq          << " \\ \n"
         "   -q " << _args->min_mapq           << " \\ \n"
         "   -m " << _args->min_af             << " \\ \n"
