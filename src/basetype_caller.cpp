@@ -15,7 +15,7 @@ const std::string BaseTypeRunner::usage() const {
 
         "Required arguments:\n" 
         "  -R, --reference FILE         Input reference fasta file.\n"
-        "  --output-vcf FILE            Output VCF file.\n\n"
+        "  -O, --output-vcf FILE        Output VCF file.\n\n"
 
         "Optional options:\n"
         "  -L, --align-file-list=FILE   BAM/CRAM files list, one file per row.\n"
@@ -54,24 +54,21 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
     static const struct option BASETYPE_CMDLINE_LOPTS[] = {
         // Optional arguments to long style command line parameters require 'equals sign' (=). 
         // https://stackoverflow.com/questions/1052746/getopt-does-not-parse-optional-arguments-to-parameters
-        {"input",           optional_argument, NULL, 'I'},
-        {"align-file-list", optional_argument, NULL, 'L'},
-        {"reference",       required_argument, NULL, 'R'},
+        {"reference",         required_argument, NULL, 'R'},
+        {"output-vcf",        required_argument, NULL, 'O'},
+        {"align-file-list",   optional_argument, NULL, 'L'},
 
-        {"min-af",      optional_argument, NULL, 'm'},
-        {"min-mapq",    optional_argument, NULL, 'q'},
-        {"min-BQ",      optional_argument, NULL, 'Q'},
-        {"batch-count", optional_argument, NULL, 'B'},
-        {"thread",      optional_argument, NULL, 't'},
+        {"min-af",            optional_argument, NULL, 'm'},
+        {"min-mapq",          optional_argument, NULL, 'q'},
+        {"min-BQ",            optional_argument, NULL, 'Q'},
+        {"batch-count",       optional_argument, NULL, 'B'},
+        {"thread",            optional_argument, NULL, 't'},
 
-        {"regions",     optional_argument, NULL, 'r'},
-        {"positions",   optional_argument, NULL, 'p'},
-        {"pop-group",   optional_argument, NULL, 'G'},  // parameter for calculating allele frequency for specific population-group
-        {"output-vcf",  required_argument, NULL, '1'},
+        {"regions",           optional_argument, NULL, 'r'},
+        {"pop-group",         optional_argument, NULL, 'G'},  // parameter for calculating allele frequency for specific population-group
 
-        // {"output-batch-file", required_argument, NULL, 0},  not use?
-        {"filename-has-samplename", no_argument, NULL, '3'},
-        {"smart-rerun",             no_argument, NULL, '4'},
+        {"filename-has-samplename", no_argument, NULL, '1'},
+        {"smart-rerun",             no_argument, NULL, '2'},
         {"help",                    no_argument, NULL, 'h'},
 
         // must set this value
@@ -86,32 +83,34 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
 
     char c;
     std::vector<std::string> bv;
-    while((c = getopt_long(cmd_argc, cmd_argv, "L:R:m:q:Q:B:t:r:G:h", BASETYPE_CMDLINE_LOPTS, NULL)) >= 0) {
+    while((c = getopt_long(cmd_argc, cmd_argv, "L:R:O:m:q:Q:B:t:r:G:h", BASETYPE_CMDLINE_LOPTS, NULL)) >= 0) {
         // 字符流解决命令行参数转浮点等类型的问题
         std::stringstream ss(optarg ? optarg: "");  
         switch (c) {
-            // case 'I': _args->input_bf.push_back(optarg);      break;  // 恒参 (一直用)
-            case 'R': _args->reference = optarg;              break;  /* 临参 */
+            case 'R': _args->reference  = optarg;              break;  /* 临参 */
+            case 'O': _args->output_vcf = optarg;              break;  // 恒参
             case 'L':
                 bv = ngslib::get_firstcolumn_from_file(optarg); 
                 _args->input_bf.insert(_args->input_bf.end(), 
-                                       bv.begin(), bv.end()); break;  /* 临参 */
-            case 'm': ss >> _args->min_af;                    break;  // 恒参
-            case 'q': ss >> _args->min_mapq;                  break;  // 恒参
-            case 'Q': ss >> _args->min_baseq;                 break;  // 恒参
-            case 'B': ss >> _args->batchcount;                break;  // 恒参
-            case 't': ss >> _args->thread_num;                break;  // 恒参
+                                       bv.begin(), bv.end());  break;  /* 临参 */
 
-            case 'r': _args->regions        = optarg;         break;  /* 临参 */
-            case 'G': _args->pop_group_file = optarg;         break;  // 
-            case '1': _args->output_vcf     = optarg;         break;  // 恒参
+            case 'm': ss >> _args->min_af;                     break;  // 恒参
+            case 'q': ss >> _args->min_mapq;                   break;  // 恒参
+            case 'Q': ss >> _args->min_baseq;                  break;  // 恒参
+            case 'B': ss >> _args->batchcount;                 break;  // 恒参
+            case 't': ss >> _args->thread_num;                 break;  // 恒参
 
-            case '3': _args->filename_has_samplename = true;  break;  // 恒参
-            case '4': _args->smart_rerun             = true;  break;  // 恒参
-            case 'h': std::cout << usage() << std::endl; exit(1);
+            case 'r': _args->regions        = optarg;          break;  /* 临参 */
+            case 'G': _args->pop_group_file = optarg;          break;  // 
+            case '1': _args->filename_has_samplename = true;   break;  // 恒参
+            case '2': _args->smart_rerun             = true;   break;  // 恒参
+            case 'h': 
+                std::cout << usage() << std::endl; 
+                exit(EXIT_SUCCESS);
+
             default: 
                 std::cerr << "Unknown argument: " << c << std::endl; 
-                exit(1);
+                abort();
         }
     }
 

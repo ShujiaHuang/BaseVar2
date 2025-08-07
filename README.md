@@ -181,14 +181,13 @@ Optional options:
 
 This command will provide detailed information about parameters of `basevar`.
 
-
 ## Quick start
 
 ### Call variants from several bamfiles
 
 ```bash
 basevar caller -R reference.fasta \
-    -B 200 -t 4 \
+    -q 30 -Q 20 -B 500 -t 24 \
     --pop-group=sample_group.info \
     --regions=chr11:5246595-5248428,chr17:41197764-41276135 \
     --output-vcf test.vcf.gz 00alzqq6jw.bam 09t3r9n2rg.bam 0fkpl1p55b.bam ...
@@ -196,13 +195,12 @@ basevar caller -R reference.fasta \
 
 The format of `sample_group.info` could be found [here](tests/data/140k_thalassemia_brca_bam/sample_group.info).
 
-
 ### Or call variants from bamlist
 
 ```bash
 
 basevar caller -R reference.fasta \
-    -B 200 -t 4 \
+    -q 30 -Q 20 -B 500 -t 24 \
     -L bamfile.list \ 
     --regions=chr11:5246595-5248428,chr17:41197764-41276135 \
     --pop-group=sample_group.info \

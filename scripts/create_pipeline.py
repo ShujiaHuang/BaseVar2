@@ -29,12 +29,17 @@ def creat_basetype_pipe():
     exe_prog = pardir + '/bin/basevar caller'
 
     optp = argparse.ArgumentParser()
-    optp.add_argument('-o', '--outdir', metavar='STR', dest='outdir',
+    optp.add_argument('-O', '--outdir', metavar='STR', dest='outdir',
                       help='The output directory', default='')
     optp.add_argument('-R', '--reference_fasta', metavar='FILE', dest='reference',
                       help='The reference fa file', default='')
     optp.add_argument('-f', '--ref_fai', metavar='FILE', dest='ref_fai',
                       help='The reference fai file', default='')
+    optp.add_argument('-Q', '--min-BQ', metavar='INT', dest='min_bq',
+                      help='Minimal base quality', default=20)
+    optp.add_argument('-q', '--mapq', metavar='INT', dest='mapq',
+                      help='Minimal mapping quality', default=30)
+    
     optp.add_argument('-r', '--regions', metavar='Region', dest='regions',
                       help='skip positions not in (chr:start-end)', default='')
     optp.add_argument('-d', '--delta', metavar='INT', dest='delta',
@@ -48,8 +53,8 @@ def creat_basetype_pipe():
     ## Parameters for BaseType
     optp.add_argument('-L', '--align-file-list', dest='infilelist', metavar='FILE',
                       help='BAM/CRAM files list, one file per row.', default='')
-    optp.add_argument('-m', '--min_af', dest='min_af', type=float, metavar='MINAF', default=0.001,
-                      help='By setting min AF to skip uneffective caller positions to accelerate program speed. [0.001]')
+    optp.add_argument('-m', '--min_af', dest='min_af', type=float, metavar='MINAF', default=0.0001,
+                      help='By setting min AF to skip uneffective caller positions to accelerate program speed. [0.0001]')
     optp.add_argument('-G', '--pop-group', dest='pop_group', metavar='FILE',
                       help='Calculating the allele frequency for specific population.', default='')
 
@@ -76,13 +81,13 @@ def creat_basetype_pipe():
             outfile_prefix = chr_id + '_' + str(start) + '_' + str(end)
             if opt.pop_group:
                 print(f'time {exe_prog} -t {opt.n_thread} -R {opt.reference} -L {opt.infilelist} '
-                      f'-G {opt.pop_group} -r {reg} --min-af={opt.min_af} '
+                      f'-G {opt.pop_group} -r {reg} --min-af={opt.min_af} -q {opt.mapq} -Q {opt.min_bq} '
                       f'--output-vcf {opt.outdir}/{outfile_prefix}.vcf.gz '
                       f'--smart-rerun > {opt.outdir}/{outfile_prefix}.log && '
                       f'echo "** {outfile_prefix} done **"')
             else:    
                 print(f'time {exe_prog} -t {opt.n_thread} -R {opt.reference} -L {opt.infilelist} '
-                      f'-r {reg} --min-af={opt.min_af} '
+                      f'-r {reg} --min-af={opt.min_af} -q {opt.mapq} -Q {opt.min_bq} '
                       f'--output-vcf {opt.outdir}/{outfile_prefix}.vcf.gz '
                       f'--smart-rerun > {opt.outdir}/{outfile_prefix}.log && '
                       f'echo "** {outfile_prefix} done **"')
