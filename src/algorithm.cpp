@@ -9,49 +9,78 @@ double norm_dist(double x) {
     return kf_erfc(double(x / std::sqrt(2.0))) / 2.0;
 }
 
-std::vector<int> calculatePL(char base, char ref_base, double base_quality_prob) {
-    // This function calculates the Genotype likelihoods (PL) for a given base and quality against the reference base.
-    // REF: R, ALT: A. RR is homozygous for the reference base, AR is heterozygous, and AA is homozygous for the alternate base.
-    char ref = ref_base;
-    char alt = base;  // Assuming alt_base is set for biallelic variant
+std::vector<int> calculatePL(const std::string& ref_base, 
+                             const std::vector<std::string>& alt_bases, 
+                             const std::vector<std::string>& align_bases, 
+                             const std::vector<char>& base_quals) 
+{
+    // This function calculates the Genotype likelihoods (PL) for given bases and quality against the reference base.
+    if (align_bases.size() != base_quals.size()) {
+        throw std::invalid_argument("Bases and base quality vectors must be of the same length");
+    }
 
-    std::vector<std::pair<char, char>> genotypes = {{ref, ref}, {ref, alt}, {alt, alt}};
-    std::vector<double> log10_L(3, 0.0); // Log-likelihoods for each genotype
-
-    // Iterate over each read in the pileup
-    char B = base; // Observed base
-    double e = 1.0 - base_quality_prob; // Error probability
-    double P_correct = base_quality_prob; // Probability of correct base
-    double P_error = e / 3.0; // Probability of error (uniform across other bases)
-
-    // Compute P(B|X) for X = ref and X = alt
-    double P_B_given_ref = (B == ref) ? P_correct : P_error;
-    double P_B_given_alt = (B == alt) ? P_correct : P_error;
-
-    // For each genotype, compute P(R|G)
-    for (int g = 0; g < 3; ++g) {
-        char allele1 = genotypes[g].first;
-        char allele2 = genotypes[g].second;
-        // Compute P(R|allele1) and P(R|allele2)
-        double P_R_given_allele1 = (allele1 == ref) ? P_B_given_ref : P_B_given_alt;
-        double P_R_given_allele2 = (allele2 == ref) ? P_B_given_ref : P_B_given_alt;
-        // Compute P(R|G) = 0.5 * P(R|allele1) + 0.5 * P(R|allele2)
-        double P_R_given_G = 0.5 * P_R_given_allele1 + 0.5 * P_R_given_allele2;
-        // Compute log10(P(R|G))
-        if (P_R_given_G > 0) {
-            log10_L[g] += log10(P_R_given_G);
-        } else {
-            // Handle potential underflow (should be rare)
-            log10_L[g] += -std::numeric_limits<double>::max();
+    // Calculate number of alleles (REF + ALTs)
+    size_t n_alleles = alt_bases.size() + 1;
+    
+    // Calculate number of possible genotypes: n(n+1)/2 where n is number of alleles
+    size_t n_genotypes = (n_alleles * (n_alleles + 1)) / 2;
+    
+    // Create all possible genotype combinations
+    std::vector<std::pair<std::string, std::string>> genotypes;
+    genotypes.reserve(n_genotypes);
+    
+    // Generate all possible genotype pairs (including homozygous and heterozygous)
+    for (size_t i = 0; i < n_alleles; i++) {
+        for (size_t j = i; j < n_alleles; j++) {
+            std::string allele1 = (i == 0) ? ref_base : alt_bases[i-1];
+            std::string allele2 = (j == 0) ? ref_base : alt_bases[j-1];
+            genotypes.push_back({allele1, allele2});
         }
     }
 
-    // Find the maximum log-likelihood across all genotypes
+    // Initialize log-likelihoods for each genotype
+    std::vector<double> log10_L(n_genotypes, 0.0);
+
+    // Iterate over each read in the pileup
+    for (size_t i = 0; i < align_bases.size(); ++i) {
+        if (align_bases[i][0] == 'N' || align_bases[i][0] == 'n') continue; // Skip Ns
+
+        std::string B = align_bases[i];
+        int Q = static_cast<int>(base_quals[i]) - 33;
+        
+        double e = (Q < 0) ? 1.0 : std::pow(10.0, -Q / 10.0);
+        double base_quality_prob = 1.0 - e;
+
+        double P_correct = base_quality_prob;
+        double P_error   = e / 3.0; // Probability of error (uniform across other bases)
+
+        // For each genotype, compute P(R|G)
+        for (size_t g = 0; g < n_genotypes; ++g) {
+            const auto& [allele1, allele2] = genotypes[g];
+            
+            // Calculate P(R|allele) for both alleles in the genotype
+            double P_R_given_allele1 = (B == allele1) ? P_correct : P_error;
+            double P_R_given_allele2 = (B == allele2) ? P_correct : P_error;
+
+            // P(R|G) = 0.5 * P(R|allele1) + 0.5 * P(R|allele2)
+            double P_R_given_G = 0.5 * P_R_given_allele1 + 0.5 * P_R_given_allele2;
+
+            // Add log10(P(R|G)) to the cumulative log-likelihood
+            if (P_R_given_G > 0) {
+                log10_L[g] += log10(P_R_given_G);
+            } else {
+                // Handle potential underflow (should be rare)
+                log10_L[g] += -std::numeric_limits<double>::max();
+            }
+        }
+    }
+
+    // Find the maximum log-likelihood
     double max_log10_L = *std::max_element(log10_L.begin(), log10_L.end());
 
-    // Compute the genotype likelihoods (PL)
-    std::vector<int> pl(3, 0);
-    for (int g = 0; g < 3; ++g) {
+    // Calculate Phred-scaled likelihoods (PL)
+    std::vector<int> pl(n_genotypes);
+    for (size_t g = 0; g < n_genotypes; ++g) {
         pl[g] = static_cast<int>(std::round(-10.0 * (log10_L[g] - max_log10_L)));
     }
 

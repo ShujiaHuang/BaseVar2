@@ -88,7 +88,10 @@ double median(std::vector<T> &value) {
 }
 
 // Calculate the Genotype likelihoods for a given base and quality against the reference base
-std::vector<int> calculatePL(char base, char ref_base, double base_quality_prob);
+std::vector<int> calculatePL(const std::string& ref_base, 
+                             const std::vector<std::string>& alt_bases, 
+                             const std::vector<std::string>& align_bases, 
+                             const std::vector<char>& base_quals);
 
 // Function for chi^2 test
 double chi2_test(double chi_sqrt_value, double degree_of_freedom);
