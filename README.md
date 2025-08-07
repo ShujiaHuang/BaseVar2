@@ -145,34 +145,33 @@ $ g++ -O3 -fPIC ../src/*.cpp ../htslib/libhts.a -I ../htslib -lz -lbz2 -lm -llzm
 
 ```
 
-To review each of the parameters, you can type `basevar basetype -h` in the Linux/MacOS Terminal. 
+To review each of the parameters, you can type `basevar caller -h` in the Linux/MacOS Terminal. 
 
 ```bash
-$ /path/to/basevar basetype -h
+$ /path/to/basevar caller -h
 
 About: Call variants and estimate allele frequency by BaseVar.
-Usage: basevar basetype [options] <-R Fasta> <--output-vcf> <--output-cvg> [-I input] ...
+Usage: basevar caller [options] <-R Fasta> <--output-vcf> [-L bam.list] in1.bam [in2.bam ...] ...
 
-optional arguments:
-  -I, --input=FILE             BAM/CRAM file containing reads.
-  -L, --align-file-list=FILE   BAM/CRAM files list, one file per row.
+Required arguments:
   -R, --reference FILE         Input reference fasta file.
+  --output-vcf FILE            Output VCF file.
+
+Optional options:
+  -L, --align-file-list=FILE   BAM/CRAM files list, one file per row.
+  -r, --regions=REG[,...]      Skip positions which not in these regions. This parameter could be a list
+                               of comma deleimited genome regions(e.g.: chr:start-end).
+  -G, --pop-group=FILE         Calculating the allele frequency for specific population.
 
   -m, --min-af=float           Setting prior precision of MAF and skip ineffective caller positions,
-                               a typical approach involves setting it to min(0.001, 100/x), where x
-                               represents the number of input BAM files [min(0.001, 100/x)]. In most
+                               a typical approach involves setting it to min(0.001000, 100/x), where x
+                               represents the number of input BAM files min(0.001000, 100/x). In most
                                cases, users need not be overly concerned about this parameter, as it
                                is generally handled automatically by the program.
-  -q, --mapq=INT               Only include reads with mapping quality >= INT. [10]
+  -Q, --min-BQ INT             Skip bases with base quality < INT [5]
+  -q, --mapq=INT               Skip reads with mapping quality < INT [10]
   -B, --batch-count=INT        INT simples per batchfile. [200]
-  -t, --thread=INT             Number of threads. [4]
-
-  -G, --pop-group=FILE         Calculating the allele frequency for specific population.
-  -r, --regions=chr:start-end  Skip positions which not in these regions. This parameter could be a list
-                               of comma deleimited genome regions(e.g.: chr:start-end) or a file contain
-                               the list of regions.
-  --output-vcf FILE            Output VCF file.
-  --output-cvg FILE            Output position coverage file.
+  -t, --thread=INT             Number of threads. [14]
 
   --filename-has-samplename    If the name of bamfile is something like 'SampleID.xxxx.bam', set this
                                argrument could save a lot of time during get the sample id from BAMfile.
@@ -188,19 +187,11 @@ This command will provide detailed information about parameters of `basevar`.
 ### Call variants from several bamfiles
 
 ```bash
-basevar basetype -R reference.fasta \
+basevar caller -R reference.fasta \
     -B 200 -t 4 \
-    -I 00alzqq6jw.bam \
-    -I 09t3r9n2rg.bam \
-    -I 0fkpl1p55b.bam \
-    -I 13dg1gvsfk.bam \
-    -I 17phildszl.bam \
-    -I 1dbpgqt0dq.bam \
-    -I 1kyws27hoc.bam \
     --pop-group=sample_group.info \
     --regions=chr11:5246595-5248428,chr17:41197764-41276135 \
-    --output-vcf test.vcf.gz \
-    --output-cvg test.cvg.tsv.gz
+    --output-vcf test.vcf.gz 00alzqq6jw.bam 09t3r9n2rg.bam 0fkpl1p55b.bam ...
 ```
 
 The format of `sample_group.info` could be found [here](tests/data/140k_thalassemia_brca_bam/sample_group.info).
@@ -215,8 +206,7 @@ basevar basetype -R reference.fasta \
     -L bamfile.list \ 
     --regions=chr11:5246595-5248428,chr17:41197764-41276135 \
     --pop-group=sample_group.info \
-    --output-vcf test.vcf.gz \
-    --output-cvg test.cvg.tsv.gz
+    --output-vcf test.vcf.gz 
 ```
 
 For stramlinened variant calling across the entire genome, you can use the pipeline generator [**create_pipeline.py**](https://github.com/ShujiaHuang/basevar/blob/master/scripts/create_pipeline.py), which distributes the computational tasks based on the --delta parameter across a specific chromosome defined by the -c parameter.
