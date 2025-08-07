@@ -11,11 +11,17 @@
 const std::string BaseTypeRunner::usage() const {
     const std::string BASETYPE_USAGE = 
         "About: Call variants and estimate allele frequency by BaseVar.\n" 
-        "Usage: basevar basetype [options] <-R Fasta> <--output-vcf> <--output-cvg> [-I input] ...\n\n" 
-        "optional arguments:\n" 
-        "  -I, --input=FILE             BAM/CRAM file containing reads.\n"
+        "Usage: basevar basetype [options] <-R Fasta> <--output-vcf> [-L bam.list] in1.bam [in2.bam ...] ...\n\n" 
+
+        "Required arguments:\n" 
+        "  -R, --reference FILE         Input reference fasta file.\n"
+        "  --output-vcf FILE            Output VCF file.\n\n"
+
+        "Optional options:\n"
         "  -L, --align-file-list=FILE   BAM/CRAM files list, one file per row.\n"
-        "  -R, --reference FILE         Input reference fasta file.\n\n"
+        "  -r, --regions=REG[,...]      Skip positions which not in these regions. This parameter could be a list\n"
+        "                               of comma deleimited genome regions(e.g.: chr:start-end).\n"
+        "  -G, --pop-group=FILE         Calculating the allele frequency for specific population.\n\n"
 
         "  -m, --min-af=float           Setting prior precision of MAF and skip ineffective caller positions,\n"
         "                               a typical approach involves setting it to min(" + std::to_string(_args->min_af) + ", 100/x), where x \n"
@@ -26,12 +32,6 @@ const std::string BaseTypeRunner::usage() const {
         "  -q, --mapq=INT               Skip reads with mapping quality < INT [" + std::to_string(_args->min_mapq) + "]\n"
         "  -B, --batch-count=INT        INT simples per batchfile. [" + std::to_string(_args->batchcount) + "]\n" 
         "  -t, --thread=INT             Number of threads. [" + std::to_string(_args->thread_num) + "]\n\n"
-
-        "  -G, --pop-group=FILE         Calculating the allele frequency for specific population.\n" 
-        "  -r, --regions=chr:start-end  Skip positions which not in these regions. This parameter could be a list\n"
-        "                               of comma deleimited genome regions(e.g.: chr:start-end).\n"
-        "  --output-vcf FILE            Output VCF file.\n"
-        "  --output-cvg FILE            Output position coverage file.\n\n"
 
         "  --filename-has-samplename    If the name of bamfile is something like 'SampleID.xxxx.bam', set this\n"
         "                               argrument could save a lot of time during get the sample id from BAMfile.\n"
@@ -68,7 +68,6 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
         {"positions",   optional_argument, NULL, 'p'},
         {"pop-group",   optional_argument, NULL, 'G'},  // parameter for calculating allele frequency for specific population-group
         {"output-vcf",  required_argument, NULL, '1'},
-        {"output-cvg",  required_argument, NULL, '2'},
 
         // {"output-batch-file", required_argument, NULL, 0},  not use?
         {"filename-has-samplename", no_argument, NULL, '3'},
@@ -80,20 +79,23 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
     };
 
     // Save the complete command line options in VCF header
-    _cmdline_string = "##mitoquest_caller_command=";
+    _cmdline_string = "##basevar_command=basevar ";
     for (size_t i = 0; i < cmd_argc; ++i) {
         _cmdline_string += (i > 0) ? " " + std::string(cmd_argv[i]) : std::string(cmd_argv[i]);
     }
 
     char c;
-    while((c = getopt_long(cmd_argc, cmd_argv, "I:L:R:m:q:Q:B:t:r:G:h", BASETYPE_CMDLINE_LOPTS, NULL)) >= 0) {
+    std::vector<std::string> bv;
+    while((c = getopt_long(cmd_argc, cmd_argv, "L:R:m:q:Q:B:t:r:G:h", BASETYPE_CMDLINE_LOPTS, NULL)) >= 0) {
         // 字符流解决命令行参数转浮点等类型的问题
         std::stringstream ss(optarg ? optarg: "");  
         switch (c) {
-            case 'I': _args->input_bf.push_back(optarg);      break;  // 恒参 (一直用)
-            case 'L': _args->in_bamfilelist = optarg;         break;  /* 临参 */
-            case 'R': _args->reference      = optarg;         break;  /* 临参 */
-
+            // case 'I': _args->input_bf.push_back(optarg);      break;  // 恒参 (一直用)
+            case 'R': _args->reference = optarg;              break;  /* 临参 */
+            case 'L':
+                bv = ngslib::get_firstcolumn_from_file(optarg); 
+                _args->input_bf.insert(_args->input_bf.end(), 
+                                       bv.begin(), bv.end()); break;  /* 临参 */
             case 'm': ss >> _args->min_af;                    break;  // 恒参
             case 'q': ss >> _args->min_mapq;                  break;  // 恒参
             case 'Q': ss >> _args->min_baseq;                 break;  // 恒参
@@ -103,7 +105,6 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
             case 'r': _args->regions        = optarg;         break;  /* 临参 */
             case 'G': _args->pop_group_file = optarg;         break;  // 
             case '1': _args->output_vcf     = optarg;         break;  // 恒参
-            case '2': _args->output_cvg     = optarg;         break;  // 恒参
 
             case '3': _args->filename_has_samplename = true;  break;  // 恒参
             case '4': _args->smart_rerun             = true;  break;  // 恒参
@@ -113,15 +114,19 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
                 exit(1);
         }
     }
+
+    // Collect BAM/CRAM files
+    while (optind < cmd_argc) {
+        _args->input_bf.push_back(cmd_argv[optind++]);
+    }
+
     /* Make sure we set valid arguments */
-    if (_args->input_bf.empty() && _args->in_bamfilelist.empty())
-        throw std::invalid_argument("[ERROR] Missing argument '-I/--input' or '-L/--align-file-list'");
+    if (_args->input_bf.empty())
+        throw std::invalid_argument("[ERROR] Missing required BAM/CRAM files.");
     if (_args->reference.empty())
         throw std::invalid_argument("[ERROR] Missing argument '-R/--reference'");
     if (_args->output_vcf.empty())
         throw std::invalid_argument("[ERROR] Missing argument '--output-vcf'");
-    if (_args->output_cvg.empty())
-        throw std::invalid_argument("[ERROR] Missing argument '--output-cvg'");
     
     if (_args->min_af < 0)
         throw std::invalid_argument("[ERROR] '-m/--min-af' argument must be > 0");
@@ -138,14 +143,11 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
 
     // recovering the absolute paths of output files
     _args->output_vcf = ngslib::abspath(_args->output_vcf);
-    _args->output_cvg = ngslib::abspath(_args->output_cvg);
 
     // Output the commandline options
     std::cout << 
         "[INFO] BaseVar arguments:\n"
-        "basevar basetype -R " + _args->reference        + " \\ \n"  + (_args->input_bf.empty() ? "" : 
-        "   -I " + ngslib::join(_args->input_bf, " -I ") + " \\ \n") + (_args->in_bamfilelist.empty() ? "" : 
-        "   -L " + _args->in_bamfilelist       + " \\ \n") <<
+        "basevar basetype -R " + _args->reference        + " \\ \n" <<
         "   -Q " << _args->min_baseq          << " \\ \n"
         "   -q " << _args->min_mapq           << " \\ \n"
         "   -m " << _args->min_af             << " \\ \n"
@@ -153,10 +155,10 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
         "   -t " << _args->thread_num         << " \\ \n"  << (_args->regions.empty() ? "" : 
         "   -r " + _args->regions              + " \\ \n") << (_args->pop_group_file.empty() ? "" : 
         "   -G " + _args->pop_group_file       + " \\ \n") <<
-        "   --output-vcf " + _args->output_vcf + " \\ \n"
-        "   --output-vcg " + _args->output_cvg << (_args->filename_has_samplename ? " \\ \n"
+        "   --output-vcf " + _args->output_vcf << (_args->filename_has_samplename ? " \\ \n"
         "   --filename-has-samplename" : "")   << (_args->smart_rerun ? " \\ \n"
-        "   --smart-rerun": "")                << "\n" << std::endl;
+        "   --smart-rerun": "")                << " " + _args->input_bf[0] + " [... " 
+        << _args->input_bf.size() << " bamfiles in total]. \n" << std::endl;
     
     if (_args->smart_rerun) {
         std::cout << "************************************************\n"
@@ -169,10 +171,6 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
                      "************************************************\n\n";
     }
 
-    if (!_args->in_bamfilelist.empty()) {
-        std::vector<std::string> filelist = ngslib::get_firstcolumn_from_file(_args->in_bamfilelist);
-        _args->input_bf.insert(_args->input_bf.end(), filelist.begin(), filelist.end());
-    }
     std::cout << "[INFO] Finish loading arguments and we have " << _args->input_bf.size()
               << " BAM/CRAM files for variants calling.\n"      << std::endl;
 
@@ -346,7 +344,6 @@ void BaseTypeRunner::_get_popgroup_info() {
 
 // Run the processes of calling variant and output files.
 void BaseTypeRunner::_variant_caller_process() {
-
     // Get filepath and stem name first.
     std::string _bname = ngslib::basename(_args->output_vcf);
     size_t si = _bname.find(".vcf");
@@ -364,7 +361,7 @@ void BaseTypeRunner::_variant_caller_process() {
     }
 
     // 以区间为单位进行变异检测, 每个区间里调用多线程
-    std::vector<std::string> batchfiles, vcffiles, cvgfiles;
+    std::vector<std::string> batchfiles, vcffiles;
     for (auto &gr: _calling_intervals) {
         clock_t cpu_start_time = clock();
         time_t real_start_time = time(0);
@@ -392,20 +389,18 @@ void BaseTypeRunner::_variant_caller_process() {
         cpu_start_time  = clock();
 
         std::string sub_vcf_fn = prefix + ".vcf.gz";
-        std::string sub_cvg_fn = prefix + ".cvg.gz";
-        _variants_discovery(batchfiles, gr, sub_vcf_fn, sub_cvg_fn);
+        _variants_discovery(batchfiles, gr, sub_vcf_fn);
 
         // Time information
         now = time(0);
         ct  = ctime(&now); 
         ct.pop_back();
         std::cout << "\n" << "[INFO] "+ ct +". Done for calling all variants in " + gr.to_string() + ": "
-                  << "[" + sub_vcf_fn + "," + sub_cvg_fn + "], " << difftime(now, real_start_time) << "(CPU time: " 
+                  << sub_vcf_fn + ", " << difftime(now, real_start_time) << "(CPU time: " 
                   << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC << ") seconds elapsed in total.\n" 
                   << std::endl;
 
         vcffiles.push_back(sub_vcf_fn);
-        cvgfiles.push_back(sub_cvg_fn);
         
         if (IS_DELETE_CACHE_BATCHFILE) {
             for (auto bf: batchfiles) {
@@ -426,7 +421,7 @@ void BaseTypeRunner::_variant_caller_process() {
     }
 
     // Merge VCF
-    std::string header = vcf_header_define(_args->reference, add_group_info, _samples_id);
+    std::string header = vcf_header_define(_args->reference, add_group_info, _samples_id, _cmdline_string);
     merge_file_by_line(vcffiles, _args->output_vcf, header, true);
 
     const tbx_conf_t bf_tbx_conf = {1, 1, 2, 0, '#', 0};  // {preset, seq col, beg col, end col, header-char, skip-line}
@@ -434,14 +429,6 @@ void BaseTypeRunner::_variant_caller_process() {
         tbx_index_build(_args->output_vcf.c_str(), 0, &bf_tbx_conf))  // file suffix is ".tbi"
         throw std::runtime_error("tbx_index_build failed: Is the file bgzip-compressed? "
                                  "Check this file: " + _args->output_vcf + "\n");
-
-    // Merge CVG
-    header = cvg_header_define(group_name, BASES);
-    merge_file_by_line(cvgfiles, _args->output_cvg, header, true);
-    if ((ngslib::suffix_name(_args->output_cvg) == ".gz") &&          // create index
-        tbx_index_build(_args->output_cvg.c_str(), 0, &bf_tbx_conf))  // file suffix is ".tbi"
-        throw std::runtime_error("tbx_index_build failed: Is the file bgzip-compressed? "
-                                 "Check this file: " + _args->output_cvg + "\n");
 
     if (IS_DELETE_CACHE_BATCHFILE) {
         ngslib::safe_remove(cache_outdir);
@@ -452,18 +439,15 @@ void BaseTypeRunner::_variant_caller_process() {
 std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::GenomeRegion gr, 
                                                             const std::string bf_prefix) 
 {
-    // std::string ref_id; uint32_t reg_beg, reg_end;
-    // std::tie(ref_id, reg_beg, reg_end) = genome_region;
-    std::string fa_seq = reference[gr.chrom];  // use the whole sequence of ``ref_id`` for simply
+    ThreadPool thread_pool(_args->thread_num);  // set multiple-thread
+    std::vector<std::future<bool>> create_batchfile_processes;
 
     int bn = _args->input_bf.size() / _args->batchcount;  // number of batchfiles
     if (_args->input_bf.size() % _args->batchcount > 0)
         bn++;
 
-    ThreadPool thread_pool(_args->thread_num);  // set multiple-thread
-    std::vector<std::future<bool>> create_batchfile_processes;
-
     std::vector<std::string> batchfiles;
+    std::string fa_seq = reference[gr.chrom];  // use the whole sequence of ``ref_id`` for simply
     for (size_t i(0), j(1); i < _args->input_bf.size(); i+=_args->batchcount, ++j) {
         // set name of batchfile and must be compressed by BGZF.
         std::string batchfile = bf_prefix + "." + ngslib::tostring(j) + "_" + ngslib::tostring(bn) + ".bf.gz";
@@ -509,9 +493,16 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::Genome
 
 void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfiles, 
                                          const ngslib::GenomeRegion gr,
-                                         const std::string out_vcf_fn,
-                                         const std::string out_cvg_fn) 
+                                         const std::string out_vcf_fn) 
 {
+    // Split the region into multiple sub-regions for multiple-thread calling
+    // Each sub-region is about 'STEP_REGION_LEN' bp length
+    // Then merge all the sub-vcf files into one file.
+    if (batchfiles.empty()) {
+        throw std::invalid_argument("[ERROR] No batchfiles for calling variants in " + gr.to_string() + "\n");
+    }
+
+    // decide how many sub-regions we should split
     static const uint32_t STEP_REGION_LEN = 100000; // 10 for test, should set to be large than 100000
     int bn = (gr.end - gr.start + 1) / STEP_REGION_LEN;
     if ((gr.end - gr.start + 1) % STEP_REGION_LEN > 0)
@@ -521,13 +512,11 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     ThreadPool thread_pool(_args->thread_num);  
     std::vector<std::future<bool>> call_variants_processes;
 
-    std::vector<std::string> subvcfs, subcvgs;
+    std::vector<std::string> subvcfs;
     uint32_t sub_reg_start, sub_reg_end; // get region information
     for (uint32_t i(gr.start), j(1); i < gr.end + 1; i += STEP_REGION_LEN, ++j) {
         std::string tmp_vcf_fn = out_vcf_fn + "." + ngslib::tostring(j) + "_" + ngslib::tostring(bn);
-        std::string tmp_cvg_fn = out_cvg_fn + "." + ngslib::tostring(j) + "_" + ngslib::tostring(bn);
         subvcfs.push_back(tmp_vcf_fn);
-        subcvgs.push_back(tmp_cvg_fn);
 
         sub_reg_start = i;  // 1-based
         sub_reg_end = (sub_reg_start+STEP_REGION_LEN-1) > gr.end ? gr.end : sub_reg_start+STEP_REGION_LEN-1;
@@ -541,8 +530,7 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
                                std::cref(_groups_idx),
                                _args->min_af,
                                regstr,        // 局部变量必须拷贝，会变 
-                               tmp_vcf_fn,    // 局部变量必须拷贝，会变 
-                               tmp_cvg_fn));  // 局部变量必须拷贝，会变 
+                               tmp_vcf_fn));  // 局部变量必须拷贝，会变 
     }
 
     // Run and make sure all processes could be finished.
@@ -552,30 +540,28 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
         }
     }
     call_variants_processes.clear();  // release the thread
-
+  
     std::string header = "## No need header here";
     merge_file_by_line(subvcfs, out_vcf_fn, header, true);
-    merge_file_by_line(subcvgs, out_cvg_fn, header, true);
 
     return;
 }
 
 /// Functions for calling variants outside of 'BaseTypeRunner' class 
 // A unit for calling variants and let it run in a thread.
-bool _variant_calling_unit(const std::vector<std::string> &batchfiles, 
+bool _variant_calling_unit(const std::vector<std::string> &batchfiles,  // total batchfiles in the region
                            const std::vector<std::string> &sample_ids,  // total samples
                            const std::map<std::string, std::vector<size_t>> &group_smp_idx,
                            const double min_af,
                            const std::string region,    // genome region format like samtools
-                           const std::string tmp_vcf_fn,
-                           const std::string tmp_cvg_fn) 
+                           const std::string tmp_vcf_fn) 
 {
     clock_t cpu_start_time = clock();
     time_t real_start_time = time(0);
 
     /*************** Preparing for reading data **************/
+    // Get and check the sample id from batchfiles header.
     std::vector<std::string> bf_smp_ids = _get_sampleid_from_batchfiles(batchfiles);
-    // Check smaples id
     if (ngslib::join(bf_smp_ids, ",") != ngslib::join(sample_ids, ","))
         throw std::runtime_error("[BUG] The order of sample ids in batchfiles must be the same as "
                                  "input bamfiles.\n" 
@@ -586,11 +572,8 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
     std::vector<tbx_t*> batch_file_tbx;
     std::vector<hts_itr_t*> batch_file_itr;
     for (size_t i(0); i < batchfiles.size(); ++i) {
-
-        // Get and check the sample id from batchfiles header.
-        BGZF *f = bgzf_open(batchfiles[i].c_str(), "r");
-        f = bgzf_open(batchfiles[i].c_str(), "r"); // open again
-        batch_file_hds.push_back(f);               // record the file handle
+        BGZF *f = bgzf_open(batchfiles[i].c_str(), "r"); // open again
+        batch_file_hds.push_back(f);                     // record the file handle
 
         tbx_t *tbx = tbx_index_load(batchfiles[i].c_str());
         if (!tbx) {
@@ -611,19 +594,14 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
     BGZF *VCF = bgzf_open(tmp_vcf_fn.c_str(), "w"); // output vcf file
     if (!VCF) throw std::runtime_error("[ERROR] " + tmp_vcf_fn + " open failure.");
     
-    BGZF *CVG = bgzf_open(tmp_cvg_fn.c_str(), "w"); // output coverage file
-    if (!CVG) throw std::runtime_error("[ERROR] " + tmp_cvg_fn + " open failure.");
-
     std::vector<std::string> smp_bf_line_vector;
     smp_bf_line_vector.reserve(batchfiles.size());  // size number is as the same as batchfiles.
 
     bool is_eof(false), has_data(false);
     uint32_t n = 0;
     while (!is_eof) {
-        // clear the vector before next loop.
-        smp_bf_line_vector.clear();
+        smp_bf_line_vector.clear();  // clear the vector before next loop.
         for (size_t i(0); i < batchfiles.size(); ++i) {
-            
             // Fetch one line from each batchfile per loop and the row number of batchfiles must be the same.
             kstring_t s; s.s = NULL; s.l = s.m = 0; // must be refreshed in loop
             int eof = tbx_bgzf_itr_next(batch_file_hds[i], batch_file_tbx[i], batch_file_itr[i], &s);
@@ -642,8 +620,10 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
         }
 
         // Samples' data for each poistion is ready and calling variants now
-        bool cc = _basevar_caller(smp_bf_line_vector, group_smp_idx, min_af, sample_ids.size(), VCF, CVG);
-        if (cc && !has_data) has_data = cc;
+        if (!smp_bf_line_vector.empty()) {
+            bool cc = _basevar_caller(smp_bf_line_vector, group_smp_idx, min_af, sample_ids.size(), VCF);
+            if (cc && !has_data) has_data = cc;
+        }
     }
 
     // close all batchfiles
@@ -654,15 +634,14 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
             throw std::runtime_error("[ERROR] " + batchfiles[i] + " fail close.");
     }
 
-    // close VCF and CVG file
+    // close VCF file
     if (bgzf_close(VCF) < 0) throw std::runtime_error("[ERROR] " + tmp_vcf_fn + " fail close.");
-    if (bgzf_close(CVG) < 0) throw std::runtime_error("[ERROR] " + tmp_cvg_fn + " fail close.");
 
     // Time information
     time_t now = time(0);
     std::string ct(ctime(&now));
     ct.pop_back();
-    std::cout << "[INFO] " + ct + ". Done for creating [" + tmp_vcf_fn + ", " + tmp_cvg_fn + "], "
+    std::cout << "[INFO] " + ct + ". Done for creating " + tmp_vcf_fn + ", "
               << difftime(now, real_start_time) 
               << " (CPU time: " << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC 
               << ") seconds elapsed." << std::endl;
@@ -673,8 +652,8 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
 std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::string> &batchfiles) {
     // Get sample id from batchfiles header.
     std::vector<std::string> bf_smp_ids;
+    std::string smp_head_tag = "##SampleIDs=";  // header of sample ids in batchfiles
     for (size_t i(0); i < batchfiles.size(); ++i) {
-
         BGZF *f = bgzf_open(batchfiles[i].c_str(), "r");
         kstring_t s; s.s = NULL; s.l = s.m = 0;
 
@@ -682,7 +661,7 @@ std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::st
         while (bgzf_getline(f, '\n', &s) >= 0) {
             if (s.s[0] != '#') { // head char is '#' in batchfile.
                 break;
-            } else if (strncmp(s.s, "##SampleIDs=", 12) == 0) {
+            } else if (strncmp(s.s, smp_head_tag.c_str(), smp_head_tag.length()) == 0) {
                 // Header looks like: ##SampleIDs=smp1,smp2,smp3,...
                 std::vector<std::string> h; ngslib::split(s.s, h, "=");
 
@@ -701,135 +680,192 @@ std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::st
 
 bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, 
                      const std::map<std::string, std::vector<size_t>> &group_smp_idx,
-                     double min_af, 
-                     size_t n_sample,
-                     BGZF *vcf_hd, 
-                     BGZF *cvg_hd) 
+                     const double min_af, size_t n_sample, BGZF *vcf_hd) 
 {
-    // Initial
-    BatchInfo samples_bi;
+    // Initialize vectors with the size of 'batch_data_capacity'.
+    int batch_data_capacity = n_sample / smp_bf_line_vector.size() + 1;  // number of samples in each batchfile
+    std::vector<std::string> map_ref_bases;           map_ref_bases.reserve(batch_data_capacity);
+    std::vector<std::string> map_read_bases;          map_read_bases.reserve(batch_data_capacity);
+    std::vector<std::string> map_read_base_qualities; map_read_base_qualities.reserve(batch_data_capacity);
+    std::vector<std::string> read_pos_ranks;          read_pos_ranks.reserve(batch_data_capacity);
+    std::vector<std::string> mapqs;                   mapqs.reserve(batch_data_capacity);
+    std::vector<std::string> map_strands;             map_strands.reserve(batch_data_capacity);
 
-    // Prepare the capacity for saving time
-    samples_bi.align_bases.reserve(n_sample);
-    samples_bi.align_base_quals.reserve(n_sample);
-    samples_bi.mapqs.reserve(n_sample);
-    samples_bi.map_strands.reserve(n_sample);
-    samples_bi.base_pos_ranks.reserve(n_sample);
-    samples_bi.depth = 0;
-    samples_bi.n = n_sample;
+    // Initialize vectors with the size of 'n_sample'
+    std::vector<BaseType::BatchInfo> all_smps_bi_vector;
+    all_smps_bi_vector.reserve(n_sample);
 
-    std::vector<std::string> col_info;
+    std::string ref_id;
+    uint32_t ref_pos;   // 1-based position
+    int depth = 0;      // Total depth of all samples at this position
     bool keep_push_back = true;
+    std::vector<std::string> col_info;
+
+    // collect all data of each sample in a position
     for (size_t i(0); i < smp_bf_line_vector.size(); ++i) {
         // smp_bf_line_vector[i] format is: 
         // [CHROM, POS, REF, Depth, MappingQuality, Readbases, ReadbasesQuality, ReadPositionRank, Strand]
         // Looks like: chr11   5246595    C    10     37 0 0 0 0    ...
         ngslib::split(smp_bf_line_vector[i], col_info, "\t");
         if (col_info.size() != 9) {  // 9 is the column number of batchfile 
-            throw std::runtime_error("[ERROR] batchfile has invalid data:\n" + smp_bf_line_vector[i]);
+            throw std::runtime_error("[ERROR] batchfile has invalid data:\n" + 
+                                     smp_bf_line_vector[i]);
         }
 
         if (i == 0) {
-            samples_bi.ref_id   = col_info[0];             // chromosome id
-            samples_bi.ref_pos  = std::stoi(col_info[1]);  // string to int type
-            samples_bi.ref_base = col_info[2];
-            
-        } else if ((samples_bi.ref_id   != col_info[0])            || 
-                   (samples_bi.ref_pos  != std::stoi(col_info[1])) || 
-                   (samples_bi.ref_base != col_info[2])) 
-        {
-            throw std::runtime_error("[ERROR] Batchfiles must have the same genome coordinate in each line.");
+            ref_id  = col_info[0];             // chromosome id
+            ref_pos = std::stoi(col_info[1]);  // string to int type
+        } else if ((ref_id != col_info[0]) || (ref_pos != std::stoi(col_info[1]))) {
+            throw std::runtime_error("[ERROR] Batchfiles must have the same genome "
+                                     "coordinate in each line.");
         }
          
-        samples_bi.depth += std::stoi(col_info[3]);
-        ngslib::split(col_info[4], samples_bi.mapqs,            " ", keep_push_back);  // keep adding data to vector
-        ngslib::split(col_info[5], samples_bi.align_bases,      " ", keep_push_back);
-        ngslib::split(col_info[6], samples_bi.align_base_quals, " ", keep_push_back);
-        ngslib::split(col_info[7], samples_bi.base_pos_ranks,   " ", keep_push_back);
-        ngslib::split(col_info[8], samples_bi.map_strands,      " ", keep_push_back);
+        depth += std::stoi(col_info[3]);  // total depth of all samples at this position
+
+        ngslib::split(col_info[2], map_ref_bases,           " ");  // It's upper case already in batchfile.
+        ngslib::split(col_info[4], mapqs,                   " ");  
+        ngslib::split(col_info[5], map_read_bases,          " ");  // It's upper case already in batchfile.
+        ngslib::split(col_info[6], map_read_base_qualities, " ");
+        ngslib::split(col_info[7], read_pos_ranks,          " ");
+        ngslib::split(col_info[8], map_strands,             " ");
+
+        int batch_sample_num = map_read_bases.size();
+
+        // check data
+        if ((map_ref_bases.size()           != batch_sample_num) || 
+            (map_read_bases.size()          != batch_sample_num) || 
+            (map_read_base_qualities.size() != batch_sample_num) ||
+            (read_pos_ranks.size()          != batch_sample_num) ||
+            (mapqs.size()                   != batch_sample_num) || 
+            (map_strands.size()             != batch_sample_num))
+        {
+            std::cerr << ref_id << " " << ref_pos << " " << col_info[3]                    << "\t" << ngslib::join(map_ref_bases, " ")           << "\n" 
+                      << "bt.mapqs.size():             " << mapqs.size()                   << "\t" << ngslib::join(mapqs, " ")                   << "\n"
+                      << "bt.align_bases.size():       " << map_read_bases.size()          << "\t" << ngslib::join(map_read_bases, " ")          << "\n"
+                      << "bt.align_base_quals.size():  " << map_read_base_qualities.size() << "\t" << ngslib::join(map_read_base_qualities, " ") << "\n"
+                      << "bt.map_strands.size():       " << map_strands.size()             << "\t" << ngslib::join(map_strands, " ")             << "\n"
+                      << "bt.base_pos_ranks.size():    " << read_pos_ranks.size()          << "\t" << ngslib::join(read_pos_ranks, " ")          << "\n"
+                      << std::endl;
+
+            throw std::runtime_error("[ERROR] Something is wrong in batchfiles.");
+        }
+
+        // Create AlignInfo for each sample
+        for (size_t j(0); j < batch_sample_num; ++j) {
+            BaseType::BatchInfo smp_bi(ref_id, ref_pos);  // create a BatchInfo for each sample
+            ngslib::split(map_ref_bases[j],           smp_bi.ref_bases,        "|");
+            ngslib::split(mapqs[j],                   smp_bi.mapqs,            "|");
+            ngslib::split(map_read_bases[j],          smp_bi.align_bases,      "|");
+            ngslib::split(map_read_base_qualities[j], smp_bi.align_base_quals, "|");
+            ngslib::split(read_pos_ranks[j],          smp_bi.base_pos_ranks,   "|");
+            ngslib::split(map_strands[j],             smp_bi.map_strands,      "|");
+
+            all_smps_bi_vector.push_back(smp_bi);
+        }
     }
 
-    // Coverage is 0 of all samples on this position. skip
-    if (samples_bi.depth == 0) return false;
-    
+    if (depth == 0) return false; // no data at this position, return false
+
     // check data
-    if ((samples_bi.mapqs.size()            != n_sample) || 
-        (samples_bi.align_bases.size()      != n_sample) || 
-        (samples_bi.align_base_quals.size() != n_sample) || 
-        (samples_bi.map_strands.size()      != n_sample) || 
-        (samples_bi.base_pos_ranks.size()   != n_sample))
-    {
-        std::cerr << "Total samples size is: " << n_sample            << "\n" + samples_bi.ref_id    << " " 
-                  << samples_bi.ref_pos << " " << samples_bi.ref_base << " " << samples_bi.depth     << "\n" 
-                  << "bt.samples_bi.mapqs.size():            " << samples_bi.mapqs.size()            << "\t" << ngslib::join(samples_bi.mapqs, " ")            << "\n"
-                  << "bt.samples_bi.align_bases.size():      " << samples_bi.align_bases.size()      << "\t" << ngslib::join(samples_bi.align_bases, " ")      << "\n"
-                  << "bt.samples_bi.align_base_quals.size(): " << samples_bi.align_base_quals.size() << "\t" << ngslib::join(samples_bi.align_base_quals, " ") << "\n"
-                  << "bt.samples_bi.map_strands.size():      " << samples_bi.map_strands.size()      << "\t" << ngslib::join(samples_bi.map_strands, " ")      << "\n"
-                  << "bt.samples_bi.base_pos_ranks.size():   " << samples_bi.base_pos_ranks.size()   << "\t" << ngslib::join(samples_bi.base_pos_ranks, " ")   << "\n"
-                  << std::endl;
-        throw std::runtime_error("[ERROR] Something is wrong in batchfiles.");
+    if (all_smps_bi_vector.size() != n_sample) {
+        throw std::runtime_error("[ERROR] The number of samples does not match. It should be " + std::to_string(n_sample) + 
+                                 " but got " + std::to_string(all_smps_bi_vector.size()) + " samples in batchfiles for " + 
+                                 ref_id + " " + std::to_string(ref_pos) + ".\n");
     }
     
-    // output coverage first
-    _out_cvg_line(&samples_bi, group_smp_idx, cvg_hd);
+    // Detect variant at this position by using all samples
+    auto [bt, global_vi] = _basetype_caller_unit(all_smps_bi_vector, min_af);
+    
+    // check if there is a variant at this position
+    // 对 ale_bases 这里的 toupper 函数其实可以省略
+    bool is_variant = (global_vi.ale_bases.size() > 1) || 
+                      (!global_vi.ale_bases.empty() && 
+                        global_vi.ale_bases[0][0] !=
+                        global_vi.ref_bases[0][0]);  // 'ale_bases' and 'ref_bases' are all upper case already.
+    
+    if (is_variant) {    
+        // Collect and normalize allele information. Return the variant and allele information of this
+        // position and replace the align_bases in samples_batchinfo_vector with the normalized bases.
+        // AlleleInfo is a struct-type to collect and normalize allele information, which is used to 
+        // output VCF record.
+        AlleleInfo ai = collect_and_normalized_allele_info(global_vi, all_smps_bi_vector);
 
-    // Detect variant and output
-    BaseType bt(&samples_bi, min_af);
-    bt.lrt();
-
-    if (bt.get_alt_bases().size() && bt.is_only_snp()) { // only output SNPs in VCF file
-
-        std::map<std::string, BaseType> popgroup_bt;
+        std::map<std::string, BaseType> popgroup_bt;  // group_id => BaseType
         if (!group_smp_idx.empty()) { // group is not empty
-            std::vector<char> basecombination;
-            basecombination.push_back(toupper(bt.get_ref_base()[0]));  // push upper reference base. 
-            // do not sort, keep the original order as the same as 'alt_bases'
-            basecombination.insert(basecombination.end(), bt.get_alt_bases().begin(), bt.get_alt_bases().end());
-            
             // Call BaseType for each group
-            std::map<std::string, std::vector<size_t>>::const_iterator it = group_smp_idx.begin();
-            for (; it != group_smp_idx.end(); ++it) {
-                popgroup_bt[it->first] = __gb(&samples_bi, it->second, basecombination, min_af);
+            std::vector<std::string> basecombination;
+
+            basecombination.push_back(ai.ref); // reference base must be the first one
+            basecombination.insert(basecombination.end(), ai.alts.begin(), ai.alts.end());
+
+            std::map<std::string, std::vector<size_t>>::const_iterator sub_g_it = group_smp_idx.begin();
+            for (; sub_g_it != group_smp_idx.end(); ++sub_g_it) {
+                auto [g_bt, g_vi] = _basetype_caller_unit(all_smps_bi_vector,
+                                                          min_af,
+                                                          sub_g_it->second, // group index
+                                                          basecombination);
+                popgroup_bt[sub_g_it->first] = g_bt;
             }
         }
-        _out_vcf_line(bt, popgroup_bt, &samples_bi, vcf_hd);
+
+        VCFRecord vcf_record = _vcfrecord_in_pos(all_smps_bi_vector, global_vi, popgroup_bt, ai);
+
+        if (vcf_record.is_valid()) {
+            // write to file and check is successful or not.
+            std::string out = vcf_record.to_string() + "\n";
+            if (bgzf_write(vcf_hd, out.c_str(), out.length()) != out.length())
+                throw std::runtime_error("[ERROR] fail to write data");
+                
+        } else {
+            std::cerr << "[WARNING] Invalid VCF record at " << ref_id << ":" << ref_pos << " "
+                      << vcf_record.ref << " " << ngslib::join(vcf_record.alt, ",")
+                      << " ,skip writing this record.\n";
+        }
     }
 
-    return !bt.get_alt_bases().empty() && bt.is_only_snp();  // has SNP
+    // return true if there is a variant at this position
+    return is_variant; 
 }
 
-const BaseType __gb(const BatchInfo *smp_bi, 
-                    const std::vector<size_t> group_idx, 
-                    const std::vector<char> &basecombination, 
-                    double min_af) 
+std::pair<BaseType, VariantInfo> _basetype_caller_unit(const std::vector<BaseType::BatchInfo> &smps_bi_v, 
+                                                       const double min_af,
+                                                       const std::vector<size_t> group_idx, 
+                                                       const std::vector<std::string> basecombination)
 {
-    BatchInfo g_smp_bi = __get_group_batchinfo(smp_bi, group_idx);
-    BaseType bt(&g_smp_bi, min_af);
-    bt.lrt(basecombination);
-
-    return bt;
-}
-
-const BatchInfo __get_group_batchinfo(const BatchInfo *smp_bi, const std::vector<size_t> group_idx) {
-
-    BatchInfo g_smp_bi;
-    g_smp_bi.ref_id   = smp_bi->ref_id;
-    g_smp_bi.ref_pos  = smp_bi->ref_pos;
-    g_smp_bi.ref_base = smp_bi->ref_base;
-    g_smp_bi.depth    = smp_bi->depth;    // 这个深度肯定不是 group samples 的深度，但没关系，不会用到
-    g_smp_bi.n        = group_idx.size(); // sample size for speific group
-
-    for (auto i : group_idx) {
-        g_smp_bi.align_bases.push_back(smp_bi->align_bases[i]);
-        g_smp_bi.align_base_quals.push_back(smp_bi->align_base_quals[i]);
-        g_smp_bi.mapqs.push_back(smp_bi->mapqs[i]);
-        g_smp_bi.map_strands.push_back(smp_bi->map_strands[i]);
-        g_smp_bi.base_pos_ranks.push_back(smp_bi->base_pos_ranks[i]);
+    // 如果 group_idx 为空,使用所有样本的索引
+    std::vector<size_t> indices;
+    if (group_idx.empty()) {
+        indices.reserve(smps_bi_v.size());
+        for (size_t i = 0; i < smps_bi_v.size(); ++i) {
+            indices.push_back(i);
+        }
+    } else {
+        indices = group_idx;
+    }
+    
+    BaseType::BatchInfo all_smps_bi(smps_bi_v[0].ref_id, smps_bi_v[0].ref_pos);
+    for (auto i : indices) {
+        for (size_t j(0); j < smps_bi_v[i].ref_bases.size(); ++j) {
+            all_smps_bi.ref_bases.push_back(smps_bi_v[i].ref_bases[j]);     // It's upper case already in batchfile.
+            all_smps_bi.align_bases.push_back(smps_bi_v[i].align_bases[j]); // It's upper case already in batchfile.
+            all_smps_bi.align_base_quals.push_back(smps_bi_v[i].align_base_quals[j]);
+            all_smps_bi.mapqs.push_back(smps_bi_v[i].mapqs[j]);
+            all_smps_bi.map_strands.push_back(smps_bi_v[i].map_strands[j]);
+            all_smps_bi.base_pos_ranks.push_back(smps_bi_v[i].base_pos_ranks[j]);
+        }
     }
 
-    return g_smp_bi;
-}
+    BaseType bt(&all_smps_bi, min_af);
+    if (basecombination.empty()) {
+        // If basecombination is empty, use the default reference base
+        bt.lrt();
+    } else {
+        // If basecombination is not empty, use the provided basecombination
+        bt.lrt(basecombination);
+    } 
 
+    return {bt, get_pos_variant_info(bt, &all_smps_bi)};
+}
 
 bool __create_a_batchfile(const std::vector<std::string> batch_align_files,  
                           const std::vector<std::string> batch_sample_ids,   
@@ -878,7 +914,8 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
         }
 
         /* Output batchfile, no matter 'batchsamples_posinfomap_vector' is empty or not. */
-        __write_record_to_batchfile(batchsamples_posinfomap_vector, fa_seq,
+        __write_record_to_batchfile(batchsamples_posinfomap_vector, 
+                                    fa_seq,
                                     ngslib::GenomeRegion(gr.chrom, sub_reg_beg, sub_reg_end), 
                                     obf);
         batchsamples_posinfomap_vector.clear();  // 必须清空，为下个循环做准备
@@ -920,16 +957,15 @@ bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
 
     uint32_t extend_start = gr.start > REG_EXPEND_SIZE ? gr.start - REG_EXPEND_SIZE : 1;  // 1-based
     uint32_t extend_end   = gr.end + REG_EXPEND_SIZE;
-    std::string extend_regstr = gr.chrom + ":" + std::to_string(extend_start) + "-" + std::to_string(extend_end);
+    std::string extend_rgstr = gr.chrom + ":" + std::to_string(extend_start) + "-" + std::to_string(extend_end);
 
     // Loop all alignment files
     bool is_empty = true;
     for(size_t i(0); i < batch_align_files.size(); ++i) {
-        ngslib::Bam bf(batch_align_files[i], "r");  // open bamfile in reading mode (one sample, one bamfile)
-
         // 位点信息存入该变量, 且由于是按区间读取比对数据，key 值无需再包含 ref_id，因为已经不言自明。
         PosMap sample_posinfo_map;
-        if (bf.fetch(extend_regstr)) { // Set 'bf' only fetch alignment reads in 'exp_regstr'.
+        ngslib::Bam bf(batch_align_files[i], "r");  // open bamfile in reading mode (one sample, one bamfile)
+        if (bf.fetch(extend_rgstr)) { // Set 'bf' only fetch alignment reads in 'exp_rgstr'.
             hts_pos_t map_ref_start, map_ref_end;  // hts_pos_t is uint64_t
             std::vector<ngslib::BamRecord> sample_target_reads; 
             ngslib::BamRecord al;       // alignment read
@@ -986,22 +1022,17 @@ void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,
         throw std::runtime_error("[basetype.cpp::__seek_position] 'sample_posinfo_map' must be empty.");
     }
 
-    AlignBaseInfo align_base_info;
-    align_base_info.ref_id = gr.chrom;
-
     // A vector of: (cigar_op, read position, reference position, read base, read_qual, reference base)
     std::vector<ngslib::ReadAlignedPair> aligned_pairs;
+    std::set<uint32_t> indel_pos_set;
     for(auto &al: sample_map_reads) {
+        AlignBase ab;
+        ab.map_strand = al.map_strand();  // '*', '-' or '+'
+        ab.mapq = al.mapq();
 
-        align_base_info.map_strand = al.map_strand();  // '*', '-' or '+'
-        align_base_info.mapq = al.mapq();
-
-        aligned_pairs = al.get_aligned_pairs(fa_seq);
-        char mean_qqual_char = int(al.mean_qqual()) + 33; // 33 is the offset of base QUAL
         uint32_t map_ref_pos;
+        aligned_pairs = al.get_aligned_pairs(fa_seq);
         for (size_t i(0); i < aligned_pairs.size(); ++i) {
-            // Todo: data of 'align_base_info' and 'aligned_pairs[i]' is similar, 
-            // just use 'aligned_pairs[i]' to replace 'align_base_info'?
             map_ref_pos = aligned_pairs[i].ref_pos + 1;  // ref_pos is 0-based, convert to 1-based;
 
             if (gr.end < map_ref_pos) break;
@@ -1012,52 +1043,98 @@ void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,
                 aligned_pairs[i].op == BAM_CEQUAL ||  /* CIGAR: = */
                 aligned_pairs[i].op == BAM_CDIFF)     /* CIGAR: X */
             {
-                // One character
-                align_base_info.ref_base       = aligned_pairs[i].ref_base[0];
-                align_base_info.read_base      = aligned_pairs[i].read_base[0];
-                align_base_info.read_base_qual = aligned_pairs[i].read_qual[0];
+                // SNV. Only one base in 'ref_base' and 'read_base'.
+                ab.ref_base  = aligned_pairs[i].ref_base[0];
+                ab.read_base = aligned_pairs[i].read_base[0];
+                ab.base_qual = aligned_pairs[i].read_qual[0];
             } else if (aligned_pairs[i].op == BAM_CINS) {  /* CIGAR: I */
+                // Insertion. 'ref_base' is empty, 'read_base' is the inserted bases.
                 if (!aligned_pairs[i].ref_base.empty()) {
                     std::cerr << al << "\n";
                     throw std::runtime_error("[ERROR] We got reference base in insertion region.");
                 }
 
-                // roll back one position to the left side of insertion break point.
-                --map_ref_pos;
-                align_base_info.ref_base       = fa_seq[aligned_pairs[i].ref_pos-1]; // break point's ref base
-                align_base_info.read_base      = fa_seq[aligned_pairs[i].ref_pos-1] + aligned_pairs[i].read_base;
-                align_base_info.read_base_qual = mean_qqual_char;  // set to be mean quality of the whole read
+                // do not roll back position here
+                ab.ref_base  = "";  // empty reference base
+                ab.read_base = "+" + aligned_pairs[i].read_base;  // insertion bases
+
+                // mean quality of the whole insertion sequence
+                double total_qual = 0.0;
+                for (char q : aligned_pairs[i].read_qual) {
+                    total_qual += (q - 33);  // convert to int type
+                }
+                ab.base_qual = static_cast<char>(total_qual / aligned_pairs[i].read_qual.size() + 33); // convert to char type
+
             } else if (aligned_pairs[i].op == BAM_CDEL) {  /* CIGAR: D */
+                // Deletion. 'read_base' is empty, 'ref_base' is the deleted bases.
                 if (!aligned_pairs[i].read_base.empty()) {
                     std::cerr << al << "\n";
                     throw std::runtime_error("[ERROR] We got read bases in deletion region.");
                 }
 
-                // roll back one position to the left side of deletion break point.
-                --map_ref_pos;
-                align_base_info.ref_base       = fa_seq[aligned_pairs[i].ref_pos-1] + aligned_pairs[i].ref_base;
-                align_base_info.read_base      = fa_seq[aligned_pairs[i].ref_pos-1]; // break point's ref base
-                align_base_info.read_base_qual = mean_qqual_char;  // set to be mean quality of the whole read
-            } else { 
+                // do not roll back position here
+                ab.ref_base  = aligned_pairs[i].ref_base;
+                ab.read_base = "-" + aligned_pairs[i].ref_base;  // aligned_pairs[i].ref_base 识别用的 (后面不直接用，要替换的)，同位点可以有多类型的 DEL 
+
+                // mean quality of the whole deletion sequence
+                ab.base_qual = static_cast<char>(al.mean_qqual() + 33); // convert to char type
+            } else {
                 // Skip in basevar for other kind of CIGAR symbals.
                 continue;
             }
-            align_base_info.ref_pos = map_ref_pos;
 
             // qpos is 0-based, conver to 1-based to set the rank of base on read.
-            align_base_info.rpr = aligned_pairs[i].qpos + 1;
-            if (align_base_info.read_base_qual < min_baseq + 33) {
-                // Skip this base if its quality is lower than 'min_baseq'
-                continue;
-            }
+            ab.rpr = aligned_pairs[i].qpos + 1;
+            if (ab.base_qual < min_baseq + 33) continue; // Skip low quality bases, 33 is the offset of base QUAL
 
+            // Need to convert the ref and read_base to upper case if it is a insertion in case of the read base is a lower case.
+            std::transform(ab.ref_base.begin(), ab.ref_base.end(), ab.ref_base.begin(), ::toupper);
+            std::transform(ab.read_base.begin(), ab.read_base.end(), ab.read_base.begin(), ::toupper);
+
+            // 以 map_ref_pos 为 key，将所有的 read_bases 信息存入 map 中，多个突变共享同个 ref_pos
             if (sample_posinfo_map.find(map_ref_pos) == sample_posinfo_map.end()) {
-                // Just get the base from first read which aligned on this ref_pos,
-                // no matter the first one it's indel or not.
-
-                // {ref_pos (no need to add ref_id in the key) => map info}
-                sample_posinfo_map.insert({map_ref_pos, align_base_info});
+                AlignInfo pos_align_info(gr.chrom, map_ref_pos);
+                sample_posinfo_map.insert({map_ref_pos, pos_align_info});
             }
+
+            // collected all the align base infromations of the mapping read and store it into the map
+            sample_posinfo_map[map_ref_pos].align_bases.push_back(ab);
+
+            // Record the reference position for Indels
+            if (ab.read_base[0] == '-' || ab.read_base[0] == '+') {
+                indel_pos_set.insert(map_ref_pos);
+            }
+        }
+    }
+
+    // 对于 Indel 位点，按照 Indel 优先原则对位点的 align info 做修改
+    for (auto pos: indel_pos_set) {
+        uint32_t leftmost_pos = pos > 1 ? pos - 1 : pos; // roll back one position to the leftmost of Indels break point.
+        AlignInfo raw_align_info = sample_posinfo_map[pos];
+        sample_posinfo_map.erase(pos);
+
+        AlignInfo indel_info(raw_align_info.ref_id, leftmost_pos);  // record Indels on the leftmost position
+        AlignInfo non_indel_info(raw_align_info.ref_id, pos);       // raw position for non-indel variants
+        for (auto ab: raw_align_info.align_bases) {
+            if (ab.read_base[0] == '-' || ab.read_base[0] == '+') {
+                ab.ref_base = fa_seq[leftmost_pos - 1] + ab.ref_base;  // add one leftmost ref-base
+                indel_info.align_bases.push_back(ab); // 同位点可以有多类型的 DEL/INS
+            } else {
+                non_indel_info.align_bases.push_back(ab);
+            }
+        }
+
+        if (indel_info.align_bases.empty()) {
+            throw std::runtime_error("[ERROR] Must get at least one Indel here.");
+        } else {
+            // 如果 leftmost_pos 的位点信息将被 Indel 信息覆盖
+            sample_posinfo_map[leftmost_pos] = indel_info;
+        }
+
+        // If there is still non-Indel information, we still need to keep the information
+        // at the original position.
+        if (non_indel_info.align_bases.size() > 0) {
+            sample_posinfo_map[pos] = non_indel_info;
         }
     }
 
@@ -1070,52 +1147,64 @@ void __write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vec
                                  const ngslib::GenomeRegion gr, 
                                  BGZF *obf) 
 {
-    const static char BASE_Q0_ASCII = '!';  // The ascii code of '!' character is 33
+    const static std::string BASE_Q0_ASCII = "!";  // The ascii code of '!' character is 33
 
     // Output columns and set zhe capacity for each vector: 
     // [CHROM, POS, REF, Depth(CoveredSample), MappingQuality, 
     //  Readbases, ReadbasesQuality, ReadPositionRank, Strand]
     size_t sn = batchsamples_posinfomap_vector.size();
-    std::vector<int> mapq;                     mapq.reserve(sn);
-    std::vector<std::string> map_read_bases;   map_read_bases.reserve(sn);
-    std::vector<char> map_read_base_qualities; map_read_base_qualities.reserve(sn);
-    std::vector<int> read_pos_ranks;           read_pos_ranks.reserve(sn);
-    std::vector<char> map_strands;             map_strands.reserve(sn);
+
+    // Initialize vectors with the size of 'sn'.
+    std::vector<std::string> map_ref_bases;           map_ref_bases.reserve(sn);
+    std::vector<std::string> map_read_bases;          map_read_bases.reserve(sn);
+    std::vector<std::string> map_read_base_qualities; map_read_base_qualities.reserve(sn);
+    std::vector<std::string> read_pos_ranks;          read_pos_ranks.reserve(sn);
+    std::vector<std::string> mapq;                    mapq.reserve(sn);
+    std::vector<std::string> map_strands;             map_strands.reserve(sn);
 
     for (uint32_t pos(gr.start); pos < gr.end+1; ++pos) {
-
         PosMap::const_iterator smp_pos_it;  // specifi sample position map
         uint32_t depth = 0;
+
         for (size_t i = 0; i < sn; i++) {
             smp_pos_it = batchsamples_posinfomap_vector[i].find(pos);
             if (smp_pos_it != batchsamples_posinfomap_vector[i].end()) {
-
-                ++depth;
                 if (smp_pos_it->second.ref_id != gr.chrom || smp_pos_it->second.ref_pos != pos)
                     throw std::runtime_error("[ERROR] reference id or position not match.");
                 
-                mapq.push_back(smp_pos_it->second.mapq);
-                if (smp_pos_it->second.ref_base.size() == smp_pos_it->second.read_base.size()) { // SNV
-                    map_read_bases.push_back(smp_pos_it->second.read_base);
-                } else if (smp_pos_it->second.ref_base.size() < smp_pos_it->second.read_base.size()) {  // INS
-                    map_read_bases.push_back("+" + smp_pos_it->second.read_base);
-                } else { // DEL
-                    map_read_bases.push_back("-" + smp_pos_it->second.ref_base);
-                }
-                map_read_base_qualities.push_back(smp_pos_it->second.read_base_qual);
-                read_pos_ranks.push_back(smp_pos_it->second.rpr);
-                map_strands.push_back(smp_pos_it->second.map_strand);
+                depth += smp_pos_it->second.align_bases.size();  // accumulate depth
+                
+                BaseType::BatchInfo smp_bi;
+                for (const auto &ab : smp_pos_it->second.align_bases) {
+                    // REF may be single base for SNVs or a sub-seq for Indels
+                    smp_bi.ref_bases.push_back(ab.ref_base);
+                    smp_bi.align_bases.push_back(ab.read_base);
+                    smp_bi.align_base_quals.push_back(ab.base_qual);
+                    smp_bi.base_pos_ranks.push_back(ab.rpr);
 
+                    smp_bi.mapqs.push_back(ab.mapq);
+                    smp_bi.map_strands.push_back(ab.map_strand);
+                }
+
+                map_ref_bases.push_back(ngslib::join(smp_bi.ref_bases, "|"));  
+                map_read_bases.push_back(ngslib::join(smp_bi.align_bases, "|"));
+                map_read_base_qualities.push_back(ngslib::join(smp_bi.align_base_quals, "|"));
+                read_pos_ranks.push_back(ngslib::join(smp_bi.base_pos_ranks, "|"));
+                mapq.push_back(ngslib::join(smp_bi.mapqs, "|"));
+                map_strands.push_back(ngslib::join(smp_bi.map_strands, "|"));
             } else {
-                mapq.push_back(0);
-                map_read_bases.push_back("N");
+                // If the sample does not have any reads on this position, set default values.
+                map_ref_bases.push_back("N"); 
+                map_read_bases.push_back("N"); 
                 map_read_base_qualities.push_back(BASE_Q0_ASCII);
-                read_pos_ranks.push_back(0);
-                map_strands.push_back('.');
+                read_pos_ranks.push_back("0");
+                mapq.push_back("0");
+                map_strands.push_back("*");  // no strand information
             }
         }
 
-        std::string out = gr.chrom + "\t" + std::to_string(pos) + "\t" + fa_seq[pos-1] + "\t" + 
+        std::string out = gr.chrom + "\t" + std::to_string(pos)      + "\t" + 
+                          ngslib::join(map_ref_bases, " ")           + "\t" + 
                           std::to_string(depth)                      + "\t" + 
                           ngslib::join(mapq, " ")                    + "\t" + 
                           ngslib::join(map_read_bases, " ")          + "\t" + 
@@ -1128,203 +1217,127 @@ void __write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vec
             throw std::runtime_error("[ERROR] fail to write data");
 
         // clear up 
-        mapq.clear();
+        map_ref_bases.clear();
         map_read_bases.clear();
         map_read_base_qualities.clear();
         read_pos_ranks.clear();
+        mapq.clear();
         map_strands.clear();
     }
 
     return;
 }
 
-void _out_vcf_line(const BaseType &bt, 
-                   const std::map<std::string, BaseType> &group_bt, 
-                   const BatchInfo *smp_bi, 
-                   BGZF *vcf_hd) 
-{
+VariantInfo get_pos_variant_info(const BaseType &bt, const BaseType::BatchInfo *smp_bi) {
+    VariantInfo vi(bt.get_ref_id(), bt.get_ref_pos(), bt.get_total_depth(), bt.get_var_qual()+0.5);
+    int major_allele_depth = 0;
+    vi.major_allele_idx    = 0;
 
-    std::map<char, std::string> alt_gt;
-    std::vector<int> cm_ac; 
-    std::vector<double> cm_af, cm_caf;
-    double ad_sum = 0;
-    for (size_t i(0); i < bt.get_alt_bases().size(); ++i) {
+    for (size_t i(0); i < bt.get_active_bases().size(); ++i) {
+        std::string b = bt.get_active_bases()[i];
+        std::string ref_base = bt.get_bases2ref().at(b);
 
-        char b = bt.get_alt_bases()[i];
-        alt_gt[b] = "./" + std::to_string(i+1);
+        vi.ref_bases.push_back(ref_base); // could only be ref-base
+        vi.ale_bases.push_back(b);        // could be ref or non-ref alleles
+        vi.depths.push_back(bt.get_base_depth(b));
+        vi.freqs.push_back(bt.get_lrt_af(b));
 
-        ad_sum = ad_sum + bt.get_base_depth(b);
-        cm_ac.push_back(bt.get_base_depth(b));
-        cm_af.push_back(bt.get_lrt_af(b));
-        cm_caf.push_back(bt.get_base_depth(b) / bt.get_total_depth());  // Allele frequency by read count
-    }
-
-    // Sample genotype information
-    std::vector<std::string> samples;
-    std::vector<char> align_bases;  // used in ranksumtest
-    std::string gt;
-    char upper_ref_base = toupper(bt.get_ref_base()[0]);  // only for SNPs
-
-    for (size_t i(0); i < smp_bi->n; ++i) { // loop all samples
-        // Todo: 因为每个样本只留了一个碱基，先这样 后续要改进
-        char fb = smp_bi->align_bases[i][0];  // a string, get first base
-        align_bases.push_back(fb);            // only get the first base, suit for SNPs
-
-        if (fb != 'N' && fb != '+' && fb != '-') {
-            // For the base which not in bt.get_alt_bases()
-            if (alt_gt.find(fb) == alt_gt.end()) alt_gt[fb] = "./.";
-            gt = (fb == upper_ref_base) ? "0/." : alt_gt[fb];
-
-            double qual = bt.get_qual_pvalue()[i];
-            std::vector<int> pl = calculatePL(fb, upper_ref_base, qual);
-
-            // GT:PL:AB:SO:BP
-            samples.push_back(gt + ":" + ngslib::join(pl, ",") + ":" + fb + ":" + smp_bi->map_strands[i] + ":" + std::to_string(qual));
-        } else {
-            samples.push_back("./.");  // 'N' or Indel.
+        if (major_allele_depth < bt.get_base_depth(b)) {
+            vi.major_allele_idx = i;
+            major_allele_depth  = bt.get_base_depth(b);
         }
     }
 
-    // For INFO
-    std::string alt_bases_string = ngslib::join(bt.get_alt_bases(), "");
+    // calculate the Strand Bias
+    for (size_t i(0); i < vi.ale_bases.size(); ++i) {
+        vi.strand_bias.push_back(strand_bias(vi.ale_bases[vi.major_allele_idx],
+                                             vi.ale_bases[i],
+                                             smp_bi->align_bases,
+                                             smp_bi->map_strands));
+    }
 
-    // Rank Sum Test for mapping qualities of REF versus ALT reads
-    int mq_rank_sum = ref_vs_alt_ranksumtest(upper_ref_base, alt_bases_string, align_bases, smp_bi->mapqs);
+    return vi;
+}
 
-    // Rank Sum Test for variant appear position among read of REF versus ALT
-    int read_pos_rank_sum = ref_vs_alt_ranksumtest(upper_ref_base, alt_bases_string, align_bases, smp_bi->base_pos_ranks);
-    
-    // Rank Sum Test for base quality of REF versus ALT
-    int base_q_rank_sum = ref_vs_alt_ranksumtest(upper_ref_base, alt_bases_string, align_bases, smp_bi->align_base_quals);
+VCFRecord _vcfrecord_in_pos(const std::vector<BaseType::BatchInfo> &samples_batchinfo_vector, // has been normalized with ref and alt bases by 'global_variant_info'
+                            const VariantInfo &global_variant_info,
+                            const std::map<std::string, BaseType> &group_bt, 
+                            AlleleInfo &ai)
+{
+    // Return empty record if no variants
+    if (samples_batchinfo_vector.empty()) return VCFRecord();
 
-    // Variant call confidence normalized by depth of sample reads supporting a variant.
-    double qd = bt.get_var_qual() / ad_sum; 
-    if (qd == 0) qd = 0.0; // make sure -0.0 => 0.0
+    VCFRecord vcf_record;
+    vcf_record.chrom = global_variant_info.ref_id;  // all samples should have the same ref_id
+    vcf_record.pos   = global_variant_info.ref_pos; // all samples should have the same ref_pos
+    vcf_record.qual  = global_variant_info.qual;    // variant quality score, use the one from VariantInfo
+    vcf_record.ref   = ai.ref;                      // normalized reference base (upper case) at this position
+    vcf_record.alt   = ai.alts;                     // normalized alternative bases (upper case) at this position
 
-    // Strand bias by fisher exact test and Strand bias estimated by the Symmetric Odds Ratio test.
-    StrandBiasInfo sbi = strand_bias(upper_ref_base, alt_bases_string, align_bases, smp_bi->map_strands);
+    // Add FORMAT field
+    vcf_record.format = "GT:GQ:PL:AD:DP";  // Genotype, Genotype Quality, Phred-scaled likelihoods of genotypes, Active allele depth, total coverage reads
+    for (const auto &smp_bi : samples_batchinfo_vector) { // Loop all samples in the batch file
+        // For each sample, we need to collect the genotype information
+        auto sa = process_sample_variant(vcf_record.ref, vcf_record.alt, smp_bi);
 
-    // construct the INFO field.
+        // Update allele counts: include both ref and alt alleles
+        for (const auto& alt : sa.sample_alts) {
+            ai.allele_counts[alt]++;
+            ai.total_alleles++;
+        }
+
+        // Format sample string in GT:PL:AD:DP, returned string is likely "0/1:100,50,0:30:80"
+        vcf_record.samples.push_back(format_sample_string(sa));
+    }
+
+    // Construct the INFO field, like "AC=1;AN=2;AF=0.5;DP=14;DP4=10,4,0,0;"
+    std::vector<int> ac;
+    std::vector<double> af, caf;
+    std::vector<double> fs, sor;
+    std::vector<int> dp4({ai.strand_bias_info[ai.ref].fwd, ai.strand_bias_info[ai.ref].rev});
+    for (const auto& alt : vcf_record.alt) { 
+        // Only record the counts (AC) and frequencies (AF) of non-ref allele in INFO field
+        ac.push_back(ai.allele_counts[alt]);
+        af.push_back(ai.allele_freqs[alt]);  // allele frequency by LRT
+        caf.push_back(ai.allele_counts[alt]/double(ai.total_alleles));
+
+        dp4.push_back(ai.strand_bias_info[alt].fwd);  // alt_fwd
+        dp4.push_back(ai.strand_bias_info[alt].rev);  // alt_rev
+        fs.push_back(ai.strand_bias_info[alt].fs);    // strand bias
+        sor.push_back(ai.strand_bias_info[alt].sor);  // symmetric odds ratio
+    }
+
     std::vector<std::string> info = {
-        "CM_DP="  + std::to_string(bt.get_total_depth()),
-        "CM_AC="  + ngslib::join(cm_ac, ","),
-        "CM_AF="  + ngslib::join(cm_af, ","), 
-        "CM_CAF=" + ngslib::join(cm_caf, ","),
-        "MQRankSum="      + std::to_string(mq_rank_sum),
-        "ReadPosRankSum=" + std::to_string(read_pos_rank_sum),
-        "BaseQRankSum="   + std::to_string(base_q_rank_sum),
-        "QD="     + std::to_string(qd),  // use 'roundf(qd * 1000) / 1000' to round the value to 3 decimal places
-        "SOR="    + std::to_string(sbi.sor),
-        "FS="     + std::to_string(sbi.fs), 
-        "SB_REF=" + std::to_string(sbi.ref_fwd) + "," + std::to_string(sbi.ref_rev),
-        "SB_ALT=" + std::to_string(sbi.alt_fwd) + "," + std::to_string(sbi.alt_rev)
+        "AF="  + ngslib::join(af, ","), 
+        "CAF=" + ngslib::join(caf, ","),
+        "AC="  + ngslib::join(ac, ","),
+        "AN="  + std::to_string(ai.total_alleles),  // AN,total number of alleles
+        "DP="  + std::to_string(ai.total_dp),       // DP, total depth of coverage
+        "DP4=" + ngslib::join(dp4, ","),
+        "FS="  + ngslib::join(fs, ","),
+        "SOR=" + ngslib::join(sor, ",")
     };
 
-    if (!group_bt.empty()) { // not empty
+    // Add group allele frequency information if available
+    if (!group_bt.empty()) {
         std::vector<std::string> group_af_info;
         for (std::map<std::string, BaseType>::const_iterator it(group_bt.begin()); it != group_bt.end(); ++it) {
 
             std::vector<double> af;
-            char b;
-            for (auto b : it->second.get_alt_bases()) {
+            for (auto b : it->second.get_active_bases()) {
+                if (b == ai.ref) continue;  // skip reference base
+
                 af.push_back(it->second.get_lrt_af(b));
             }
 
-            if (!af.empty())  // has group AF
+            if (!af.empty()) {
                 group_af_info.push_back(it->first + "_AF=" + ngslib::join(af, ",")); // groupID_AF=xxx,xxx
+            }
         }
         info.insert(info.end(), group_af_info.begin(), group_af_info.end());
     }
 
-    std::string sample_format = "GT:PL:AB:SO:BP";
-    std::string qs  = (bt.get_var_qual() > QUAL_THRESHOLD) ? "." : "LowQual";
-    std::string out = bt.get_ref_id() + "\t" + std::to_string(bt.get_ref_pos()) + "\t.\t" + bt.get_ref_base() + "\t" + 
-                      ngslib::join(bt.get_alt_bases(), ",") + "\t" + std::to_string(bt.get_var_qual()) + "\t" + 
-                      qs + "\t" + ngslib::join(info, ";")   + "\t" + sample_format + "\t" + 
-                      ngslib::join(samples, "\t") + "\n";
-    // write to file and check is successful or not.
-    if (bgzf_write(vcf_hd, out.c_str(), out.length()) != out.length())
-        throw std::runtime_error("[ERROR] fail to write data");
+    vcf_record.info = ngslib::join(info, ";");
 
-    return;
-}
-
-void _out_cvg_line(const BatchInfo *smp_bi, 
-                   const std::map<std::string, std::vector<size_t>> & group_smp_idx, 
-                   BGZF *cvg_hd) 
-{
-    // base depth and indels for each subgroup
-    std::map<std::string, IndelTuple> group_cvg;
-    // Call BaseType for each group
-    std::map<std::string, std::vector<size_t>>::const_iterator it = group_smp_idx.begin();
-    for (; it != group_smp_idx.end(); ++it) {
-        const BatchInfo g_smp_bi = __get_group_batchinfo(smp_bi, it->second);
-        group_cvg[it->first] = __base_depth_and_indel(g_smp_bi.align_bases);
-    } // group_cvg 信息计算了，因为有 bug 未用上（2024-09-05）
-
-    std::map<char, int> base_depth;
-    std::string indel_string;
-    // coverage info for each position
-    std::tie(indel_string, base_depth) = __base_depth_and_indel(smp_bi->align_bases);
-
-    std::vector<char> align_bases;  // used in ranksumtest
-    for (size_t i(0); i < smp_bi->n; ++i) {
-        char fb = smp_bi->align_bases[i][0];  // a string, get first base
-        align_bases.push_back(fb); 
-    }
-
-    char upper_ref_base = toupper(smp_bi->ref_base[0]);  // only for SNPs
-    std::vector<char> alt_bases;  // used in ranksumtest
-    int total_depth = 0;
-    for (std::map<char, int>::iterator it(base_depth.begin()); it != base_depth.end(); ++it) {
-        total_depth += it->second;
-        if (it->first != upper_ref_base) {
-            alt_bases.push_back(it->first);
-        }
-    }
-
-    StrandBiasInfo sbi = strand_bias(upper_ref_base, ngslib::join(alt_bases, ""), align_bases, smp_bi->map_strands);
-    if (total_depth > 0) {
-        std::vector<int> dd;
-        for (auto b : BASES) dd.push_back(base_depth[b]);
-        std::string out = smp_bi->ref_id              + "\t" + std::to_string(smp_bi->ref_pos) + "\t" + 
-                          smp_bi->ref_base            + "\t" + std::to_string(total_depth)     + "\t" + 
-                          ngslib::join(dd, "\t")      + "\t" + indel_string                    + "\t" +
-                          std::to_string(sbi.fs)      + "\t" + std::to_string(sbi.sor)         + "\t" +
-                          std::to_string(sbi.ref_fwd) + ","  + std::to_string(sbi.ref_rev)     + ","  +
-                          std::to_string(sbi.alt_fwd) + ","  + std::to_string(sbi.alt_rev)     + "\n";
-        if (bgzf_write(cvg_hd, out.c_str(), out.length()) != out.length())
-            throw std::runtime_error("[ERROR] fail to write data");
-    }
-
-    return;
-}
-
-
-IndelTuple __base_depth_and_indel(const std::vector<std::string> &align_bases) {
-// bug: indel 没被正常输出，而是被跳过了 (原因是在 batchfile 时，优先输出了 snp，而不是 indels 怎被设为 0 覆盖)
-    std::map<char, int> base_depth;
-    std::string indel_string;
-
-    for (auto b : BASES) base_depth[b] = 0;
-
-    std::map<std::string, int> indel_depth;
-    for (auto bs: align_bases) {
-        if (bs[0] == 'N') continue;
-
-        if (base_depth.find(bs[0]) != base_depth.end()) {
-            // ignore all bases('*') which not match ``BASE``
-            base_depth[bs[0]]++;
-        } else {
-            // indel
-            indel_depth[bs]++;
-        }
-    }
-
-    std::vector<std::string> indels;
-    for (std::map<std::string, int>::iterator it(indel_depth.begin()); it != indel_depth.end(); ++it) {
-        indels.push_back(it->first + "|" + std::to_string(it->second));
-    }
-    indel_string = (!indels.empty()) ? ngslib::join(indels, ",") : ".";
-    return std::make_tuple(indel_string, base_depth);
+    return vcf_record;
 }

@@ -7,7 +7,6 @@
  * @date 2018-08-29
  * 
  */
-
 #ifndef __INCLUDE_BASETYPE_CALLER_H__
 #define __INCLUDE_BASETYPE_CALLER_H__
 
@@ -24,13 +23,13 @@
 #include "io/fasta.h"
 #include "io/bam.h"
 #include "io/utils.h"
-#include "external/robin_hood.h"
-#include "external/thread_pool.h"
 
-#include "basetype.h"
 #include "basetype_utils.h"
+#include "basetype.h"
 #include "algorithm.h"
 #include "version.h"
+
+#include "external/thread_pool.h"
 
 static const bool IS_DELETE_CACHE_BATCHFILE = true;
 
@@ -43,7 +42,6 @@ public:
     struct BaseTypeARGS {
         /* Variables for all the commandline options of BaseType */
         std::vector<std::string> input_bf;  // BAM/SAM/CRAM file, a vector
-        std::string in_bamfilelist;         // BAM/CRAM files list, one file per row
         std::string reference;              // Input reference fasta file
 
         float min_af;                       // Setting prior precision of MAF and skip uneffective caller positions
@@ -55,7 +53,6 @@ public:
         std::string regions;                // Interval regions
         std::string pop_group_file;         // Specific population
         std::string output_vcf;             // Output VCF file
-        std::string output_cvg;             // Output coverage file
 
         bool filename_has_samplename;       // sample name in file name
         bool smart_rerun;                   // Smart rerun by checking batchfiles
@@ -95,7 +92,7 @@ private:
     std::vector<ngslib::GenomeRegion> _calling_intervals;    // vector of calling regions
 
     // templary output files
-    std::vector<std::string> _sub_out_vcf, _sub_out_cvg;
+    std::vector<std::string> _sub_out_vcf;
 
     void _get_calling_interval();  // load the calling region from input
     void _get_sample_id_from_bam();
@@ -116,30 +113,12 @@ private:
                                                 const std::string bf_prefix);
     void _variants_discovery(const std::vector<std::string> &batchfiles, 
                              const ngslib::GenomeRegion genome_region,
-                             const std::string sub_vcf_fn,
-                             const std::string sub_cvg_fn);
+                             const std::string sub_vcf_fn);
 
     BaseTypeRunner(const BaseTypeRunner &) = delete;             // reject using copy constructor (C++11 style).
     BaseTypeRunner &operator=(const BaseTypeRunner &) = delete;  // reject using copy/assignment operator (C++11 style).
 
 };  // BaseTypeRunner class
-
-// Mainly use for create batchfile
-struct AlignBaseInfo {
-    std::string ref_id;
-    uint32_t ref_pos;
-    std::string ref_base;   // reference base
-
-    std::string read_base;  // read base
-    int mapq;               // mapping quality
-    int rpr;                // read position rank
-    char map_strand;        // mapping reference strand, should be one of '*', '-', '+'
-    char read_base_qual;    // read base quality (get mean quality of read if Indels, 
-                            // I don't care about Indels for NIPT data)
-};
-
-typedef robin_hood::unordered_map<uint32_t, AlignBaseInfo> PosMap;           // give a short name to this type
-typedef std::vector<PosMap> PosMapVector;
 
 // This function is only used by BaseTypeRunner::_create_batchfiles
 bool __create_a_batchfile(const std::vector<std::string> batch_align_files, // Not a modifiable value
@@ -168,42 +147,38 @@ void __write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vec
                                  const ngslib::GenomeRegion target_genome_region,  // 该参数和 __seek_position 中一样 
                                  BGZF *obf);
 
+// Get sample id from batchfiles header.
+std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::string> &batchfiles);
+
 // A unit for calling variants and let it run in a thread.
 bool _variant_calling_unit(const std::vector<std::string> &batchfiles, 
                            const std::vector<std::string> &sample_ids,
                            const std::map<std::string, std::vector<size_t>> & group_smp_idx,
                            const double min_af,
-                           const std::string region,  // genome region format like samtools
-                           const std::string tmp_vcf_fn,
-                           const std::string tmp_cvg_fn);
-
-// Get sample id from batchfiles header.
-std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::string> &batchfiles);
+                           const std::string reg_str,  // genome region format like samtools
+                           const std::string vcf_fn);
 
 bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, 
                      const std::map<std::string, std::vector<size_t>> &group_smp_idx,
-                     double min_af,
-                     size_t n_sample, 
-                     BGZF *vcf_hd, 
-                     BGZF *cvg_hd);
+                     const double min_af, size_t n_sample, BGZF *vcf_hd);
 
-const BaseType __gb(const BatchInfo *smp_bi, 
-              const std::vector<size_t> group_idx, 
-              const std::vector<char> &basecombination, 
-              double min_af);
+std::pair<BaseType, VariantInfo> _basetype_caller_unit(const std::vector<BaseType::BatchInfo> &samples_batchinfo_vector, 
+                                                       const double min_af,
+                                                       const std::vector<size_t> group_idx = std::vector<size_t>(),
+                                                       const std::vector<std::string> basecombination = std::vector<std::string>());
 
-const BatchInfo __get_group_batchinfo(const BatchInfo *smp_bi, const std::vector<size_t> group_idx);
+/**
+ * @brief Get the variant information object
+ * 
+ * @param bt BaseType
+ * @param smp_bi BaseType::BatchInfo 
+ * @return VariantInfo 
+ * 
+ */
+VariantInfo get_pos_variant_info(const BaseType &bt, const BaseType::BatchInfo *smp_bi);
 
-void _out_vcf_line(const BaseType &bt, 
-                   const std::map<std::string, BaseType> &group_bt, 
-                   const BatchInfo *smp_bi, 
-                   BGZF *vcf_hd);
-
-void _out_cvg_line(const BatchInfo *smp_bi, 
-                   const std::map<std::string, std::vector<size_t>> & group_smp_idx, 
-                   BGZF *cvg_hd);
-
-typedef std::tuple<std::string, std::map<char, int>> IndelTuple;
-IndelTuple __base_depth_and_indel(const std::vector<std::string> &align_bases);
-
+VCFRecord _vcfrecord_in_pos(const std::vector<BaseType::BatchInfo> &samples_batchinfo_vector, 
+                            const VariantInfo &global_variant_info,
+                            const std::map<std::string, BaseType> &group_bt, 
+                            AlleleInfo &ai);
 #endif
