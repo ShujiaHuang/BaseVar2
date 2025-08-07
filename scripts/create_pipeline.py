@@ -26,7 +26,7 @@ def load_reference_fai(in_fai, chroms=None):
 def creat_basetype_pipe():
 
     pardir = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), os.path.pardir))
-    exe_prog = pardir + '/bin/basevar basetype'
+    exe_prog = pardir + '/bin/basevar caller'
 
     optp = argparse.ArgumentParser()
     optp.add_argument('-o', '--outdir', metavar='STR', dest='outdir',
@@ -78,14 +78,12 @@ def creat_basetype_pipe():
                 print(f'time {exe_prog} -t {opt.n_thread} -R {opt.reference} -L {opt.infilelist} '
                       f'-G {opt.pop_group} -r {reg} --min-af={opt.min_af} '
                       f'--output-vcf {opt.outdir}/{outfile_prefix}.vcf.gz '
-                      f'--output-cvg {opt.outdir}/{outfile_prefix}.cvg.tsv.gz '
                       f'--smart-rerun > {opt.outdir}/{outfile_prefix}.log && '
                       f'echo "** {outfile_prefix} done **"')
             else:    
                 print(f'time {exe_prog} -t {opt.n_thread} -R {opt.reference} -L {opt.infilelist} '
                       f'-r {reg} --min-af={opt.min_af} '
                       f'--output-vcf {opt.outdir}/{outfile_prefix}.vcf.gz '
-                      f'--output-cvg {opt.outdir}/{outfile_prefix}.cvg.tsv.gz '
                       f'--smart-rerun > {opt.outdir}/{outfile_prefix}.log && '
                       f'echo "** {outfile_prefix} done **"')
 
