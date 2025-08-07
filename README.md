@@ -201,7 +201,7 @@ The format of `sample_group.info` could be found [here](tests/data/140k_thalasse
 
 ```bash
 
-basevar basetype -R reference.fasta \
+basevar caller -R reference.fasta \
     -B 200 -t 4 \
     -L bamfile.list \ 
     --regions=chr11:5246595-5248428,chr17:41197764-41276135 \
