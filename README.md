@@ -186,7 +186,7 @@ This command will provide detailed information about parameters of `basevar`.
 
 ```bash
 basevar caller -R reference.fasta \
-    -q 30 -Q 20 -B 500 -t 24 \
+    -q 10 -Q 20 -B 500 -t 24 \
     --pop-group=sample_group.info \
     --regions=chr11:5246595-5248428,chr17:41197764-41276135 \
     --output-vcf test.vcf.gz 00alzqq6jw.bam 09t3r9n2rg.bam 0fkpl1p55b.bam ...
@@ -199,17 +199,17 @@ The format of `sample_group.info` could be found [here](https://github.com/Shuji
 ```bash
 
 basevar caller -R reference.fasta \
-    -q 30 -Q 20 -B 500 -t 24 \
+    -q 10 -Q 20 -B 500 -t 24 \
     -L bamfile.list \ 
     --regions=chr11:5246595-5248428,chr17:41197764-41276135 \
     --pop-group=sample_group.info \
     --output-vcf test.vcf.gz 
 ```
 
-For stramlinened variant calling across the entire genome, you can use the pipeline generator [**create_pipeline.py**](https://github.com/ShujiaHuang/basevar/blob/master/scripts/create_pipeline.py), which distributes the computational tasks based on the --delta parameter across a specific chromosome defined by the -c parameter.
+For stramlinened variant calling across the entire genome, you can use the pipeline generator [**create_pipeline.py**](https://github.com/ShujiaHuang/BaseVar2/blob/main/scripts/create_pipeline.py), which distributes the computational tasks based on the --delta parameter across a specific chromosome defined by the -c parameter.
 
 ```bash
-$ python create_pipeline.py -R reference.fa --ref_fai reference_fa.fai -c chr20 --delta 5000000 -t 20 -L bamfile.list -o outdir > basevar.chr20.sh
+$ python create_pipeline.py -Q 20 -q 10 -R reference.fa --ref_fai reference_fa.fai -c chr20 --delta 5000000 -t 24 -L bamfile.list -o outdir > basevar.chr20.sh
 ```
 
 **BaseVar** is under active development. Obtain the newest version by pulling the newest version and compilling again.
