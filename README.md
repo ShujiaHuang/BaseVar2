@@ -97,7 +97,6 @@ $ git clone https://github.com/ShujiaHuang/basevar2.git
 
 After cloing, navigate into the `basevar` folder (`cd basevar`) and execute the following:
 
-
 ```bash
 
 $ cd htslib
@@ -131,7 +130,7 @@ Navigate into `bin/` folder (`cd basevar/bin`) first and execute the following c
 
 ```bash
 $ cd bin/
-$ g++ -O3 -fPIC ../src/*.cpp ../htslib/libhts.a -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -lssl -lcrypto -o basevar
+$ g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -lssl -lcrypto -o basevar
 
 
 ```
@@ -140,7 +139,7 @@ $ g++ -O3 -fPIC ../src/*.cpp ../htslib/libhts.a -I ../htslib -lz -lbz2 -lm -llzm
 
 ```bash
 $ cd bin/
-$ g++ -O3 -fPIC ../src/*.cpp ../htslib/libhts.a -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -o basevar
+$ g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -o basevar
 
 
 ```
