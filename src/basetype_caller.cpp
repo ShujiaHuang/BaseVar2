@@ -1324,10 +1324,10 @@ VCFRecord _vcfrecord_in_pos(const std::vector<BaseType::BatchInfo> &samples_batc
         for (std::map<std::string, BaseType>::const_iterator it(group_bt.begin()); it != group_bt.end(); ++it) {
 
             std::vector<double> af;
-            for (auto b : it->second.get_active_bases()) {
+            for (auto b : it->second.get_active_bases()) { // must have the same order with ai.ref + ai.alts
                 if (b == ai.ref) continue;  // skip reference base
 
-                af.push_back(it->second.get_lrt_af(b));
+                af.push_back(it->second.get_lrt_af(b));  // 由于 active-base 不完全一样，所以存在与 ai.alts 顺序不一致的风险
             }
 
             if (!af.empty()) {
