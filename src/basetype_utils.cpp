@@ -78,7 +78,7 @@ AlleleInfo collect_and_normalized_allele_info(VariantInfo &variant, std::vector<
     std::map<std::string, std::string> raw_bases_map;  // raw bases to normalized bases
     for (size_t j = 0; j < variant.ale_bases.size(); j++) {
         std::string raw_base = variant.ale_bases[j];
-        std::string alt(raw_base);
+        std::string alt(raw_base); // it will be modified based on shared_ref
         std::string ref(variant.ref_bases[j]);
 
         // rebase if Indels
@@ -91,8 +91,8 @@ AlleleInfo collect_and_normalized_allele_info(VariantInfo &variant, std::vector<
         }
         
         if (ref != shared_ref && shared_ref.length() > ref.length()) {
-            alt += shared_ref.substr(ref.length());
-            variant.ale_bases[j] = alt;  // Update the ALT sequence
+            alt += shared_ref.substr(ref.length()); // Adding suffix seq to fit with shared_ref
+            variant.ale_bases[j] = alt;             // Update the ALT sequence
         }
 
         unique_alts.insert(alt);

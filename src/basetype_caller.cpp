@@ -1086,7 +1086,7 @@ void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,
             ab.rpr = aligned_pairs[i].qpos + 1;
             if (ab.base_qual < min_baseq + 33) continue; // Skip low quality bases, 33 is the offset of base QUAL
 
-            // Need to convert the ref and read_base to upper case if it is a insertion in case of the read base is a lower case.
+            // Need to convert the ref and read_base to upper case in case of the base is a lower case.
             std::transform(ab.ref_base.begin(), ab.ref_base.end(), ab.ref_base.begin(), ::toupper);
             std::transform(ab.read_base.begin(), ab.read_base.end(), ab.read_base.begin(), ::toupper);
 
@@ -1117,6 +1117,7 @@ void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,
         for (auto ab: raw_align_info.align_bases) {
             if (ab.read_base[0] == '-' || ab.read_base[0] == '+') {
                 ab.ref_base = fa_seq[leftmost_pos - 1] + ab.ref_base;  // add one leftmost ref-base
+                std::transform(ab.ref_base.begin(), ab.ref_base.end(), ab.ref_base.begin(), ::toupper);
                 indel_info.align_bases.push_back(ab); // 同位点可以有多类型的 DEL/INS
             } else {
                 non_indel_info.align_bases.push_back(ab);
