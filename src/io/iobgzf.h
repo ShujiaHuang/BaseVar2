@@ -87,14 +87,13 @@ namespace ngslib {
             return *this;
         }
 
-        // Destructor
-        ~BGZFile() { close(); /* call to close the file.*/ }
-
         // Add static factory method for creating multiple BGZFile objects
         static std::vector<std::unique_ptr<BGZFile>> open_multiple(
             const std::vector<std::string>& filenames, 
-            const char* mode = "r"
-        ); 
+            const char* mode = "r");
+
+        // Destructor
+        ~BGZFile() { close(); /* call to close the file.*/ }
     
         // Functions for I/O operations
         BGZFile& write(const std::string &data); // Write operations
