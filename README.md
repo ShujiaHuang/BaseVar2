@@ -193,7 +193,7 @@ basevar caller -R reference.fasta \
     --output-vcf test.vcf.gz 00alzqq6jw.bam 09t3r9n2rg.bam 0fkpl1p55b.bam ...
 ```
 
-The format of `sample_group.info` could be found [here](tests/data/140k_thalassemia_brca_bam/sample_group.info).
+The format of `sample_group.info` could be found [here](https://github.com/ShujiaHuang/BaseVar2/blob/main/tests/data/sample_group.info).
 
 ### Or call variants from bamlist
 
