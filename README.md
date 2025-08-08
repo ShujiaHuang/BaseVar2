@@ -213,8 +213,3 @@ $ python create_pipeline.py -Q 20 -q 10 -R reference.fa --ref_fai reference_fa.f
 ```
 
 **BaseVar** is under active development. Obtain the newest version by pulling the newest version and compilling again.
-
-
-
-
-
