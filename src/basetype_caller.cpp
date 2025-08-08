@@ -545,6 +545,105 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     return;
 }
 
+// bool _variant_calling_unit(const std::vector<std::string> &batchfiles,  // total batchfiles in the region
+//                            const std::vector<std::string> &sample_ids,  // total samples
+//                            const std::map<std::string, std::vector<size_t>> &group_smp_idx,
+//                            const double min_af,
+//                            const std::string region,    // genome region format like samtools
+//                            const std::string tmp_vcf_fn) 
+// {
+//     clock_t cpu_start_time = clock();
+//     time_t real_start_time = time(0);
+
+//     /*************** Preparing for reading data **************/
+//     // Get and check the sample id from batchfiles header.
+//     std::vector<std::string> bf_smp_ids = _get_sampleid_from_batchfiles(batchfiles);
+//     if (ngslib::join(bf_smp_ids, ",") != ngslib::join(sample_ids, ","))
+//         throw std::runtime_error("[BUG] The order of sample ids in batchfiles must be the same as "
+//                                  "input bamfiles.\n" 
+//                                  "Sample ids in batchfiles: " + ngslib::join(bf_smp_ids, ",") + "\n" 
+//                                  "Sample ids in bamfiles  : " + ngslib::join(sample_ids, ",") + "\n");
+
+//     std::vector<BGZF*> batch_file_hds;
+//     std::vector<tbx_t*> batch_file_tbx;
+//     std::vector<hts_itr_t*> batch_file_itr;
+//     for (size_t i(0); i < batchfiles.size(); ++i) {
+//         BGZF *f = bgzf_open(batchfiles[i].c_str(), "r"); // open again
+//         batch_file_hds.push_back(f);                     // record the file handle
+
+//         tbx_t *tbx = tbx_index_load(batchfiles[i].c_str());
+//         if (!tbx) {
+//             throw std::runtime_error("[ERROR] " + batchfiles[i] + " tabix index load failed.");
+//         }
+//         batch_file_tbx.push_back(tbx);
+
+//         hts_itr_t *itr =NULL;
+//         if ((itr = tbx_itr_querys(tbx, region.c_str())) == 0) {
+//             throw std::runtime_error("[ERROR] load data in " + region + " failed. "
+//                                      "Check input file: " + batchfiles[i]);
+//         }
+//         batch_file_itr.push_back(itr);
+//     }
+//     /************* Done for reading data *************/
+
+//     // Start calling variants
+//     ngslib::BGZFile VCF(tmp_vcf_fn.c_str(), "w"); // output vcf file
+    
+//     std::vector<std::string> smp_bf_line_vector;
+//     smp_bf_line_vector.reserve(batchfiles.size());  // size number is as the same as batchfiles.
+
+//     bool is_eof(false), has_data(false);
+//     uint32_t n = 0;
+//     while (!is_eof) {
+//         smp_bf_line_vector.clear();  // clear the vector before next loop.
+//         for (size_t i(0); i < batchfiles.size(); ++i) {
+//             // Fetch one line from each batchfile per loop and the row number of batchfiles must be the same.
+//             kstring_t s; s.s = NULL; s.l = s.m = 0; // must be refreshed in loop
+//             int eof = tbx_bgzf_itr_next(batch_file_hds[i], batch_file_tbx[i], batch_file_itr[i], &s);
+//             if (eof < 0) {
+//                 is_eof = true;
+//                 free(s.s);
+//                 break;
+//             }
+//             smp_bf_line_vector.push_back(s.s);
+//             free(s.s);
+//         }
+        
+//         ++n;  // line number
+//         if (n % 10000 == 0) {
+//             std::cout << "[INFO] Have been loaded " << n << " lines.\n";
+//         }
+
+//         // Samples' data for each poistion is ready and calling variants now
+//         if (!smp_bf_line_vector.empty()) {
+//             bool cc = _basevar_caller(smp_bf_line_vector, group_smp_idx, min_af, sample_ids.size(), VCF);
+//             if (cc && !has_data) has_data = cc;
+//         }
+//     }
+
+//     // close all batchfiles
+//     for (size_t i(0); i < batchfiles.size(); ++i) {
+//         tbx_destroy(batch_file_tbx[i]);
+//         tbx_itr_destroy(batch_file_itr[i]);
+//         if ((bgzf_close(batch_file_hds[i]) < 0))
+//             throw std::runtime_error("[ERROR] " + batchfiles[i] + " fail close.");
+//     }
+
+//     // close VCF file
+//     VCF.close();
+
+//     // Time information
+//     time_t now = time(0);
+//     std::string ct(ctime(&now));
+//     ct.pop_back();
+//     std::cout << "[INFO] " + ct + ". Done for creating " + tmp_vcf_fn + ", "
+//               << difftime(now, real_start_time) 
+//               << " (CPU time: " << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC 
+//               << ") seconds elapsed." << std::endl;
+
+//     return has_data;
+// }
+
 /// Functions for calling variants outside of 'BaseTypeRunner' class 
 // A unit for calling variants and let it run in a thread.
 bool _variant_calling_unit(const std::vector<std::string> &batchfiles,  // total batchfiles in the region
@@ -565,74 +664,62 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,  // total
                                  "input bamfiles.\n" 
                                  "Sample ids in batchfiles: " + ngslib::join(bf_smp_ids, ",") + "\n" 
                                  "Sample ids in bamfiles  : " + ngslib::join(sample_ids, ",") + "\n");
-
-    std::vector<BGZF*> batch_file_hds;
-    std::vector<tbx_t*> batch_file_tbx;
-    std::vector<hts_itr_t*> batch_file_itr;
-    for (size_t i(0); i < batchfiles.size(); ++i) {
-        BGZF *f = bgzf_open(batchfiles[i].c_str(), "r"); // open again
-        batch_file_hds.push_back(f);                     // record the file handle
-
-        tbx_t *tbx = tbx_index_load(batchfiles[i].c_str());
-        if (!tbx) {
-            throw std::runtime_error("[ERROR] " + batchfiles[i] + " tabix index load failed.");
-        }
-        batch_file_tbx.push_back(tbx);
-
-        hts_itr_t *itr =NULL;
-        if ((itr = tbx_itr_querys(tbx, region.c_str())) == 0) {
-            throw std::runtime_error("[ERROR] load data in " + region + " failed. "
-                                     "Check input file: " + batchfiles[i]);
-        }
-        batch_file_itr.push_back(itr);
-    }
-    /************* Done for reading data *************/
-
-    // Start calling variants
-    ngslib::BGZFile VCF(tmp_vcf_fn.c_str(), "w"); // output vcf file
     
+    // Open indexes and iterators
+    std::vector<std::unique_ptr<tbx_t, void(*)(tbx_t*)>> indexes;
+    std::vector<std::unique_ptr<hts_itr_t, void(*)(hts_itr_t*)>> iterators;
+    for (const auto& file : batchfiles) {
+        // Open index
+        tbx_t* tbx = tbx_index_load(file.c_str());
+        if (!tbx) {
+            throw std::runtime_error("Failed to load index for " + file);
+        }
+        indexes.emplace_back(tbx, tbx_destroy);
+        
+        // Create iterator
+        hts_itr_t* itr = tbx_itr_querys(tbx, region.c_str());
+        if (!itr) {
+            throw std::runtime_error("Failed to create iterator for " + file);
+        }
+        iterators.emplace_back(itr, hts_itr_destroy);
+    }
+
+    // Open all batch files using the new factory method
+    auto batch_files = ngslib::BGZFile::open_multiple(batchfiles);
+
+    // Output VCF file
+    ngslib::BGZFile VCF_OUT(tmp_vcf_fn.c_str(), "w");
+
     std::vector<std::string> smp_bf_line_vector;
-    smp_bf_line_vector.reserve(batchfiles.size());  // size number is as the same as batchfiles.
+    smp_bf_line_vector.reserve(batchfiles.size());
 
     bool is_eof(false), has_data(false);
     uint32_t n = 0;
     while (!is_eof) {
-        smp_bf_line_vector.clear();  // clear the vector before next loop.
-        for (size_t i(0); i < batchfiles.size(); ++i) {
-            // Fetch one line from each batchfile per loop and the row number of batchfiles must be the same.
-            kstring_t s; s.s = NULL; s.l = s.m = 0; // must be refreshed in loop
-            int eof = tbx_bgzf_itr_next(batch_file_hds[i], batch_file_tbx[i], batch_file_itr[i], &s);
-            if (eof < 0) {
+        smp_bf_line_vector.clear();
+        
+        // Read one line from each file
+        for (size_t i = 0; i < batch_files.size(); ++i) {
+            std::string line;
+            if (!batch_files[i]->readline_with_index(indexes[i].get(), iterators[i].get(), line)) {
                 is_eof = true;
-                free(s.s);
                 break;
             }
-            smp_bf_line_vector.push_back(s.s);
-            free(s.s);
+            smp_bf_line_vector.push_back(std::move(line));
+        }
+
+        if (!smp_bf_line_vector.empty()) {
+            bool cc = _basevar_caller(smp_bf_line_vector, group_smp_idx, min_af, sample_ids.size(), VCF_OUT);
+            if (cc && !has_data) has_data = true;
         }
         
-        ++n;  // line number
-        if (n % 10000 == 0) {
-            std::cout << "[INFO] Have been loaded " << n << " lines.\n";
+        if (++n % 10000 == 0) {
+            std::cout << "[INFO] Processed " << n << " lines.\n";
         }
-
-        // Samples' data for each poistion is ready and calling variants now
-        if (!smp_bf_line_vector.empty()) {
-            bool cc = _basevar_caller(smp_bf_line_vector, group_smp_idx, min_af, sample_ids.size(), VCF);
-            if (cc && !has_data) has_data = cc;
-        }
-    }
-
-    // close all batchfiles
-    for (size_t i(0); i < batchfiles.size(); ++i) {
-        tbx_destroy(batch_file_tbx[i]);
-        tbx_itr_destroy(batch_file_itr[i]);
-        if ((bgzf_close(batch_file_hds[i]) < 0))
-            throw std::runtime_error("[ERROR] " + batchfiles[i] + " fail close.");
     }
 
     // close VCF file
-    VCF.close();
+    VCF_OUT.close();
 
     // Time information
     time_t now = time(0);
@@ -643,6 +730,7 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,  // total
               << " (CPU time: " << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC 
               << ") seconds elapsed." << std::endl;
 
+    // Files will be automatically closed when destructors are called
     return has_data;
 }
 
