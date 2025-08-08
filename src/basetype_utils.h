@@ -18,6 +18,7 @@
 #include <htslib/kstring.h>
 
 #include "io/fasta.h"
+#include "io/iobgzf.h"
 #include "io/utils.h"
 #include "basetype.h"
 
@@ -58,7 +59,6 @@ struct AlignInfo {
 
 typedef robin_hood::unordered_map<uint32_t, AlignInfo> PosMap;    // give a short name to this type
 typedef std::vector<PosMap> PosMapVector;
-
 typedef struct {
     int fwd, rev;
     double fs;   // Phred-scaled p-value using Fisher's exact test to detect strand bias
@@ -118,6 +118,7 @@ struct VCFSampleAnnotation {
     std::vector<int> allele_depths;       // AD, depth
     std::vector<int> PL;                  // PL: A list of phred-scale score of genotype likelihoods
 };
+
 struct VCFRecord {
     // Required fields
     std::string chrom;     // CHROM: chromosome name

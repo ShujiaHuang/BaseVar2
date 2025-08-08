@@ -279,37 +279,28 @@ std::string cvg_header_define(const std::vector<std::string> &group_info, const 
 }
 
 void merge_file_by_line(const std::vector<std::string> &infiles, const std::string &outfile, 
-                        std::string header, bool is_remove_tempfile) 
+                        std::string header, bool is_remove_tempfile)
 {
     if (infiles.empty()) return;
 
-    bool is_compress_out = (ngslib::suffix_name(outfile) == ".gz") ? true : false;
-    BGZF *OUT = bgzf_open(outfile.c_str(), is_compress_out ? "w" : "uw");  // output file
-    if (!OUT) throw std::runtime_error("[ERROR] " + outfile + " open failure.");
-
-    header += "\n";
-    if (bgzf_write(OUT, header.c_str(), header.length()) != header.length())
-        throw std::runtime_error("[ERROR] fail to write data");
+    bool is_compress = (ngslib::suffix_name(outfile) == ".gz") ? true : false;
+    ngslib::BGZFile OUT(outfile, is_compress ? "wb" : "uw"); 
+    OUT << header << "\n";
 
     /* Merge all files here */
     for (auto fn: infiles) {
-        BGZF *f = bgzf_open(fn.c_str(), "r");
-        kstring_t s; s.s = NULL; s.l = s.m = 0;
-        while (bgzf_getline(f, '\n', &s) >= 0) {
-            if (s.s[0] == '#') continue;  // ignore the header of subfiles.
-            std::string out(s.s); out += "\n";
+        ngslib::BGZFile f(fn, "r");
+        std::string line;
 
-            if (bgzf_write(OUT, out.c_str(), out.length()) != out.length())
-                throw std::runtime_error("[ERROR] fail to write data");
+        while (f.readline(line)) {
+            if (line[0] == '#') continue;
+            OUT << line << "\n";
         }
-        bgzf_close(f);
+        OUT.flush(); // 确保数据被写入
 
         if (is_remove_tempfile) ngslib::safe_remove(fn);
     }
-    
-    int is_cl = bgzf_close(OUT);
-    if (is_cl < 0) throw std::runtime_error("[ERROR] " + outfile + " fail close.");
-    
+
+    OUT.close();
     return;
 }
-

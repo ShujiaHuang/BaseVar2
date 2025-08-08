@@ -17,10 +17,10 @@
 #include <ctime>      // clock
 #include <algorithm>  // std::min
 
-#include <htslib/bgzf.h>
 #include <htslib/tbx.h>
 
 #include "io/fasta.h"
+#include "io/iobgzf.h"
 #include "io/bam.h"
 #include "io/utils.h"
 
@@ -145,7 +145,7 @@ void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,  //
 void __write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vector, 
                                  const std::string &fa_seq,
                                  const ngslib::GenomeRegion target_genome_region,  // 该参数和 __seek_position 中一样 
-                                 BGZF *obf);
+                                 ngslib::BGZFile &obf);
 
 // Get sample id from batchfiles header.
 std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::string> &batchfiles);
@@ -160,7 +160,9 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,
 
 bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, 
                      const std::map<std::string, std::vector<size_t>> &group_smp_idx,
-                     const double min_af, size_t n_sample, BGZF *vcf_hd);
+                     const double min_af, 
+                     size_t n_sample, 
+                     ngslib::BGZFile &vcf_hd);
 
 std::pair<BaseType, VariantInfo> _basetype_caller_unit(const std::vector<BaseType::BatchInfo> &samples_batchinfo_vector, 
                                                        const double min_af,

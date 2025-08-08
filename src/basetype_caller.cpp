@@ -377,7 +377,7 @@ void BaseTypeRunner::_variant_caller_process() {
         std::string ct(ctime(&now)); 
         ct.pop_back();
         std::cout << "[INFO] "+ ct +". Done for creating all " << batchfiles.size() << " batchfiles in " 
-                  << gr.to_string() + " and start to call variants, "  << difftime(now, real_start_time) << "(CPU time: " 
+                  << gr.to_string() + " and start to call variants, " << difftime(now, real_start_time) << "(CPU time: " 
                   << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC << ") seconds elapsed in total.\n" 
                   << std::endl;
 
@@ -389,17 +389,16 @@ void BaseTypeRunner::_variant_caller_process() {
 
         std::string sub_vcf_fn = prefix + ".vcf.gz";
         _variants_discovery(batchfiles, gr, sub_vcf_fn);
+        vcffiles.push_back(sub_vcf_fn);
 
         // Time information
         now = time(0);
         ct  = ctime(&now); 
         ct.pop_back();
-        std::cout << "\n" << "[INFO] "+ ct +". Done for calling all variants in " + gr.to_string() + ": "
+        std::cout << "[INFO] "+ ct +". Done for calling all variants in " + gr.to_string() + ": "
                   << sub_vcf_fn + ", " << difftime(now, real_start_time) << "(CPU time: " 
                   << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC << ") seconds elapsed in total.\n" 
                   << std::endl;
-
-        vcffiles.push_back(sub_vcf_fn);
         
         if (IS_DELETE_CACHE_BATCHFILE) {
             for (auto bf: batchfiles) {
@@ -587,11 +586,10 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,  // total
         }
         batch_file_itr.push_back(itr);
     }
-    /************* Done for reading data prepare *************/
+    /************* Done for reading data *************/
 
     // Start calling variants
-    BGZF *VCF = bgzf_open(tmp_vcf_fn.c_str(), "w"); // output vcf file
-    if (!VCF) throw std::runtime_error("[ERROR] " + tmp_vcf_fn + " open failure.");
+    ngslib::BGZFile VCF(tmp_vcf_fn.c_str(), "w"); // output vcf file
     
     std::vector<std::string> smp_bf_line_vector;
     smp_bf_line_vector.reserve(batchfiles.size());  // size number is as the same as batchfiles.
@@ -634,7 +632,7 @@ bool _variant_calling_unit(const std::vector<std::string> &batchfiles,  // total
     }
 
     // close VCF file
-    if (bgzf_close(VCF) < 0) throw std::runtime_error("[ERROR] " + tmp_vcf_fn + " fail close.");
+    VCF.close();
 
     // Time information
     time_t now = time(0);
@@ -652,26 +650,25 @@ std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::st
     // Get sample id from batchfiles header.
     std::vector<std::string> bf_smp_ids;
     std::string smp_head_tag = "##SampleIDs=";  // header of sample ids in batchfiles
-    for (size_t i(0); i < batchfiles.size(); ++i) {
-        BGZF *f = bgzf_open(batchfiles[i].c_str(), "r");
-        kstring_t s; s.s = NULL; s.l = s.m = 0;
+    for (auto fn: batchfiles) {
+        ngslib::BGZFile f(fn, "r");
+        std::string line;
 
         // get all the samples' id from the header of batchfiles.
-        while (bgzf_getline(f, '\n', &s) >= 0) {
-            if (s.s[0] != '#') { // head char is '#' in batchfile.
+        while (f.readline(line)) {
+            if (line[0] != '#') { // head char is '#' in batchfile.
                 break;
-            } else if (strncmp(s.s, smp_head_tag.c_str(), smp_head_tag.length()) == 0) {
+            } else if (line.compare(0, smp_head_tag.length(), smp_head_tag) == 0) {
                 // Header looks like: ##SampleIDs=smp1,smp2,smp3,...
-                std::vector<std::string> h; ngslib::split(s.s, h, "=");
+                std::vector<std::string> h; ngslib::split(line, h, "=");
 
-                // `h[1]` is a string of sample ids, like: 'smp1,smp2,smp3,smp4,...'
+                // `h[1]` is the string of sample ids, like: 'smp1,smp2,smp3,smp4,...'
                 // set 'is_append' to be 'true', keep pushing data back in 'bf_smp_ids' vector.
-                ngslib::split(h[1], bf_smp_ids, ",", true); 
-                break;  // complete fetching the sample ids, end the loop
+                ngslib::split(h[1], bf_smp_ids, ",", true);
+                break; // complete fetching the sample ids, end the loop
             }
         }
-        free(s.s);
-        if ((bgzf_close(f)) < 0) throw std::runtime_error("[ERROR] " + batchfiles[i] + " fail close.");
+        f.close();
     }
 
     return bf_smp_ids;
@@ -679,7 +676,7 @@ std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::st
 
 bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, 
                      const std::map<std::string, std::vector<size_t>> &group_smp_idx,
-                     const double min_af, size_t n_sample, BGZF *vcf_hd) 
+                     const double min_af, size_t n_sample, ngslib::BGZFile &vcf_hd) 
 {
     // Initialize vectors with the size of 'batch_data_capacity'.
     int batch_data_capacity = n_sample / smp_bf_line_vector.size() + 1;  // number of samples in each batchfile
@@ -728,9 +725,8 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector,
         ngslib::split(col_info[7], read_pos_ranks,          " ");
         ngslib::split(col_info[8], map_strands,             " ");
 
-        int batch_sample_num = map_read_bases.size();
-
         // check data
+        int batch_sample_num = map_read_bases.size();
         if ((map_ref_bases.size()           != batch_sample_num) || 
             (map_read_bases.size()          != batch_sample_num) || 
             (map_read_base_qualities.size() != batch_sample_num) ||
@@ -776,13 +772,12 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector,
     auto [bt, global_vi] = _basetype_caller_unit(all_smps_bi_vector, min_af);
     
     // check if there is a variant at this position
-    // 对 ale_bases 这里的 toupper 函数其实可以省略
     bool is_variant = (global_vi.ale_bases.size() > 1) || 
                       (!global_vi.ale_bases.empty() && 
                         global_vi.ale_bases[0][0] !=
                         global_vi.ref_bases[0][0]);  // 'ale_bases' and 'ref_bases' are all upper case already.
     
-    if (is_variant) {    
+    if (is_variant) { 
         // Collect and normalize allele information. Return the variant and allele information of this
         // position and replace the align_bases in samples_batchinfo_vector with the normalized bases.
         // AlleleInfo is a struct-type to collect and normalize allele information, which is used to 
@@ -790,10 +785,8 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector,
         AlleleInfo ai = collect_and_normalized_allele_info(global_vi, all_smps_bi_vector);
 
         std::map<std::string, BaseType> popgroup_bt;  // group_id => BaseType
-        if (!group_smp_idx.empty()) { // group is not empty
-            // Call BaseType for each group
+        if (!group_smp_idx.empty()) { // group is not empty, call BaseType for each group
             std::vector<std::string> basecombination;
-
             basecombination.push_back(ai.ref); // reference base must be the first one
             basecombination.insert(basecombination.end(), ai.alts.begin(), ai.alts.end());
 
@@ -808,13 +801,9 @@ bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector,
         }
 
         VCFRecord vcf_record = _vcfrecord_in_pos(all_smps_bi_vector, global_vi, popgroup_bt, ai);
-
         if (vcf_record.is_valid()) {
-            // write to file and check is successful or not.
-            std::string out = vcf_record.to_string() + "\n";
-            if (bgzf_write(vcf_hd, out.c_str(), out.length()) != out.length())
-                throw std::runtime_error("[ERROR] fail to write data");
-                
+            // write to file
+            vcf_hd << vcf_record.to_string() << "\n";
         } else {
             std::cerr << "[WARNING] Invalid VCF record at " << ref_id << ":" << ref_pos << " "
                       << vcf_record.ref << " " << ngslib::join(vcf_record.alt, ",")
@@ -881,16 +870,13 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
     // 这个参数是为了限制存入 `batchsamples_posinfomap_vector` 的最大读取区间，从而控制内存消耗不要太大
     static const uint32_t STEP_REGION_LEN = 500000;  
 
-    BGZF *obf = bgzf_open(output_batch_file.c_str(), "w"); // output file handle of output_batch_file
-    if (!obf) throw std::runtime_error("[ERROR] " + output_batch_file + " open failure.");
-
     // Header of batchfile
     std::string bf_header = "##fileformat=BaseVarBatchFile_v1.0\n" 
                             "##SampleIDs=" + ngslib::join(batch_sample_ids, ",") + "\n" + 
                             "#CHROM\tPOS\tREF\tDepth(CoveredSample)\tMappingQuality\t"
-                            "Readbases\tReadbasesQuality\tReadPositionRank\tStrand\n";
-    if (bgzf_write(obf, bf_header.c_str(), bf_header.length()) != bf_header.length())
-        throw std::runtime_error("[ERROR] fail to write data");
+                            "Readbases\tReadbasesQuality\tReadPositionRank\tStrand";
+    ngslib::BGZFile obf(output_batch_file.c_str(), "w"); // output file handle of output_batch_file
+    obf << bf_header << "\n";
 
     PosMapVector batchsamples_posinfomap_vector;
     batchsamples_posinfomap_vector.reserve(batch_align_files.size());  //  pre-set the capacity
@@ -919,11 +905,8 @@ bool __create_a_batchfile(const std::vector<std::string> batch_align_files,
                                     obf);
         batchsamples_posinfomap_vector.clear();  // 必须清空，为下个循环做准备
     }
-
-    int is_cl = bgzf_close(obf);  // close file
-    if (is_cl < 0) {
-        throw std::runtime_error("[ERROR] " + output_batch_file + " fail close.");
-    }
+    
+    obf.close();
 
     // Create a Tabix index for 'output_batch_file'
     // conf: {preset, seq col, beg col, end col, header-char, skip-line}
@@ -1145,7 +1128,7 @@ void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,
 void __write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vector,
                                  const std::string &fa_seq,
                                  const ngslib::GenomeRegion gr, 
-                                 BGZF *obf) 
+                                 ngslib::BGZFile &obf) 
 {
     const static std::string BASE_Q0_ASCII = "!";  // The ascii code of '!' character is 33
 
@@ -1210,11 +1193,10 @@ void __write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vec
                           ngslib::join(map_read_bases, " ")          + "\t" + 
                           ngslib::join(map_read_base_qualities, " ") + "\t" +
                           ngslib::join(read_pos_ranks, " ")          + "\t" + 
-                          ngslib::join(map_strands, " ")             + "\n";
+                          ngslib::join(map_strands, " ");
         
         // write to file and check is successful or not.
-        if (bgzf_write(obf, out.c_str(), out.length()) != out.length())
-            throw std::runtime_error("[ERROR] fail to write data");
+        obf << out << "\n";
 
         // clear up 
         map_ref_bases.clear();
