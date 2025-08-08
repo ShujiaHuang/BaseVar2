@@ -16,6 +16,7 @@
 #include <sstream>
 #include <ctime>      // clock
 #include <algorithm>  // std::min
+#include <memory>     // std::unique_ptr
 
 #include <htslib/tbx.h>
 
