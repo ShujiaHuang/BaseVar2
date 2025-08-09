@@ -1,27 +1,20 @@
 # BaseVar: Call variants from ultra low-pass WGS data
 
-<p align="center">
-  <a href="https://github.com/ShujiaHuang/basevar">
-    <img height="300" src="https://github.com/ShujiaHuang/basevar/blob/main/docs/assets/images/basevar.png" align="center">
-  </a>
-</p>
-
+[![BaseVar Logo](https://github.com/ShujiaHuang/basevar/blob/main/docs/assets/images/basevar.png)](https://github.com/ShujiaHuang/basevar2)
 
 *BaseVar* is a specialized tool tailored for variant calling using ultra low-depth (<1x) sequencing data, particularly catering to non-invasive prenatal test (NIPT) data in human genetic studies. Leveraging maximum likelihood and likelihood ratio models, BaseVar accurately identifies polymorphisms at genomic positions and calculates allele frequencies. For in-depth mathematical explanations, refer to the comprehensive documentation available [here](https://doi.org/10.1016/j.cell.2018.08.016).
 
 Now, BaseVar has been fully implemented by C++. BaseVar showcases significant enhancements over its [original Python counterpart](https://github.com/ShujiaHuang/basevar/tree/python-version-0.6.1.1). The C++ implementation delivers a computing speed exceeding 10 times that of the Python version, all while demanding substantially less memory. Typically, each thread (-t/--thread) consumes merely 3GB to 4GB of memory when the -B (--batch-count) option is configured to 200, a stark contrast to the Python version's requirement of over 20GB.
 
-
 ## Citation
 
 Please cite the following papers if you use BaseVar in your published projects or papers. 
 
-> - Liu, S., Liu, Y., Gu, Y., Lin, X., Zhu, H., Liu, H., Xu, Z., Cheng, S., Lan, X., Li, L., Huang, M., Li, H., Nielsen, R., Davies, RW., Albrechtsen, A., Chen, GB., Qiu, X., Jin, X., Huang, S., (2024). Utilizing non-invasive prenatal test sequencing data for human genetic investigation. *Cell Genomics* 4(10), 100669 [doi:10.1016/j.xgen.2024.100669](https://www.cell.com/cell-genomics/fulltext/S2666-979X(24)00288-X)
+> - Liu, S., Liu, Y., Gu, Y., Lin, X., Zhu, H., Liu, H., Xu, Z., Cheng, S., Lan, X., Li, L., Huang, M., Li, H., Nielsen, R., Davies, RW., Albrechtsen, A., Chen, GB., Qiu, X., Jin, X., **Huang, S.**, (2024). Utilizing non-invasive prenatal test sequencing data for human genetic investigation. *Cell Genomics* 4(10), 100669 [doi:10.1016/j.xgen.2024.100669](https://www.cell.com/cell-genomics/fulltext/S2666-979X(24)00288-X)
 
 ## Installation
 
 *BaseVar requires C++17 or above.* Compile `basevar` from source codes step-by-step.
-
 
 You can install `basevar` using either of the following two methods.
 
@@ -30,11 +23,11 @@ You can install `basevar` using either of the following two methods.
 This is the simplest way of installing basevar by *cmake*
 
 ```bash
-$ git clone https://github.com/ShujiaHuang/basevar2.git
-$ cd basevar
-$ mkdir build
-$ cmake ..
-$ make 
+git clone https://github.com/ShujiaHuang/basevar2.git
+cd basevar
+mkdir build
+cmake ..
+make 
 
 ```
 
@@ -42,56 +35,20 @@ $ make
 
 If everything is smooth, you'll find an exectutable file named `basevar` in `basevar/bin/` folder.
 
-**CAUTION:** If you encounter an error message similar to the following during the compilation of htslib:
-
-```bash
-test/test_khash.c: In function 'write_stats_str2int':
-test/test_khash.c:53:9: warning: implicit declaration of function 'kh_stats' [-Wimplicit-function-declaration]
-   53 |     if (kh_stats(str2int, h, &empty, &deleted, &hist_size, &hist) == 0) {
-      |         ^~~~~~~~
-test/test_khash.c:53:18: error: 'str2int' undeclared (first use in this function)
-   53 |     if (kh_stats(str2int, h, &empty, &deleted, &hist_size, &hist) == 0) {
-      |                  ^~~~~~~
-test/test_khash.c:53:18: note: each undeclared identifier is reported only once for each function it appears in
-make: *** [test/test_khash.o] Error 1
-```
-
-you can safely disregard it as the code should continue to function properly. To continue the installation processes of basevar, 
-you can comment out relevant codes of compiling `htslib` in `CMakeList.txt` by adding "#" at the beginning of each line:
-
-```
-add_custom_target(
-    Buildhts ALL
-    COMMAND autoreconf -i && ./configure && make
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/htslib
-)
-```
-
-commnet out the lines:
-
-```
-# add_custom_target(
-#     Buildhts ALL
-#     COMMAND autoreconf -i && ./configure && make
-#     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/htslib
-# )
-```
-
-then type `cmake .. && make` again in `build` folder to contiune the processes.
-
-
 ### Method 2. Manually install processes (Optional)
+
+Sometimes, you may need to complete the installation manually if the above command fails to install **BaseVar**.
 
 **1. Download BaseVar from github**
 
 BaseVar is hosted on Github and can be downloaded with the following command:
 
 ```bash
-$ git clone https://github.com/ShujiaHuang/basevar2.git
+git clone https://github.com/ShujiaHuang/basevar2.git
+
 ```
 
 > **WARNING**: Please try several times if fail to clone the data causing by the network problem.
-
 
 **2. Navigate into htslib/htscodecs folder and run the following commands**
 
@@ -99,10 +56,10 @@ After cloing, navigate into the `basevar` folder (`cd basevar`) and execute the 
 
 ```bash
 
-$ cd htslib
-$ autoreconf -i
-$ ./configure
-$ make
+cd htslib
+autoreconf -i
+./configure
+make
 
 ```
 
@@ -129,17 +86,16 @@ Navigate into `bin/` folder (`cd basevar/bin`) first and execute the following c
 **Manually install in Linux**
 
 ```bash
-$ cd bin/
-$ g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -lssl -lcrypto -o basevar
-
+cd bin/
+g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -lssl -lcrypto -o basevar
 
 ```
 
 **Manually install in MacOS**
 
 ```bash
-$ cd bin/
-$ g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -o basevar
+cd bin/
+g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -o basevar
 
 
 ```
@@ -170,7 +126,7 @@ Optional options:
   -Q, --min-BQ INT             Skip bases with base quality < INT [5]
   -q, --mapq=INT               Skip reads with mapping quality < INT [10]
   -B, --batch-count=INT        INT simples per batchfile. [200]
-  -t, --thread=INT             Number of threads. [14]
+  -t, --thread=INT             Number of threads. [hardware-concurrency]
 
   --filename-has-samplename    If the name of bamfile is something like 'SampleID.xxxx.bam', set this
                                argrument could save a lot of time during get the sample id from BAMfile.
@@ -197,7 +153,6 @@ The format of `sample_group.info` could be found [here](https://github.com/Shuji
 ### Or call variants from bamlist
 
 ```bash
-
 basevar caller -R reference.fasta \
     -q 10 -Q 20 -B 500 -t 24 \
     -L bamfile.list \ 
@@ -209,7 +164,7 @@ basevar caller -R reference.fasta \
 For stramlinened variant calling across the entire genome, you can use the pipeline generator [**create_pipeline.py**](https://github.com/ShujiaHuang/BaseVar2/blob/main/scripts/create_pipeline.py), which distributes the computational tasks based on the --delta parameter across a specific chromosome defined by the -c parameter.
 
 ```bash
-$ python create_pipeline.py -Q 20 -q 10 -R reference.fa --ref_fai reference_fa.fai -c chr20 --delta 5000000 -t 24 -L bamfile.list -o outdir > basevar.chr20.sh
+python create_pipeline.py -Q 20 -q 10 -R reference.fa --ref_fai reference_fa.fai -c chr20 --delta 5000000 -t 24 -L bamfile.list -o outdir > basevar.chr20.sh
 ```
 
 **BaseVar** is under active development. Obtain the newest version by pulling the newest version and compilling again.
