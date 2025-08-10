@@ -32,13 +32,15 @@
 
 #include "external/thread_pool.h"
 
-static const bool IS_DELETE_CACHE_BATCHFILE = true;
 
 /**
  * @brief BaseTypeRunner class
  */
 class BaseTypeRunner {
-public:
+private:
+    static const bool IS_DELETE_CACHE_BATCHFILE = true;
+    static const char BASE_Q0_ASCII = '!'; // The ascii code of '!' character is 33
+
     // Commandline arguments
     struct BaseTypeARGS {
         /* Variables for all the commandline options of BaseType */
@@ -68,26 +70,10 @@ public:
                         smart_rerun(false), 
                         filename_has_samplename(false) {}
     };
-    ngslib::Fasta reference;  // public variable
 
-    // default constructor
-    BaseTypeRunner() : _args(NULL) {}
-    BaseTypeRunner(int cmdline_argc, char *cmdline_argv[]);
-    
-    // Destroy the malloc'ed BasTypeArgs structure
-    ~BaseTypeRunner(){ if(_args){delete _args; _args = NULL;} }
-
-    // Common functions
-    const std::string usage() const;
-    void print_calling_interval();
-
-    // Run the variant calling process
-    void run() { _variant_caller_process(); }
-
-private:
     std::string _cmdline_string;                             // save the commandline options
     BaseTypeARGS *_args;                                     // Commandline options
-    
+    ngslib::Fasta reference;  // public variable
     std::vector<std::string> _samples_id;                    // sample ID of alignment files (BAM/CRAM/SAM)
                                                              // `_samples_id` and `input_bf` have the same order 
     std::map<std::string, std::vector<size_t>> _groups_idx;  // sample group: group => samples index
@@ -107,82 +93,92 @@ private:
     /**
      * @brief Create a batch of temp files for variant discovery (could be deleted when the jobs done).
      * 
-     * @param genome_region 
+     * @param genome_region
      * @return std::vector<std::string> 
      * 
      */
     std::vector<std::string> _create_batchfiles(const ngslib::GenomeRegion genome_region, 
                                                 const std::string bf_prefix);
+
+    bool _create_a_batchfile(const std::vector<std::string>& batch_align_files, // Not a modifiable value 
+                             const std::vector<std::string>& batch_sample_ids,  // Not a modifiable value 
+                             const std::string& fa_seq,                         // Not a modifiable value
+                             const ngslib::GenomeRegion gr,                     // 切割该区间
+                             const std::string output_batch_file);              // output batchfile name
+
+    bool _fetch_base_in_region(const std::vector<std::string> &batch_align_files,
+                               const std::string &fa_seq,
+                               const ngslib::GenomeRegion target_genome_region,  // 获取该区间内的 read
+                               PosMapVector &batchsamples_posinfomap_vector);    // 信息存入该变量
+
+    void _seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,  // ngslib::BamRecord include by 'bam.h'
+                        const std::string &fa_seq,   // must be the whole chromosome sequence
+                        const ngslib::GenomeRegion target_genome_region, // 获取该区间内所有位点的碱基比对信息，该参数和 '_fetch_base_in_region' 中一样 
+                        PosMap &sample_posinfo_map);
+
+    void _write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vector, 
+                                    const ngslib::GenomeRegion target_genome_region,  // 该参数和 _seek_position 中一样 
+                                    ngslib::BGZFile &obf);
+
+    // Functions for calling variants
     void _variants_discovery(const std::vector<std::string> &batchfiles, 
                              const ngslib::GenomeRegion genome_region,
                              const std::string sub_vcf_fn);
 
-    BaseTypeRunner(const BaseTypeRunner &) = delete;             // reject using copy constructor (C++11 style).
-    BaseTypeRunner &operator=(const BaseTypeRunner &) = delete;  // reject using copy/assignment operator (C++11 style).
+    // A unit for calling variants and let it run in a thread.
+    bool _variant_calling_unit(const std::vector<std::string> &batchfiles, 
+                               const std::vector<std::string> &sample_ids,
+                               const std::map<std::string, std::vector<size_t>> & group_smp_idx,
+                               const std::string reg_str,  // genome region format like samtools
+                               const std::string vcf_fn);
+    // Get sample id from batchfiles header.
+    std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::string> &batchfiles);
 
-};  // BaseTypeRunner class
-
-// This function is only used by BaseTypeRunner::_create_batchfiles
-bool __create_a_batchfile(const std::vector<std::string> batch_align_files, // Not a modifiable value
-                          const std::vector<std::string> batch_sample_ids,  // Not a modifiable value
-                          const std::string &fa_seq,                        // Not a modifiable value
-                          const ngslib::GenomeRegion genome_region,         // 切割该区间
-                          const int min_mapq,                               // mapping quality threshold
-                          const int min_baseq,                              // base quality threshold
-                          const std::string output_batch_file);             // output batchfile name
-
-bool __fetch_base_in_region(const std::vector<std::string> &batch_align_files,
-                            const std::string &fa_seq,                   
-                            const int min_mapq,
-                            const int min_baseq,  // minimum base quality
-                            const ngslib::GenomeRegion target_genome_region,  // 获取该区间内的 read
-                            PosMapVector &batchsamples_posinfomap_vector);    // 信息存入该变量
-
-void __seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,  // ngslib::BamRecord include by 'bam.h'
-                     const std::string &fa_seq,
-                     const ngslib::GenomeRegion target_genome_region,         // 获取该区间内所有位点的碱基比对信息，该参数和 '__fetch_base_in_region' 中一样 
-                     const int min_baseq,  // minimum base quality
-                     PosMap &sample_posinfo_map);
-
-void __write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vector, 
-                                 const std::string &fa_seq,
-                                 const ngslib::GenomeRegion target_genome_region,  // 该参数和 __seek_position 中一样 
-                                 ngslib::BGZFile &obf);
-
-// Get sample id from batchfiles header.
-std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::string> &batchfiles);
-
-// A unit for calling variants and let it run in a thread.
-bool _variant_calling_unit(const std::vector<std::string> &batchfiles, 
-                           const std::vector<std::string> &sample_ids,
-                           const std::map<std::string, std::vector<size_t>> & group_smp_idx,
-                           const double min_af,
-                           const std::string reg_str,  // genome region format like samtools
-                           const std::string vcf_fn);
-
-bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, 
+    bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, 
                      const std::map<std::string, std::vector<size_t>> &group_smp_idx,
-                     const double min_af, 
                      size_t n_sample, 
                      ngslib::BGZFile &vcf_hd);
 
-std::pair<BaseType, VariantInfo> _basetype_caller_unit(const std::vector<BaseType::BatchInfo> &samples_batchinfo_vector, 
-                                                       const double min_af,
-                                                       const std::vector<size_t> group_idx = std::vector<size_t>(),
-                                                       const std::vector<std::string> basecombination = std::vector<std::string>());
+    std::pair<BaseType, VariantInfo> _basetype_caller_unit(
+        const std::vector<BaseType::BatchInfo> &samples_batchinfo_vector, 
+        const std::vector<size_t> group_idx = std::vector<size_t>(),
+        const std::vector<std::string> basecombination = std::vector<std::string>());
 
-/**
- * @brief Get the variant information object
- * 
- * @param bt BaseType
- * @param smp_bi BaseType::BatchInfo 
- * @return VariantInfo 
- * 
- */
-VariantInfo get_pos_variant_info(const BaseType &bt, const BaseType::BatchInfo *smp_bi);
+    /**
+     * @brief Get the variant information object
+     * 
+     * @param bt BaseType
+     * @param smp_bi BaseType::BatchInfo 
+     * @return VariantInfo 
+     * 
+     */
+    VariantInfo get_pos_variant_info(const BaseType &bt, const BaseType::BatchInfo *smp_bi);
+    VCFRecord _vcfrecord_in_pos(const std::vector<BaseType::BatchInfo> &samples_batchinfo_vector, 
+                                const VariantInfo &global_variant_info,
+                                const std::map<std::string, BaseType> &group_bt, 
+                                AlleleInfo &ai);
 
-VCFRecord _vcfrecord_in_pos(const std::vector<BaseType::BatchInfo> &samples_batchinfo_vector, 
-                            const VariantInfo &global_variant_info,
-                            const std::map<std::string, BaseType> &group_bt, 
-                            AlleleInfo &ai);
+    BaseTypeRunner(const BaseTypeRunner &) = delete;             // reject using copy constructor (C++11 style).
+    BaseTypeRunner &operator=(const BaseTypeRunner &) = delete;  // reject using copy/assignment operator (C++11 style).
+
+public:
+    // default constructor
+    BaseTypeRunner() : _args(NULL) {}
+    BaseTypeRunner(int cmdline_argc, char *cmdline_argv[]);
+    
+    // Destroy the malloc'ed BasTypeArgs structure
+    ~BaseTypeRunner(){ if(_args){delete _args; _args = NULL;} }
+
+    // Common functions
+    const std::string usage() const;
+    void print_calling_interval();
+
+    // Run the variant calling process
+    void run() { _variant_caller_process(); }
+
+};  // BaseTypeRunner class
+
+
+
+
 #endif
