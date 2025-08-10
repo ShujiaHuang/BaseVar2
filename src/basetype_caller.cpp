@@ -370,7 +370,7 @@ void BaseTypeRunner::run() {
         time_t now = time(0);
         std::string ct(ctime(&now)); 
         ct.pop_back();
-        std::cout << "[INFO] "+ ct +". Done for creating all " << batchfiles.size() << " batchfiles in " 
+        std::cout << "[INFO] " + ct + ". Done for creating all " << batchfiles.size() << " batchfiles in " 
                   << gr.to_string() + " and start to call variants, " << difftime(now, real_start_time) << "(CPU time: " 
                   << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC << ") seconds elapsed in total.\n" 
                   << std::endl;
@@ -393,7 +393,7 @@ void BaseTypeRunner::run() {
         now = time(0);
         ct  = ctime(&now); 
         ct.pop_back();
-        std::cout << "[INFO]"+ ct +". Done for calling all variants in " + gr.to_string() + ": "
+        std::cout << "[INFO] " + ct + ". Done for variants detection in " + gr.to_string() + ": "
                   << sub_vcf_fn + ", " << difftime(now, real_start_time) << "(CPU time: " 
                   << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC << ") seconds elapsed in total.\n" 
                   << std::endl;
@@ -837,38 +837,38 @@ bool BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
                                          const std::string out_vcf_fn) 
 {
     // Split the region into multiple sub-regions for multiple-thread calling
-    // Each sub-region is about 'STEP_REGION_LEN' bp length
+    // Each sub-region is about 'STEP_LEN' bp length
     // Then merge all the sub-vcf files into one file.
+
     if (batchfiles.empty()) {
         throw std::invalid_argument("[ERROR] No batchfiles for calling variants in " + gr.to_string() + "\n");
     }
 
     // decide how many sub-regions we should split
     int bn = _args->thread_num;
-    uint32_t STEP_REGION_LEN = (gr.end - gr.start + 1) / bn;
-    if ((gr.end - gr.start + 1) % bn) STEP_REGION_LEN++;
+    uint32_t STEP_LEN = (gr.end - gr.start + 1) / bn;
+    if ((gr.end - gr.start + 1) % bn) STEP_LEN++;
     
     // prepare multiple-thread
     ThreadPool thread_pool(_args->thread_num);  
     std::vector<std::future<bool>> call_variants_processes;
 
     std::vector<std::string> subvcfs;
-    uint32_t sub_reg_start, sub_reg_end; // get region information
-    for (uint32_t i(gr.start), j(1); i < gr.end + 1; i += STEP_REGION_LEN, ++j) {
+    for (uint32_t i(gr.start), j(1); i < gr.end + 1; i += STEP_LEN, ++j) {
         std::string tmp_vcf_fn = out_vcf_fn + "." + std::to_string(j) + "_" + std::to_string(bn);
         subvcfs.push_back(tmp_vcf_fn);
 
-        sub_reg_start = i;  // 1-based
-        sub_reg_end = (sub_reg_start+STEP_REGION_LEN-1) > gr.end ? gr.end : sub_reg_start+STEP_REGION_LEN-1;
-        std::string regstr = gr.chrom + ":" + std::to_string(sub_reg_start) + "-" + std::to_string(sub_reg_end);
+        uint32_t sub_gr_start = i; // 1-based
+        uint32_t sub_gr_end = (sub_gr_start+STEP_LEN-1) > gr.end ? gr.end : sub_gr_start+STEP_LEN-1;
+        std::string gr_str = gr.chrom + ":" + std::to_string(sub_gr_start) + "-" + std::to_string(sub_gr_end);
 
         // Performance multi-thread here.
         call_variants_processes.emplace_back(
             thread_pool.submit(std::bind(&BaseTypeRunner::_variant_calling_unit, this,
                                          std::cref(batchfiles), 
-                                         std::cref(_samples_id),
+                                         std::cref(_samples_id),  // 作为类变量，这个传参是多余的，之后再改吧，下同
                                          std::cref(_groups_idx),
-                                         regstr,        // 局部变量必须拷贝，会变 
+                                         gr_str,         // 局部变量必须拷贝，会变 
                                          tmp_vcf_fn)));  // 局部变量必须拷贝，会变 
     }
 
