@@ -54,7 +54,7 @@ git clone https://github.com/ShujiaHuang/basevar2.git
 
 > **WARNING**: Please try several times if fail to clone the data causing by the network problem.
 
-**2. Navigate into htslib/htscodecs folder and run the following commands**
+**2. Navigate into `htslib` folder and run the following commands**
 
 After cloing, navigate into the `basevar` folder (`cd basevar`) and execute the following:
 
