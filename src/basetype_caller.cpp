@@ -382,8 +382,12 @@ void BaseTypeRunner::run() {
         cpu_start_time  = clock();
 
         std::string sub_vcf_fn = prefix + ".vcf.gz";
-        _variants_discovery(batchfiles, gr, sub_vcf_fn);
+        bool is_empty = _variants_discovery(batchfiles, gr, sub_vcf_fn);
         vcffiles.push_back(sub_vcf_fn);
+
+        if (is_empty) {
+            std::cerr << "[WARNING] No variants found in region: " << gr.to_string() << "\n";
+        }
 
         // Time information
         now = time(0);
@@ -400,6 +404,8 @@ void BaseTypeRunner::run() {
                 ngslib::safe_remove(bf+".tbi");
             }
         }
+
+        batchfiles.clear(); 
     }
 
     // Merge all VCF subfiles
@@ -446,7 +452,7 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::Genome
         batchfiles.push_back(batchfile);   // Store the name of batchfile into a vector
 
         if (_args->smart_rerun && ngslib::is_readable(batchfile)) {
-            // do not have to create the exists batchfiles again if set `--smart-rerun`
+            // do not create the existed batchfile again if set `--smart-rerun`
             std::cout << "[INFO] " + batchfile + " already exists, we don't have to "
                          "create it again, when we set `--smart-rerun`.\n";
             continue;
@@ -555,7 +561,7 @@ bool BaseTypeRunner::_fetch_base_in_region(const std::vector<std::string> &batch
                                            PosMapVector &batchsamples_posinfomap_vector)  
 {
     // only using here, In case of missing the overlap reads on side position, 200bp would be enough
-    static const uint32_t REG_EXPEND_SIZE = 200;
+    static const uint32_t REG_EXPEND_SIZE = 100;
 
     uint32_t extend_start = gr.start > REG_EXPEND_SIZE ? gr.start - REG_EXPEND_SIZE : 1;  // 1-based
     uint32_t extend_end   = gr.end + REG_EXPEND_SIZE;
@@ -826,7 +832,7 @@ void BaseTypeRunner::_write_record_to_batchfile(const PosMapVector &batchsamples
     return;
 }
 
-void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfiles, 
+bool BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfiles, 
                                          const ngslib::GenomeRegion gr,
                                          const std::string out_vcf_fn) 
 {
@@ -838,11 +844,10 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     }
 
     // decide how many sub-regions we should split
-    static const uint32_t STEP_REGION_LEN = 100000; // 10 for test, should set to be large than 100000
-    int bn = (gr.end - gr.start + 1) / STEP_REGION_LEN;
-    if ((gr.end - gr.start + 1) % STEP_REGION_LEN > 0)
-        bn++;
-
+    int bn = _args->thread_num;
+    uint32_t STEP_REGION_LEN = (gr.end - gr.start + 1) / bn;
+    if ((gr.end - gr.start + 1) % bn) STEP_REGION_LEN++;
+    
     // prepare multiple-thread
     ThreadPool thread_pool(_args->thread_num);  
     std::vector<std::future<bool>> call_variants_processes;
@@ -868,9 +873,11 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     }
 
     // Run and make sure all processes could be finished.
+    bool is_empty = true;
     for (auto & p: call_variants_processes) {
         if (p.valid()) {
             bool x = p.get();
+            if (is_empty && x) is_empty = false;
         }
     }
     call_variants_processes.clear();  // release the thread
@@ -878,7 +885,7 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     std::string header = "## No need header here";
     merge_file_by_line(subvcfs, out_vcf_fn, header, true);
 
-    return;
+    return is_empty;
 }
 
 /// Functions for calling variants outside of 'BaseTypeRunner' class 
@@ -929,12 +936,10 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
     std::vector<std::string> smp_bf_line_vector;
     smp_bf_line_vector.reserve(batchfiles.size());
 
-    bool is_eof(false), has_data(false);
-    uint32_t n = 0;
-    while (!is_eof) {
+    bool is_eof(false);
+    int n = 0, variant_count = 0;
+    while (!is_eof) { // Read one line from each file per loop.
         smp_bf_line_vector.clear();
-        
-        // Read one line from each file
         for (size_t i = 0; i < batch_files_hd.size(); ++i) {
             std::string line;
             if (!batch_files_hd[i]->readline_with_index(indexes[i].get(), iterators[i].get(), line)) {
@@ -946,7 +951,7 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
 
         if (!smp_bf_line_vector.empty()) {
             bool cc = _basevar_caller(smp_bf_line_vector, group_smp_idx, sample_ids.size(), VCF_OUT);
-            if (cc && !has_data) has_data = true;
+            if (cc) ++variant_count;
         }
         
         if (++n % 10000 == 0) {
@@ -961,13 +966,13 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
     time_t now = time(0);
     std::string ct(ctime(&now));
     ct.pop_back();
-    std::cout << "[INFO] " + ct + ". Done for creating " + tmp_vcf_fn + ", "
+    std::cout << "[INFO] " + ct + ". Found " << variant_count << " variants and has been wrote in " + tmp_vcf_fn + ", "
               << difftime(now, real_start_time) 
               << " (CPU time: " << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC 
               << ") seconds elapsed." << std::endl;
 
     // Files will be automatically closed when destructors are called
-    return has_data;
+    return variant_count > 0;
 }
 
 std::vector<std::string> BaseTypeRunner::_get_sampleid_from_batchfiles(const std::vector<std::string> &batchfiles) {

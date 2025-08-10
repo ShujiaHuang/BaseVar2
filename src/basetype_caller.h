@@ -82,13 +82,10 @@ private:
     // templary output files
     std::vector<std::string> _sub_out_vcf;
 
-    void _get_calling_interval();  // load the calling region from input
+    void _make_calling_interval();  // load the calling region from input
     void _get_sample_id_from_bam();
     void _get_popgroup_info();
-    ngslib::GenomeRegion _make_gregion_region(std::string gregion);
-
-    // For variant calling
-    void _variant_caller_process();
+    ngslib::GenomeRegion _make_gregion_region(const std::string &gregion);
     
     /**
      * @brief Create a batch of temp files for variant discovery (could be deleted when the jobs done).
@@ -121,7 +118,7 @@ private:
                                     ngslib::BGZFile &obf);
 
     // Functions for calling variants
-    void _variants_discovery(const std::vector<std::string> &batchfiles, 
+    bool _variants_discovery(const std::vector<std::string> &batchfiles, 
                              const ngslib::GenomeRegion genome_region,
                              const std::string sub_vcf_fn);
 
@@ -131,13 +128,13 @@ private:
                                const std::map<std::string, std::vector<size_t>> & group_smp_idx,
                                const std::string reg_str,  // genome region format like samtools
                                const std::string vcf_fn);
+
     // Get sample id from batchfiles header.
     std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::string> &batchfiles);
-
     bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, 
-                     const std::map<std::string, std::vector<size_t>> &group_smp_idx,
-                     size_t n_sample, 
-                     ngslib::BGZFile &vcf_hd);
+                         const std::map<std::string, std::vector<size_t>> &group_smp_idx,
+                         size_t n_sample, 
+                         ngslib::BGZFile &vcf_hd);
 
     std::pair<BaseType, VariantInfo> _basetype_caller_unit(
         const std::vector<BaseType::BatchInfo> &samples_batchinfo_vector, 
@@ -171,10 +168,9 @@ public:
 
     // Common functions
     const std::string usage() const;
-    void print_calling_interval();
 
-    // Run the variant calling process
-    void run() { _variant_caller_process(); }
+    // Run the whole variant calling processes
+    void run();
 
 };  // BaseTypeRunner class
 
