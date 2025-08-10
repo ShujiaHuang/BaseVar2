@@ -47,7 +47,7 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
 
     if (cmd_argc < 2) {
         std::cout << usage() << "\n" << std::endl;
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     
     // Parsing the commandline options. 
@@ -75,7 +75,8 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
         {0, 0, 0, 0}
     };
 
-    // Save the complete command line options in VCF header
+    // Save the complete command line options in VCF header.
+    // This code should be run before calling `getopt_long`
     _cmdline_string = "##basevar_command=basevar ";
     for (size_t i = 0; i < cmd_argc; ++i) {
         _cmdline_string += (i > 0) ? " " + std::string(cmd_argv[i]) : std::string(cmd_argv[i]);
@@ -151,13 +152,14 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
         "   -q " << _args->min_mapq           << " \\ \n"
         "   -m " << _args->min_af             << " \\ \n"
         "   -B " << _args->batchcount         << " \\ \n"
-        "   -t " << _args->thread_num         << " \\ \n"  << (_args->regions.empty() ? "" : 
-        "   -r " + _args->regions              + " \\ \n") << (_args->pop_group_file.empty() ? "" : 
-        "   -G " + _args->pop_group_file       + " \\ \n") <<
-        "   --output-vcf " + _args->output_vcf << (_args->filename_has_samplename ? " \\ \n"
-        "   --filename-has-samplename" : "")   << (_args->smart_rerun ? " \\ \n"
-        "   --smart-rerun": "")                << " " + _args->input_bf[0] + " [... there are inputting " 
-        << _args->input_bf.size() << " bamfiles in total]. \n" << std::endl;
+        "   -t " << _args->thread_num         << " \\ \n"  + (_args->regions.empty() ? "" : 
+        "   -r " + _args->regions              + " \\ \n") + (_args->pop_group_file.empty() ? "" : 
+        "   -G " + _args->pop_group_file       + " \\ \n") +
+        "   --output-vcf " + _args->output_vcf + " \\ \n"  + (_args->filename_has_samplename ? " \\ \n"
+        "   --filename-has-samplename" : "")   + (_args->smart_rerun ? " \\ \n"
+        "   --smart-rerun": "")                + " " + _args->input_bf[0] + " [... there are inputting " 
+        << _args->input_bf.size() << " bamfiles in total]. \n"
+        << std::endl;
     
     if (_args->smart_rerun) {
         std::cout << "************************************************\n"
@@ -171,14 +173,14 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
     }
 
     std::cout << "[INFO] Finish loading arguments and we have " << _args->input_bf.size()
-              << " BAM/CRAM files for variants calling.\n"      << std::endl;
+              << " BAM/CRAM files for variants calling."        << std::endl;
 
     // Setting the resolution of AF
     _args->min_af = std::min(float(100)/_args->input_bf.size(), _args->min_af);
     reference = _args->reference;  // load fasta
 
-    _get_calling_interval();
-    print_calling_interval();
+    // get calling interval after loading the whole `reference` genome
+    _make_calling_interval();
 
     // keep the order of '_samples_id' as the same as input 'aligne_files'
     _get_sample_id_from_bam();  
@@ -198,6 +200,7 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
 
     std::string samplename, filename;
     size_t si;
+    _samples_id.clear();
     for (size_t i(0); i < _args->input_bf.size(); ++i) {
 
         if ((i+1) % 1000 == 0)
@@ -240,7 +243,7 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
     return;
 }
 
-void BaseTypeRunner::_get_calling_interval() {
+void BaseTypeRunner::_make_calling_interval() {
 
     _calling_intervals.clear();  // clear the vector of calling intervals
     if (!_args->regions.empty()) {
@@ -252,7 +255,7 @@ void BaseTypeRunner::_get_calling_interval() {
             _calling_intervals.push_back(_make_gregion_region(rg_v[i]));
         }
     } else {
-        // Calling the whole genome
+        // Call the whole genome
         int n = reference.nseq();
         for (size_t i(0); i < n; ++i) {
             std::string ref_id = reference.iseq_name(i);
@@ -263,7 +266,7 @@ void BaseTypeRunner::_get_calling_interval() {
     return;
 }
 
-ngslib::GenomeRegion BaseTypeRunner::_make_gregion_region(std::string gregion) {
+ngslib::GenomeRegion BaseTypeRunner::_make_gregion_region(const std::string &gregion) {
     // Genome Region, 1-based
     std::string ref_id; 
     uint32_t reg_start, reg_end;
@@ -288,17 +291,6 @@ ngslib::GenomeRegion BaseTypeRunner::_make_gregion_region(std::string gregion) {
     }
 
     return ngslib::GenomeRegion(ref_id, reg_start, reg_end);  // 1-based
-}
-
-void BaseTypeRunner::print_calling_interval() {
-    std::string ref_id;
-    uint32_t reg_start, reg_end;
-    std::cout << "---- Calling Intervals ----\n";
-    for (size_t i(0); i < _calling_intervals.size(); ++i) {
-        std::cout << i+1 << " - " << _calling_intervals[i].to_string() << "\n";
-    }
-    std::cout << "\n";
-    return;
 }
 
 void BaseTypeRunner::_get_popgroup_info() {
@@ -342,7 +334,7 @@ void BaseTypeRunner::_get_popgroup_info() {
 }
 
 // Run the processes of calling variant and output files.
-void BaseTypeRunner::_variant_caller_process() {
+void BaseTypeRunner::run() {
     // Get filepath and stem name first.
     std::string _bname = ngslib::basename(_args->output_vcf);
     size_t si = _bname.find(".vcf");
@@ -358,6 +350,8 @@ void BaseTypeRunner::_variant_caller_process() {
         for (size_t i(0); i < _args->thread_num; ++i)
             ngslib::safe_remove(ngslib::get_last_modification_file(cache_outdir));
     }
+
+    std::cout << "---- Start calling variants ----\n" << std::endl;
 
     // 以区间为单位进行变异检测, 每个区间里调用多线程
     std::vector<std::string> batchfiles, vcffiles;
@@ -448,7 +442,7 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::Genome
     std::string fa_seq = reference[gr.chrom];  // use the whole sequence of ``ref_id`` for simply
     for (size_t i(0), j(1); i < _args->input_bf.size(); i+=_args->batchcount, ++j) {
         // set name of batchfile and must be compressed by BGZF.
-        std::string batchfile = bf_prefix + "." + ngslib::tostring(j) + "_" + ngslib::tostring(bn) + ".bf.gz";
+        std::string batchfile = bf_prefix + "." + std::to_string(j) + "_" + std::to_string(bn) + ".bf.gz";
         batchfiles.push_back(batchfile);   // Store the name of batchfile into a vector
 
         if (_args->smart_rerun && ngslib::is_readable(batchfile)) {
@@ -599,7 +593,6 @@ bool BaseTypeRunner::_fetch_base_in_region(const std::vector<std::string> &batch
             sample_posinfo_map.clear();  // make sure it's empty
             if (sample_target_reads.size() > 0) {
                 // get alignment information of [i] sample.
-                // __seek_position(sample_target_reads, fa_seq, gr, _args->min_baseq, sample_posinfo_map);
                 _seek_position(sample_target_reads, fa_seq, gr, sample_posinfo_map);
             }
         }
@@ -857,7 +850,7 @@ void BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     std::vector<std::string> subvcfs;
     uint32_t sub_reg_start, sub_reg_end; // get region information
     for (uint32_t i(gr.start), j(1); i < gr.end + 1; i += STEP_REGION_LEN, ++j) {
-        std::string tmp_vcf_fn = out_vcf_fn + "." + ngslib::tostring(j) + "_" + ngslib::tostring(bn);
+        std::string tmp_vcf_fn = out_vcf_fn + "." + std::to_string(j) + "_" + std::to_string(bn);
         subvcfs.push_back(tmp_vcf_fn);
 
         sub_reg_start = i;  // 1-based
