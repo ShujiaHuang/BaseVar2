@@ -100,8 +100,8 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
             case 'B': ss >> _args->batchcount;                 break;  // 恒参
             case 't': ss >> _args->thread_num;                 break;  // 恒参
 
-            case 'r': _args->regions        = optarg;          break;  /* 临参 */
-            case 'G': _args->pop_group_file = optarg;          break;  // 
+            case 'r': _args->regions                 = optarg; break;  /* 临参 */
+            case 'G': _args->pop_group_file          = optarg; break;  // 恒参 
             case '1': _args->filename_has_samplename = true;   break;  // 恒参
             case '2': _args->smart_rerun             = true;   break;  // 恒参
             case 'h': 
@@ -156,7 +156,7 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
         "   -G " + _args->pop_group_file       + " \\ \n") <<
         "   --output-vcf " + _args->output_vcf << (_args->filename_has_samplename ? " \\ \n"
         "   --filename-has-samplename" : "")   << (_args->smart_rerun ? " \\ \n"
-        "   --smart-rerun": "")                << " " + _args->input_bf[0] + " [... " 
+        "   --smart-rerun": "")                << " " + _args->input_bf[0] + " [... there are inputting " 
         << _args->input_bf.size() << " bamfiles in total]. \n" << std::endl;
     
     if (_args->smart_rerun) {

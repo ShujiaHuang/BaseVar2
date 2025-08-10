@@ -1,6 +1,10 @@
 # BaseVar: Call variants from ultra low-pass WGS data
 
-[![BaseVar Logo](https://github.com/ShujiaHuang/basevar/blob/main/docs/assets/images/basevar.png)](https://github.com/ShujiaHuang/basevar2)
+<div align="center">
+  <a href="https://github.com/ShujiaHuang/basevar2">
+    <img src="https://github.com/ShujiaHuang/basevar/blob/main/docs/assets/images/basevar.png" alt="BaseVar Logo">
+  </a>
+</div>
 
 *BaseVar* is a specialized tool tailored for variant calling using ultra low-depth (<1x) sequencing data, particularly catering to non-invasive prenatal test (NIPT) data in human genetic studies. Leveraging maximum likelihood and likelihood ratio models, BaseVar accurately identifies polymorphisms at genomic positions and calculates allele frequencies. For in-depth mathematical explanations, refer to the comprehensive documentation available [here](https://doi.org/10.1016/j.cell.2018.08.016).
 
@@ -8,7 +12,7 @@ Now, BaseVar has been fully implemented by C++. BaseVar showcases significant en
 
 ## Citation
 
-Please cite the following papers if you use BaseVar in your published projects or papers. 
+Please cite the following papers if you use BaseVar in your published projects or papers.
 
 > - Liu, S., Liu, Y., Gu, Y., Lin, X., Zhu, H., Liu, H., Xu, Z., Cheng, S., Lan, X., Li, L., Huang, M., Li, H., Nielsen, R., Davies, RW., Albrechtsen, A., Chen, GB., Qiu, X., Jin, X., **Huang, S.**, (2024). Utilizing non-invasive prenatal test sequencing data for human genetic investigation. *Cell Genomics* 4(10), 100669 [doi:10.1016/j.xgen.2024.100669](https://www.cell.com/cell-genomics/fulltext/S2666-979X(24)00288-X)
 

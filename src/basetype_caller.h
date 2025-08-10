@@ -54,6 +54,7 @@ public:
         std::string regions;                // Interval regions
         std::string pop_group_file;         // Specific population
         std::string output_vcf;             // Output VCF file
+        // std::string output_mode;            // e.g, "w", "wb", "wz"
 
         bool filename_has_samplename;       // sample name in file name
         bool smart_rerun;                   // Smart rerun by checking batchfiles
