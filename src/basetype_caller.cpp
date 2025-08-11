@@ -9,7 +9,7 @@
 #include "basetype_caller.h"
 
 const std::string BaseTypeRunner::usage() const {
-    const std::string BASETYPE_USAGE = 
+    static const std::string BASETYPE_CALLER_USAGE = 
         "About: Call variants and estimate allele frequency by BaseVar.\n" 
         "Usage: basevar caller [options] <-R Fasta> <--output-vcf> [-L bam.list] in1.bam [in2.bam ...] ...\n\n" 
 
@@ -38,7 +38,7 @@ const std::string BaseTypeRunner::usage() const {
         "  --smart-rerun                Rerun process by checking batchfiles.\n"
         "  -h, --help                   Show this help message and exit."; 
         
-    return BASETYPE_USAGE;
+    return BASETYPE_CALLER_USAGE;
 }
 
 BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
@@ -77,14 +77,14 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
 
     // Save the complete command line options in VCF header.
     // This code should be run before calling `getopt_long`
-    _cmdline_string = "##basevar_command=basevar ";
+    _cmdline_string = "##basevar_caller_command=";
     for (size_t i = 0; i < cmd_argc; ++i) {
         _cmdline_string += (i > 0) ? " " + std::string(cmd_argv[i]) : std::string(cmd_argv[i]);
     }
 
     char c;
     std::vector<std::string> bv;
-    while((c = getopt_long(cmd_argc, cmd_argv, "L:R:O:m:q:Q:B:t:r:G:h", BASETYPE_CMDLINE_LOPTS, NULL)) >= 0) {
+    while((c = getopt_long(cmd_argc, cmd_argv, "L:R:O:m:q:Q:B:t:r:G:h", BASETYPE_CMDLINE_LOPTS, nullptr)) >= 0) {
         // 字符流解决命令行参数转浮点等类型的问题
         std::stringstream ss(optarg ? optarg: "");  
         switch (c) {
@@ -334,7 +334,7 @@ void BaseTypeRunner::_get_popgroup_info() {
 }
 
 // Run the processes of calling variant and output files.
-void BaseTypeRunner::run() {
+int BaseTypeRunner::run() {
     // Get filepath and stem name first.
     std::string _bname = ngslib::basename(_args->output_vcf);
     size_t si = _bname.find(".vcf");
@@ -431,7 +431,8 @@ void BaseTypeRunner::run() {
     if (IS_DELETE_CACHE_BATCHFILE) {
         ngslib::safe_remove(cache_outdir);
     }
-    return;
+
+    return 0; // SUCCESS
 }
 
 std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::GenomeRegion gr, 

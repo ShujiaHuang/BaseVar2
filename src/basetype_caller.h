@@ -170,7 +170,7 @@ public:
     const std::string usage() const;
 
     // Run the whole variant calling processes
-    void run();
+    int run();
 
 };  // BaseTypeRunner class
 
