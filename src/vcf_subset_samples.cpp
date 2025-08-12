@@ -272,7 +272,7 @@ int VCFSubsetSamples::run() {
 
             // 在这里添加记录子集化处理
             ngslib::VCFRecord subset_rec = rec.subset_samples(subset_hdr, sample_indices);
-            if (!subset_rec.cleanup_alleles(subset_hdr)) { // 先清理不再出现的 ALT 等位基因
+            if (!subset_rec.cleanup_alleles(subset_hdr)) { // 先清理不再出现的 ALT 等位基因，并对样本基因型进行更新
                 throw std::runtime_error("Error cleaning up alleles in subset record at "
                     + subset_rec.chrom(subset_hdr) + ":" + std::to_string(subset_rec.pos() + 1));
             }  
@@ -293,7 +293,6 @@ int VCFSubsetSamples::run() {
             // function when creating the subset header, and bcf_write correctly writes
             // only the FORMAT data for the samples present in the output header.
             // We don't need to manually subset FORMAT fields here.
-
             // Write the potentially modified record
             if (outvcf.write(subset_rec) < 0) {
                 throw std::runtime_error("Error writing VCF record to: " + _output_vcf_path);

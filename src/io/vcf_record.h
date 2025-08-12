@@ -9,14 +9,16 @@
 #include <vector>
 #include <memory> // For std::shared_ptr
 #include <stdexcept>
-#include <limits> // For numeric_limits
+#include <limits> // Required for numeric_limits
+#include <cstring> // For strcmp, strlen
 
 #include <htslib/vcf.h>
+#include <htslib/kstring.h> // For string manipulation if needed
+
 #include "vcf_header.h" // Needs header context
 #include "utils.h"      // For potential utility functions
 
 namespace ngslib {
-
     /**
      * @brief A C++ wrapper class for an htslib VCF/BCF record (bcf1_t).
      *

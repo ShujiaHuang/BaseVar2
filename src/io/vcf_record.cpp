@@ -3,13 +3,6 @@
 // Date: 2025-04-17
 
 #include "vcf_record.h"
-#include <htslib/vcf.h>
-#include <htslib/kstring.h> // For string manipulation if needed
-#include <vector>
-#include <string>
-#include <cstring> // For strcmp, strlen
-#include <stdexcept>
-#include <limits> // Required for numeric_limits
 
 namespace ngslib {
 
@@ -697,7 +690,7 @@ namespace ngslib {
         VCFRecord subset_rec = copy_record();
         
         // Call bcf_subset with indices
-        // Note: bcf_subset modifies the record in place, so we need to pass the copy
+        // Note: bcf_subset modifies the record in place, so we need to pass the copy one
         // Signature: int bcf_subset(const bcf_hdr_t *h, bcf1_t *v, int n, int *imap);
         if (bcf_subset(hdr.hts_header(), subset_rec._b.get(), sample_indices.size(), sample_indices.data()) != 0) {
             throw std::runtime_error("Failed to subset record at " + chrom(hdr) + ":" + std::to_string(pos()+1));
@@ -794,7 +787,8 @@ namespace ngslib {
     }
 
     int VCFRecord::update_alleles(const VCFHeader& hdr, const std::string& ref, 
-                                  const std::vector<std::string>& alts) {
+                                  const std::vector<std::string>& alts)
+    {
         // 1. 安全性检查
         if (!is_valid_unsafe() || !hdr.is_valid() || alts.empty()) return -1;
         
