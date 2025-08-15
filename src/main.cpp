@@ -10,7 +10,7 @@
 #include <ctime>
 
 #include "version.h"
-#include "basetype_caller.h"
+#include "variant_caller.h"
 #include "concat.h"
 #include "vcf_subset_samples.h"
 
@@ -77,8 +77,10 @@ int main(int argc, char *argv[]) {
         }
     
     } else if (cmd == "-h" || cmd == "--help") {
+
         return usage();
     } else {
+        
         std::cout << "Error: Unrecognizable option: " + cmd << std::endl;
         return EXIT_FAILURE;
     }

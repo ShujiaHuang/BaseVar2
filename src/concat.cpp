@@ -6,7 +6,6 @@
  * @date 2018-09-14
  * 
  */
-
 #include "concat.h"
 
 int _concat_basevar_outfile(const std::vector<std::string> &infiles, const std::string outfile) {
@@ -32,7 +31,7 @@ int concat_runner(int argc, char *argv[]) {
         "CAUTION: This function does not sort the postions, user should take care the concat order by themself.\n\n"
          
         "Required arguments:\n"
-        "  -O, --output=FILE      Write output to a file.\n\n"
+        "  -o, --output=FILE      Write output to a file.\n\n"
 
         "optional arguments:\n" 
         "  -L, --file-list=FILE   Input VCF files list, one file per row.\n"
@@ -49,7 +48,7 @@ int concat_runner(int argc, char *argv[]) {
     // Parsing the commandline options. 
     static const struct option CONCAT_CMDLINE_LOPTS[] = {
         {"align-file-list", optional_argument, NULL, 'L'},
-        {"output",          required_argument, NULL, 'O'},
+        {"output",          required_argument, NULL, 'o'},
         {"help",                  no_argument, NULL, 'h'},
 
         // must set this value
@@ -57,12 +56,12 @@ int concat_runner(int argc, char *argv[]) {
     };
 
     char c;
-    while((c = getopt_long(argc, argv, "L:O:h", CONCAT_CMDLINE_LOPTS, NULL)) >= 0) {
+    while((c = getopt_long(argc, argv, "L:o:h", CONCAT_CMDLINE_LOPTS, NULL)) >= 0) {
         // 字符流解决命令行参数转浮点等类型的问题
         std::stringstream ss(optarg ? optarg: "");  
         switch (c) {
             case 'L': input_files = ngslib::get_firstcolumn_from_file(optarg); break;
-            case 'O': output_file = optarg;                                    break;
+            case 'o': output_file = optarg;                                    break;
             case 'h': 
                 std::cout << CONCAT_USAGE << std::endl; 
                 exit(EXIT_SUCCESS);

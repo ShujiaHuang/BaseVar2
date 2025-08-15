@@ -7,12 +7,13 @@
  * @date 2018-08-29
  * 
  */
-#ifndef __INCLUDE_BASETYPE_UTILS_H__
-#define __INCLUDE_BASETYPE_UTILS_H__
+#ifndef __INCLUDE_BASEVAR_CALLER_UTILS_H__
+#define __INCLUDE_BASEVAR_CALLER_UTILS_H__
 
 #include <string>
 #include <vector>
 #include <iostream>
+#include <iomanip>  // std::setprecision
 
 #include <htslib/bgzf.h>
 #include <htslib/kstring.h>
@@ -216,7 +217,6 @@ VCFSampleAnnotation process_sample_variant(const std::string& upper_ref_base, co
                                            const BaseType::BatchInfo& smp_bi);
 // Helper function: Convert PL index to genotype pair
 std::pair<size_t, size_t> pl_index_to_genotype(size_t pl_idx, size_t n_alleles);
-
 
 std::string format_sample_string(const VCFSampleAnnotation& sa);
 
