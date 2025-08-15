@@ -110,11 +110,11 @@ To review each of the parameters, you can type `basevar caller -h` in the Linux/
 $ /path/to/basevar caller -h
 
 About: Call variants and estimate allele frequency by BaseVar.
-Usage: basevar caller [options] <-R Fasta> <--output-vcf> [-L bam.list] in1.bam [in2.bam ...] ...
+Usage: basevar caller [options] <-f Fasta> <--output-vcf output_file> [-L bam.list] in1.bam [in2.bam ...] ...
 
 Required arguments:
-  -R, --reference FILE         Input reference fasta file.
-  --output-vcf FILE            Output VCF file.
+  -f, --reference FILE         Input reference fasta file.
+  -o, --output    FILE         Output VCF file.
 
 Optional options:
   -L, --align-file-list=FILE   BAM/CRAM files list, one file per row.
@@ -127,10 +127,10 @@ Optional options:
                                represents the number of input BAM files min(0.001000, 100/x). In most
                                cases, users need not be overly concerned about this parameter, as it
                                is generally handled automatically by the program.
-  -Q, --min-BQ INT             Skip bases with base quality < INT [5]
-  -q, --mapq=INT               Skip reads with mapping quality < INT [10]
-  -B, --batch-count=INT        INT simples per batchfile. [200]
-  -t, --thread=INT             Number of threads. [hardware-concurrency]
+  -Q, --min-BQ INT             Skip bases with base quality < INT [10]
+  -q, --mapq=INT               Skip reads with mapping quality < INT [5]
+  -B, --batch-count=INT        INT simples per batchfile. [500]
+  -t, --thread=INT             Number of threads. [14]
 
   --filename-has-samplename    If the name of bamfile is something like 'SampleID.xxxx.bam', set this
                                argrument could save a lot of time during get the sample id from BAMfile.
@@ -145,11 +145,11 @@ This command will provide detailed information about parameters of `basevar`.
 ### Call variants from several bamfiles
 
 ```bash
-basevar caller -R reference.fasta \
+basevar caller -f reference.fasta \
     -q 10 -Q 20 -B 500 -t 24 \
     --pop-group=sample_group.info \
     --regions=chr11:5246595-5248428,chr17:41197764-41276135 \
-    --output-vcf test.vcf.gz 00alzqq6jw.bam 09t3r9n2rg.bam 0fkpl1p55b.bam ...
+    --output test.vcf.gz 00alzqq6jw.bam 09t3r9n2rg.bam 0fkpl1p55b.bam ...
 ```
 
 The format of `sample_group.info` could be found [here](https://github.com/ShujiaHuang/BaseVar2/blob/main/tests/data/sample_group.info).
@@ -157,18 +157,18 @@ The format of `sample_group.info` could be found [here](https://github.com/Shuji
 ### Or call variants from bamlist
 
 ```bash
-basevar caller -R reference.fasta \
+basevar caller -f reference.fasta \
     -q 10 -Q 20 -B 500 -t 24 \
     -L bamfile.list \ 
     --regions=chr11:5246595-5248428,chr17:41197764-41276135 \
     --pop-group=sample_group.info \
-    --output-vcf test.vcf.gz 
+    --output test.vcf.gz 
 ```
 
 For stramlinened variant calling across the entire genome, you can use the pipeline generator [**create_pipeline.py**](https://github.com/ShujiaHuang/BaseVar2/blob/main/scripts/create_pipeline.py), which distributes the computational tasks based on the --delta parameter across a specific chromosome defined by the -c parameter.
 
 ```bash
-python create_pipeline.py -Q 20 -q 10 -R reference.fa --ref_fai reference_fa.fai -c chr20 --delta 5000000 -t 24 -L bamfile.list -o outdir > basevar.chr20.sh
+python create_pipeline.py -Q 20 -q 10 -f reference.fa --ref_fai reference_fa.fai -c chr20 --delta 5000000 -t 24 -L bamfile.list -o outdir > basevar.chr20.sh
 ```
 
 **BaseVar** is under active development. Obtain the newest version by pulling the newest version and compilling again.

@@ -11,11 +11,11 @@
 const std::string BaseTypeRunner::usage() const {
     static const std::string BASETYPE_CALLER_USAGE = 
         "About: Call variants and estimate allele frequency by BaseVar.\n" 
-        "Usage: basevar caller [options] <-R Fasta> <--output-vcf> [-L bam.list] in1.bam [in2.bam ...] ...\n\n" 
+        "Usage: basevar caller [options] <-f Fasta> <--output-vcf output_file> [-L bam.list] in1.bam [in2.bam ...] ...\n\n" 
 
         "Required arguments:\n" 
-        "  -R, --reference FILE         Input reference fasta file.\n"
-        "  -O, --output-vcf FILE        Output VCF file.\n\n"
+        "  -f, --reference FILE         Input reference fasta file.\n"
+        "  -o, --output    FILE         Output VCF file.\n\n"
 
         "Optional options:\n"
         "  -L, --align-file-list=FILE   BAM/CRAM files list, one file per row.\n"
@@ -54,8 +54,8 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
     static const struct option BASETYPE_CMDLINE_LOPTS[] = {
         // Optional arguments to long style command line parameters require 'equals sign' (=). 
         // https://stackoverflow.com/questions/1052746/getopt-does-not-parse-optional-arguments-to-parameters
-        {"reference",         required_argument, NULL, 'R'},
-        {"output-vcf",        required_argument, NULL, 'O'},
+        {"reference",         required_argument, NULL, 'f'},
+        {"output",            required_argument, NULL, 'o'},
         {"align-file-list",   optional_argument, NULL, 'L'},
 
         {"min-af",            optional_argument, NULL, 'm'},
@@ -84,12 +84,12 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
 
     char c;
     std::vector<std::string> bv;
-    while((c = getopt_long(cmd_argc, cmd_argv, "L:R:O:m:q:Q:B:t:r:G:h", BASETYPE_CMDLINE_LOPTS, nullptr)) >= 0) {
+    while((c = getopt_long(cmd_argc, cmd_argv, "L:f:o:m:q:Q:B:t:r:G:h", BASETYPE_CMDLINE_LOPTS, nullptr)) >= 0) {
         // 字符流解决命令行参数转浮点等类型的问题
         std::stringstream ss(optarg ? optarg: "");  
         switch (c) {
-            case 'R': _args->reference  = optarg;              break;  /* 临参 */
-            case 'O': _args->output_vcf = optarg;              break;  // 恒参
+            case 'f': _args->reference  = optarg;              break;  /* 临参 */
+            case 'o': _args->output_vcf = optarg;              break;  // 恒参
             case 'L':
                 bv = ngslib::get_firstcolumn_from_file(optarg); 
                 _args->input_bf.insert(_args->input_bf.end(), 
@@ -124,9 +124,9 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
     if (_args->input_bf.empty())
         throw std::invalid_argument("[ERROR] Missing required BAM/CRAM files.");
     if (_args->reference.empty())
-        throw std::invalid_argument("[ERROR] Missing argument '-R/--reference'");
+        throw std::invalid_argument("[ERROR] Missing argument '-f/--reference'");
     if (_args->output_vcf.empty())
-        throw std::invalid_argument("[ERROR] Missing argument '--output-vcf'");
+        throw std::invalid_argument("[ERROR] Missing argument '-o/--output-vcf'");
     
     if (_args->min_af < 0)
         throw std::invalid_argument("[ERROR] '-m/--min-af' argument must be > 0");
@@ -147,7 +147,7 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
     // Output the commandline options
     std::cout << 
         "[INFO] BaseVar arguments:\n"
-        "basevar caller -R "+ _args->reference + " \\ \n"
+        "basevar caller -f "+ _args->reference + " \\ \n"
         "   -Q " << _args->min_baseq          << " \\ \n"
         "   -q " << _args->min_mapq           << " \\ \n"
         "   -m " << _args->min_af             << " \\ \n"
