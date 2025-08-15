@@ -29,11 +29,11 @@ def creat_basetype_pipe():
     exe_prog = pardir + '/bin/basevar caller'
 
     optp = argparse.ArgumentParser()
-    optp.add_argument('-O', '--outdir', metavar='STR', dest='outdir',
+    optp.add_argument('-o', '--outdir', metavar='STR', dest='outdir',
                       help='The output directory', default='')
-    optp.add_argument('-R', '--reference_fasta', metavar='FILE', dest='reference',
+    optp.add_argument('-f', '--reference_fasta', metavar='FILE', dest='reference',
                       help='The reference fa file', default='')
-    optp.add_argument('-f', '--ref_fai', metavar='FILE', dest='ref_fai',
+    optp.add_argument('--ref_fai', metavar='FILE', dest='ref_fai',
                       help='The reference fai file', default='')
     optp.add_argument('-Q', '--min-BQ', metavar='INT', dest='min_bq',
                       help='Minimal base quality', default=20)
@@ -70,7 +70,7 @@ def creat_basetype_pipe():
         # Todo: 可以增加多 regions 的功能，逗号分开，做数组即可
         chrid, reg = opt.regions.strip().split(':')
         reg = list(map(int, reg.split('-')))
-        ref_fai[chrid, reg[0], reg[1]] if (not chroms) or (chrid in chroms) else []
+        ref_fai = [chrid, reg[0], reg[1]] if (not chroms) or (chrid in chroms) else []
 
     for chr_id, reg_start, reg_end in ref_fai:
         for i in range(reg_start-1, reg_end, opt.delta):
@@ -80,13 +80,13 @@ def creat_basetype_pipe():
 
             outfile_prefix = chr_id + '_' + str(start) + '_' + str(end)
             if opt.pop_group:
-                print(f'time {exe_prog} -t {opt.n_thread} -R {opt.reference} -L {opt.infilelist} '
+                print(f'time {exe_prog} -t {opt.n_thread} -f {opt.reference} -L {opt.infilelist} '
                       f'-G {opt.pop_group} -r {reg} --min-af={opt.min_af} -q {opt.mapq} -Q {opt.min_bq} '
                       f'--output-vcf {opt.outdir}/{outfile_prefix}.vcf.gz '
                       f'--smart-rerun > {opt.outdir}/{outfile_prefix}.log && '
                       f'echo "** {outfile_prefix} done **"')
             else:    
-                print(f'time {exe_prog} -t {opt.n_thread} -R {opt.reference} -L {opt.infilelist} '
+                print(f'time {exe_prog} -t {opt.n_thread} -f {opt.reference} -L {opt.infilelist} '
                       f'-r {reg} --min-af={opt.min_af} -q {opt.mapq} -Q {opt.min_bq} '
                       f'--output-vcf {opt.outdir}/{outfile_prefix}.vcf.gz '
                       f'--smart-rerun > {opt.outdir}/{outfile_prefix}.log && '
