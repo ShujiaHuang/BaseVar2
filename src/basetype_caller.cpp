@@ -573,7 +573,11 @@ bool BaseTypeRunner::_fetch_base_in_region(const std::vector<std::string> &batch
     for(size_t i(0); i < batch_align_files.size(); ++i) {
         // 位点信息存入该变量, 且由于是按区间读取比对数据，key 值无需再包含 ref_id，因为已经不言自明。
         PosMap sample_posinfo_map;
-        ngslib::Bam bf(batch_align_files[i], "r");  // open bamfile in reading mode (one sample, one bamfile)
+        ngslib::Bam bf( 
+            // open BAM/CRAM file in reading mode (one sample, one bamfile)
+            batch_align_files[i], "r", 
+            (ngslib::is_cram(batch_align_files[i])) ? _args->reference : ""  // input reference if cram file
+        );  
         if (bf.fetch(extend_rgstr)) { // Set 'bf' only fetch alignment reads in 'exp_rgstr'.
             hts_pos_t map_ref_start, map_ref_end;  // hts_pos_t is uint64_t
             std::vector<ngslib::BamRecord> sample_target_reads; 
