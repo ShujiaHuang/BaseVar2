@@ -24,7 +24,6 @@
 #include "io/iobgzf.h"
 #include "io/bam.h"
 #include "io/utils.h"
-#include "io/hts_utils.h"  // nglib::is_cram
 
 #include "basetype_utils.h"
 #include "basetype.h"
