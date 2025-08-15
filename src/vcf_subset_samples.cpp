@@ -193,7 +193,7 @@ bool VCFSubsetSamples::recalculate_info(const ngslib::VCFHeader& hdr, ngslib::VC
 
     if ((!_keep_all_site) && (hom_ind_count + het_ind_count == 0)) return false;  // Non variants on this site
 
-    // 目前 INFO update 还是有很多局限性，比如 AF 无法重新计算，只能按照 AC/AN，DP，DP4 也无法一句 ALT 信息重新计算
+    // 目前 INFO update 还是有局限性，比如 AF 无法重新计算，只能按照 AC/AN，DP，DP4 也无法按 ALT 信息重新计算
 
     // Update AC, AN in the record's INFO field
     rec.update_info_int(hdr, "AC", ac.data(), ac.size());
@@ -201,17 +201,20 @@ bool VCFSubsetSamples::recalculate_info(const ngslib::VCFHeader& hdr, ngslib::VC
 
     // Update AF in the record's INFO field
     std::vector<float> af(n_alt, 0.0f);
+    std::vector<float> caf(n_alt, 0.0f);
     if (an > 0) {
-        // If AN is 0 (all kept samples had missing genotypes), set AF to missing or 0
+        // If AN is 0 (all kept samples had missing genotypes), set AF to 0 or missing
         for (int i = 0; i < n_alt; ++i) {
             af[i] = static_cast<float>(ac[i]) / an;
             // Handle potential NaN/Inf just in case, though unlikely here
             if (std::isnan(af[i]) || std::isinf(af[i])) {
                 af[i] = 0.0f; // Or some other placeholder like VCFRecord::FLOAT_MISSING
             }
+            caf[i] = af[i]; // Now the AF and CAF are the same. 
         }
     }
     rec.update_info_float(hdr, "AF", af.data(), af.size());
+    rec.update_info_float(hdr, "CAF", caf.data(), caf.size());
 
     return true;
 }
@@ -272,8 +275,8 @@ int VCFSubsetSamples::run() {
 
             // 在这里添加记录子集化处理
             ngslib::VCFRecord subset_rec = rec.subset_samples(subset_hdr, sample_indices);
-            if (!subset_rec.cleanup_alleles(subset_hdr)) { // 先清理不再出现的 ALT 等位基因，并对样本基因型进行更新
-                throw std::runtime_error("Error cleaning up alleles in subset record at "
+            if (!subset_rec.cleanup_genotypes(subset_hdr)) { // 清理不再出现的 ALT 等位基因，并对样本 genotype 进行更新
+                throw std::runtime_error("Error cleaning up genotypes in subset record at "
                     + subset_rec.chrom(subset_hdr) + ":" + std::to_string(subset_rec.pos() + 1));
             }  
 
@@ -282,10 +285,11 @@ int VCFSubsetSamples::run() {
                 // Note: This will modify the subset_rec in place
                 bool is_valid = recalculate_info(subset_hdr, subset_rec);
                 if (!is_valid) {
-                    std::cout << "[INFO] No valid genotypes for any kept samples at "
-                              << subset_rec.chrom(subset_hdr) << ":" << (subset_rec.pos() + 1)
-                              << ". Skipping this record.\n";
-                    continue; // Skip this record
+                    // Output for debug
+                    // std::cout << "[INFO] No valid genotypes for any kept samples at "
+                    //           << subset_rec.chrom(subset_hdr) << ":" << (subset_rec.pos() + 1)
+                    //           << ". Skipping this record.\n";
+                    continue; // No genotypes for any kept samples at this POS, Skip it.
                 }
             }
 

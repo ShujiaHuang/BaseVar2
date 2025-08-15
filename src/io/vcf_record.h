@@ -473,11 +473,10 @@ namespace ngslib {
 
         /**
          * @brief Cleans up alleles (REF and ALT) to remove invalid or missing values.
-         * This is a helper function for update_alleles.
          * @param hdr The VCFHeader associated with this record.
          * @return True if cleanup was successful, false if the record is invalid.
          */
-        bool cleanup_alleles(const ngslib::VCFHeader& hdr);
+        bool cleanup_genotypes(const ngslib::VCFHeader& hdr);
 
         /**
          * @brief Updates the reference and alternate alleles. Requires header context.
