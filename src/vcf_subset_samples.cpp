@@ -263,9 +263,6 @@ int VCFSubsetSamples::run() {
 
         // 3. Open Output VCF
         ngslib::VCFFile outvcf(_output_vcf_path, subset_hdr, _output_mode);
-        if (!outvcf.is_open()) {
-            throw std::runtime_error("Failed to open output VCF: " + _output_vcf_path);
-        }
 
         // 4. Read, Process, Write Records
         ngslib::VCFRecord rec;
