@@ -1219,9 +1219,9 @@ VariantInfo BaseTypeRunner::get_pos_variant_info(const BaseType &bt, const BaseT
 }
 
 VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInfo> &samples_batchinfo_vector, // has been normalized with ref and alt bases by 'global_variant_info'
-                            const VariantInfo &global_variant_info,
-                            const std::map<std::string, BaseType> &group_bt, 
-                            AlleleInfo &ai)
+                                            const VariantInfo &global_variant_info,
+                                            const std::map<std::string, BaseType> &group_bt, 
+                                            AlleleInfo &ai)
 {
     // Return empty record if no variants
     if (samples_batchinfo_vector.empty()) return VCFRecord();
@@ -1286,7 +1286,7 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
             for (auto b : it->second.get_active_bases()) { // must have the same order with ai.ref + ai.alts
                 if (b == ai.ref) continue;  // skip reference base
 
-                af.push_back(it->second.get_lrt_af(b));  // 由于 active-base 不完全一样，所以存在与 ai.alts 顺序不一致的风险
+                af.push_back(it->second.get_lrt_af(b));  // 由于 active-base 不完全一样，所以存在与 ai.alts 顺序不一致的风险，要改进
             }
 
             if (!af.empty()) {
