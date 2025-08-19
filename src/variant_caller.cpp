@@ -371,7 +371,7 @@ int BaseTypeRunner::run() {
         std::string ct(ctime(&now)); 
         ct.pop_back();
         std::cout << "[INFO] " + ct + ". Done for creating all " << batchfiles.size() << " batchfiles in " 
-                  << gr.to_string() + " and start to call variants, " << difftime(now, real_start_time) << "(CPU time: " 
+                  << gr.to_string() + " and start to call variants, " << difftime(now, real_start_time) << " (CPU time: " 
                   << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC << ") seconds elapsed in total.\n" 
                   << std::endl;
 
@@ -394,7 +394,7 @@ int BaseTypeRunner::run() {
         ct  = ctime(&now); 
         ct.pop_back();
         std::cout << "[INFO] " + ct + ". Done for variants detection in " + gr.to_string() + ": "
-                  << sub_vcf_fn + ", " << difftime(now, real_start_time) << "(CPU time: " 
+                  << sub_vcf_fn + ", " << difftime(now, real_start_time) << " (CPU time: " 
                   << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC << ") seconds elapsed in total.\n" 
                   << std::endl;
         
