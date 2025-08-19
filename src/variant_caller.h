@@ -70,9 +70,9 @@ private:
                         filename_has_samplename(false) {}
     };
 
-    std::string _cmdline_string;                             // save the commandline options
-    BaseTypeARGS *_args;                                     // Commandline options
     ngslib::Fasta reference;
+    BaseTypeARGS *_args;                                     // Commandline options
+    std::string _cmdline_string;                             // save the commandline options
     std::vector<std::string> _samples_id;                    // sample ID of alignment files (BAM/CRAM/SAM)
                                                              // `_samples_id` and `input_bf` have the same order 
     std::map<std::string, std::vector<size_t>> _groups_idx;  // sample group: group => samples index
