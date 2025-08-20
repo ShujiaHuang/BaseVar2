@@ -182,12 +182,13 @@ bool VCFSubsetSamples::recalculate_info(const ngslib::VCFHeader& hdr, ngslib::VC
             } else if (non_missing_al.size() > 1) {
                 het_ind_count++;
             }
-            // available_ind_count++;
         }
     }
 
     if ((!_keep_all_site) && (an == 0)) {
-        std::cerr << "Warning: Missing call in all samples "<< rec.chrom(hdr) << ":" << (rec.pos() + 1) << "\n";
+        std::cerr << "[INFO] No valid genotypes for any kept samples at " 
+                  << rec.chrom(hdr) << ":" << (rec.pos() + 1) 
+                  << ". Skipping this record.\n";
         return false;
     }
 
@@ -282,10 +283,6 @@ int VCFSubsetSamples::run() {
                 // Note: This will modify the subset_rec in place
                 bool is_valid = recalculate_info(subset_hdr, subset_rec);
                 if (!is_valid) {
-                    // Output for debug
-                    // std::cout << "[INFO] No valid genotypes for any kept samples at "
-                    //           << subset_rec.chrom(subset_hdr) << ":" << (subset_rec.pos() + 1)
-                    //           << ". Skipping this record.\n";
                     continue; // No genotypes for any kept samples at this POS, Skip it.
                 }
             }
