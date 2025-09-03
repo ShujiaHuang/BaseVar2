@@ -21,8 +21,8 @@ namespace ngslib {
     // define data types for variant calling
     struct GenomeRegion {
         std::string chrom; // chromosome name
-        uint32_t start;    // 0-based start position
-        uint32_t end;      // 0-based end position (exclusive)
+        uint32_t start;    // start position
+        uint32_t end;      // end position
 
         GenomeRegion() : chrom(""), start(0), end(0) {};
         GenomeRegion(const std::string& rid, uint32_t s, uint32_t e) : chrom(rid), start(s), end(e) {
@@ -32,6 +32,10 @@ namespace ngslib {
                                             "-" + std::to_string(end));
             }
         };
+
+        int size() const {
+            return end - start + 1;
+        }
 
         std::string to_string() const {
             return chrom + ":" + std::to_string(start) + "-" + std::to_string(end);
