@@ -6,7 +6,7 @@
  * @date 2018-08-01
  * 
  */
-#include "variant_caller_batchfree.h"
+#include "variant_caller.h"
 
 const std::string BaseTypeRunner::usage() const {
     static const std::string BASETYPE_CALLER_USAGE = 

@@ -10,8 +10,7 @@
 #include <ctime>
 
 #include "version.h"
-// #include "variant_caller.h"
-#include "variant_caller_batchfree.h"
+#include "variant_caller.h"
 #include "vcf_subset_samples.h"
 #include "concat.h"
 
