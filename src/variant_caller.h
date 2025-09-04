@@ -38,7 +38,7 @@
 class BaseTypeRunner {
 private:
     static const bool IS_DELETE_CACHE_BATCHFILE = true;
-    static const char BASE_Q0_ASCII = '!'; // The ascii code of '!' character is 33
+    static const char BASE_Q0_CHAR = '!'; // The ascii code of '!' character is 33
 
     // Commandline arguments
     struct BaseTypeARGS {

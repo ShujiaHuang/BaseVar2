@@ -485,7 +485,7 @@ bool BaseTypeRunner::_call_variant_unit(const ngslib::GenomeRegion gr, const std
 
                 smp_bi.ref_bases.push_back("N");
                 smp_bi.align_bases.push_back("N");
-                smp_bi.align_base_quals.push_back(BASE_Q0_ASCII);
+                smp_bi.align_base_quals.push_back(BASE_Q0_CHAR);
                 smp_bi.base_pos_ranks.push_back(0);
             }
 
