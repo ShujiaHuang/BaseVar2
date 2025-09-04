@@ -33,7 +33,7 @@ const std::string BaseTypeRunner::usage() const {
         "  -B, --batch-count=INT        INT base-pairs per batch. [" + std::to_string(_args->batchcount) + "]\n"  // window size
         "  -t, --thread=INT             Number of threads. [" + std::to_string(_args->thread_num) + "]\n\n"
 
-        "  --filename-has-samplename    If the name of bamfile is something like 'SampleID.xxxx.bam', set this\n"
+        "  --filename-has-samplename    If the name of BAMfile/CRAMfile is something like 'SampleID.xxxx', set this\n"
         "                               argrument could save a lot of time during get the sample id from BAMfile.\n"
         "  -h, --help                   Show this help message and exit.\n\n"
 
