@@ -82,13 +82,13 @@ def creat_basetype_pipe():
             if opt.pop_group:
                 print(f'time {exe_prog} -t {opt.n_thread} -f {opt.reference} -L {opt.infilelist} '
                       f'-G {opt.pop_group} -r {reg} --min-af={opt.min_af} -q {opt.mapq} -Q {opt.min_bq} '
-                      f'--output {opt.outdir}/{outfile_prefix}.vcf.gz --smart-rerun '
+                      f'--output {opt.outdir}/{outfile_prefix}.vcf.gz '
                       f'> {opt.outdir}/{outfile_prefix}.log && '
                       f'echo "** {outfile_prefix} done **"')
             else:    
                 print(f'time {exe_prog} -t {opt.n_thread} -f {opt.reference} -L {opt.infilelist} '
                       f'-r {reg} --min-af={opt.min_af} -q {opt.mapq} -Q {opt.min_bq} '
-                      f'--output {opt.outdir}/{outfile_prefix}.vcf.gz --smart-rerun '
+                      f'--output {opt.outdir}/{outfile_prefix}.vcf.gz '
                       f'> {opt.outdir}/{outfile_prefix}.log && '
                       f'echo "** {outfile_prefix} done **"')
 

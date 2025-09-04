@@ -58,15 +58,13 @@ private:
         // std::string output_mode;            // e.g, "w", "wb", "wz"
 
         bool filename_has_samplename;       // sample name in file name
-        bool smart_rerun;                   // Smart rerun by checking batchfiles
 
         // Set default argument
         BaseTypeARGS(): min_af(0.001), 
                         min_mapq(5), 
                         min_baseq(10), 
-                        batchcount(500), 
+                        batchcount(1000), 
                         thread_num(std::thread::hardware_concurrency()), 
-                        smart_rerun(false), 
                         filename_has_samplename(false) {}
     };
 
@@ -82,25 +80,15 @@ private:
     std::vector<std::string> _sub_out_vcf;
 
     void _make_calling_interval();  // load the calling region from input
-    void _get_sample_id_from_bam();
+    void _get_sample_id();
     void _get_popgroup_info();
     ngslib::GenomeRegion _make_gregion_region(const std::string &gregion);
-    
-    /**
-     * @brief Create a batch of temp files for variant discovery (could be deleted when the jobs done).
-     * 
-     * @param genome_region
-     * @return std::vector<std::string> 
-     * 
-     */
-    std::vector<std::string> _create_batchfiles(const ngslib::GenomeRegion genome_region, 
-                                                const std::string bf_prefix);
 
-    bool _create_a_batchfile(const std::vector<std::string>& batch_align_files, // Not a modifiable value 
-                             const std::vector<std::string>& batch_sample_ids,  // Not a modifiable value 
-                             const std::string& fa_seq,                         // Not a modifiable value
-                             const ngslib::GenomeRegion gr,                     // 切割该区间
-                             const std::string output_batch_file);              // output batchfile name
+    // Functions for calling variants in specific region
+    bool _call_variants_in_region(const ngslib::GenomeRegion gr, const std::string out_vcf_fn);
+    bool _call_variant_unit(const ngslib::GenomeRegion sub_gr, // 局部变量，会变，必拷贝，不可传引用，否则线程执行时将丢失该值 
+                            const std::string &fa_seq,         // must be the whole chromosome sequence
+                            const std::string &out_vcf_fn);
 
     bool _fetch_base_in_region(const std::vector<std::string> &batch_align_files,
                                const std::string &fa_seq,
@@ -112,25 +100,7 @@ private:
                         const ngslib::GenomeRegion target_genome_region, // 获取该区间内所有位点的碱基比对信息，该参数和 '_fetch_base_in_region' 中一样 
                         PosMap &sample_posinfo_map);
 
-    void _write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vector, 
-                                    const ngslib::GenomeRegion target_genome_region,  // 该参数和 _seek_position 中一样 
-                                    ngslib::BGZFile &obf);
-
-    // Functions for calling variants
-    bool _variants_discovery(const std::vector<std::string> &batchfiles, 
-                             const ngslib::GenomeRegion genome_region,
-                             const std::string sub_vcf_fn);
-
-    // A unit for calling variants and let it run in a thread.
-    bool _variant_calling_unit(const std::vector<std::string> &batchfiles, 
-                               const std::vector<std::string> &sample_ids,
-                               const std::map<std::string, std::vector<size_t>> & group_smp_idx,
-                               const std::string reg_str,  // genome region format like samtools
-                               const std::string vcf_fn);
-
-    // Get sample id from batchfiles header.
-    std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::string> &batchfiles);
-    bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, 
+    bool _basevar_caller(std::vector<BaseType::BatchInfo> &all_smps_bi_vector, //const std::vector<std::string> &smp_bf_line_vector, 
                          const std::map<std::string, std::vector<size_t>> &group_smp_idx,
                          size_t n_sample, 
                          ngslib::BGZFile &vcf_hd);
