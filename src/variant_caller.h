@@ -29,17 +29,16 @@
 #include "basetype.h"
 #include "algorithm.h"
 #include "version.h"
-
 #include "external/thread_pool.h"
+
+static const bool IS_DELETE_CACHE_BATCHFILE = true;
+static const char BASE_Q0_CHAR = '!'; // The ascii code of '!' character is 33
 
 /**
  * @brief BaseTypeRunner class
  */
 class BaseTypeRunner {
 private:
-    static const bool IS_DELETE_CACHE_BATCHFILE = true;
-    static const char BASE_Q0_CHAR = '!'; // The ascii code of '!' character is 33
-
     // Commandline arguments
     struct BaseTypeARGS {
         /* Variables for all the commandline options of BaseType */
