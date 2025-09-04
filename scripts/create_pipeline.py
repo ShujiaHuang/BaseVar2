@@ -70,7 +70,7 @@ def creat_basetype_pipe():
         # Todo: 可以增加多 regions 的功能，逗号分开，做数组即可
         chrid, reg = opt.regions.strip().split(':')
         reg = list(map(int, reg.split('-')))
-        ref_fai = [chrid, reg[0], reg[1]] if (not chroms) or (chrid in chroms) else []
+        ref_fai = [[chrid, reg[0], reg[1]]] if (not chroms) or (chrid in chroms) else []
 
     for chr_id, reg_start, reg_end in ref_fai:
         for i in range(reg_start-1, reg_end, opt.delta):
