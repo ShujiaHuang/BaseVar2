@@ -34,12 +34,13 @@ const std::string BaseTypeRunner::usage() const {
         "  -t, --thread=INT             Number of threads. [" + std::to_string(_args->thread_num) + "]\n\n"
 
         "  --filename-has-samplename    If the name of BAMfile/CRAMfile is something like 'SampleID.xxxx', set this\n"
-        "                               argrument could save a lot of time during get the sample id from BAMfile.\n"
+        "                               argrument could save a lot of time during get the samples' id from BAMfiles.\n"
         "  -h, --help                   Show this help message and exit.\n\n"
 
         "Example usage:\n"
         "  [1]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 1000 --filename-has-samplename -L bam.list\n"
         "  [2]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 1000 --filename-has-samplename -L bam.list sample1.bam sample2.bam\n"
+        "  [3]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 1000 --filename-has-samplename -L bam.list -r chr1\n"
         ; 
         
     return BASETYPE_CALLER_USAGE;
