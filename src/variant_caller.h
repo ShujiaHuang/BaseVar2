@@ -117,7 +117,7 @@ private:
      * @return VariantInfo 
      * 
      */
-    VariantInfo get_pos_variant_info(const BaseType &bt, const BaseType::BatchInfo *smp_bi);
+    VariantInfo _get_pos_variant_info(const BaseType &bt, const BaseType::BatchInfo *smp_bi);
     VCFRecord _vcfrecord_in_pos(const std::vector<BaseType::BatchInfo> &samples_batchinfo_vector, 
                                 const VariantInfo &global_variant_info,
                                 const std::map<std::string, BaseType> &group_bt, 

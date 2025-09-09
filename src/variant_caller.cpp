@@ -805,10 +805,10 @@ std::pair<BaseType, VariantInfo> BaseTypeRunner::_basetype_caller_unit(
         bt.lrt(basecombination);
     } 
 
-    return {bt, get_pos_variant_info(bt, &all_smps_bi)};
+    return {bt, _get_pos_variant_info(bt, &all_smps_bi)};
 }
 
-VariantInfo BaseTypeRunner::get_pos_variant_info(const BaseType &bt, const BaseType::BatchInfo *smp_bi) {
+VariantInfo BaseTypeRunner::_get_pos_variant_info(const BaseType &bt, const BaseType::BatchInfo *smp_bi) {
     VariantInfo vi(bt.get_ref_id(), bt.get_ref_pos(), bt.get_total_depth(), bt.get_var_qual()+0.5);
     int major_allele_depth = 0;
     vi.major_allele_idx    = 0;
