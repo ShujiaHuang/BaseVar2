@@ -110,7 +110,7 @@ To review each of the parameters, you can type `basevar caller -h` in the Linux/
 $ /path/to/basevar caller -h
 
 About: Call variants and estimate allele frequency by BaseVar.
-Usage: basevar caller [options] <-f fasta> <--output-vcf out_fname> [--filename-has-samplename] [-L bam.list] in1.bam [in2.bam ...] ...
+Usage: basevar caller [options] <-f Fasta> <--output-vcf output_file> [-L bam.list] in1.bam [in2.bam ...] ...
 
 Required arguments:
   -f, --reference FILE         Input reference fasta file.
@@ -129,16 +129,18 @@ Optional options:
                                is generally handled automatically by the program.
   -Q, --min-BQ INT             Skip bases with base quality < INT [10]
   -q, --mapq=INT               Skip reads with mapping quality < INT [5]
-  -B, --batch-count=INT        INT base-pairs per batch. [1000]
+  -B, --batch-count=INT        INT simples per batchfile. [500]
   -t, --thread=INT             Number of threads. [14]
 
   --filename-has-samplename    If the name of bamfile is something like 'SampleID.xxxx.bam', set this
                                argrument could save a lot of time during get the sample id from BAMfile.
+  --smart-rerun                Rerun process by checking batchfiles.
   -h, --help                   Show this help message and exit.
 
 Example usage:
-  [1]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 1000 --filename-has-samplename -L bam.list
-  [2]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 1000 --filename-has-samplename -L bam.list sample1.bam sample2.bam
+  [1]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 500 --filename-has-samplename -L bam.list
+  [2]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 500 --filename-has-samplename -L bam.list sample1.bam sample2.bam
+  [3]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 500 --filename-has-samplename -L bam.list -r chr1 sample1.bam sample2.bam
 
 ```
 
@@ -150,7 +152,7 @@ This command will provide detailed information about parameters of `basevar`.
 
 ```bash
 basevar caller -f reference.fasta \
-    -Q 20 -q 30 -B 1000 -t 24 \
+    -Q 20 -q 30 -B 500 -t 24 \
     --pop-group=sample_group.info \
     --regions=chr11:5246595-5248428,chr17:41197764-41276135 \
     --output test.vcf.gz 00alzqq6jw.bam 09t3r9n2rg.bam 0fkpl1p55b.bam ...
@@ -162,7 +164,7 @@ The format of `sample_group.info` could be found [here](https://github.com/Shuji
 
 ```bash
 basevar caller -f reference.fasta \
-    -Q 20 -q 30 -B 1000 -t 24 \
+    -Q 20 -q 30 -B 500 -t 24 \
     -L bamfile.list \ 
     --regions=chr11:5246595-5248428,chr17:41197764-41276135 \
     --pop-group=sample_group.info \

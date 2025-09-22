@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)  # C++ 17
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set the project name
-project (BASEVAR VERSION 2.1.0 LANGUAGES CXX)
+project (BASEVAR VERSION 2.0.0 LANGUAGES CXX)
 
 # Add project metadata
 set(PROJECT_AUTHOR "Shujia Huang")
