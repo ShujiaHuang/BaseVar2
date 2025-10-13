@@ -37,7 +37,7 @@ make
 
 > If you have problems downloading, please try several times.
 
-If everything is smooth, you'll find an exectutable file named `basevar` in `basevar/bin/` folder.
+If everything is smooth, you'll find an exectutable file named `basevar` in `bin/` folder.
 
 ### Method 2. Manually install processes (Optional)
 
@@ -56,7 +56,7 @@ git clone https://github.com/ShujiaHuang/basevar2.git
 
 **2. Navigate into `htslib` folder and run the following commands**
 
-After cloing, navigate into the `basevar` folder (`cd basevar`) and execute the following:
+After cloing, navigate into the `basevar` folder and execute the following:
 
 ```bash
 
@@ -85,7 +85,7 @@ Feel free to proceed with your installation tasks despite encountering this erro
 
 **3. Go back to the upper directory and install `basevar` by running the commands below**
 
-Navigate into `bin/` folder (`cd basevar/bin`) first and execute the following commands:
+Navigate into `bin/` folder firstly and execute the following commands:
 
 **Manually install in Linux**
 
@@ -132,7 +132,7 @@ Optional options:
   -B, --batch-count=INT        INT simples per batchfile. [500]
   -t, --thread=INT             Number of threads. [14]
 
-  --filename-has-samplename    If the name of bamfile is something like 'SampleID.xxxx.bam', set this
+  --filename-has-samplename    If the prefix name of bamfiles/cramfiles start with 'Sample ID', something like 'SampleID.bam', set this
                                argrument could save a lot of time during get the sample id from BAMfile.
   --smart-rerun                Rerun process by checking batchfiles.
   -h, --help                   Show this help message and exit.

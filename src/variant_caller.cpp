@@ -21,7 +21,7 @@ const std::string BaseTypeRunner::usage() const {
         "  -L, --align-file-list=FILE   BAM/CRAM files list, one file per row.\n"
         "  -r, --regions=REG[,...]      Skip positions which not in these regions. This parameter could be a list\n"
         "                               of comma deleimited genome regions(e.g.: chr:start-end).\n"
-        "  -G, --pop-group=FILE         Calculating the allele frequency for specific population.\n\n"
+        "  -G, --pop-group=FILE         Calculating the allele frequency for specific population group.\n\n"
 
         "  -m, --min-af=float           Setting prior precision of MAF and skip ineffective caller positions,\n"
         "                               a typical approach involves setting it to min(" + std::to_string(_args->min_af) + ", 100/x), where x \n"
@@ -33,8 +33,8 @@ const std::string BaseTypeRunner::usage() const {
         "  -B, --batch-count=INT        INT simples per batchfile. [" + std::to_string(_args->batchcount) + "]\n" 
         "  -t, --thread=INT             Number of threads. [" + std::to_string(_args->thread_num) + "]\n\n"
 
-        "  --filename-has-samplename    If the name of bamfile is something like 'SampleID.xxxx.bam', set this\n"
-        "                               argrument could save a lot of time during get the sample id from BAMfile.\n"
+        "  --filename-has-samplename    If the prefix name of BAMfiles/CRAMfiles start with 'Sample ID', something like 'SampleID.bam', set this\n"
+        "                               argrument could save a lot of time during get the sample id from BAMfiles.\n"
         "  --smart-rerun                Rerun process by checking batchfiles.\n"
         "  -h, --help                   Show this help message and exit.\n\n"
 
