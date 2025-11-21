@@ -111,7 +111,6 @@ std::vector<double> BaseType::_set_initial_freq(const std::vector<std::string> &
 }
 
 BaseType::AA BaseType::_f(const std::vector<std::string> &bases, int n) {
-
     AA data;
     Combinations<std::string> c(bases, n);
     std::vector<std::vector<std::string>> cbs_v = c.get();  // combination bases vector
@@ -146,7 +145,8 @@ void BaseType::lrt(const std::vector<std::string> &specific_bases) {
             active_bases.push_back(b);
     }
 
-    if (active_bases.size() == 0) return;
+    int  BIG_N = 6; // magic number: 设置大 N 阈值，以便出现组合数爆炸 (选择放弃该位点)
+    if (active_bases.size() == 0 || active_bases.size() > BIG_N) return;
 
     // init. Base combination of active_bases
     AA var = _f(active_bases, active_bases.size());  // F4
@@ -168,7 +168,7 @@ void BaseType::lrt(const std::vector<std::string> &specific_bases) {
         chi_sqrt_value = lrt_chivalue[i_min]; // 获得该最优组合的卡方值
 
         // 注意这 H0 假设是“少碱基的组合与多碱基的组合相比无显著差异”，如果是，那么选H0，也就是少碱基的组合，否则取多碱基组合(H1)。
-        // 这和我的计算公式是一致的，只是反过来而已
+        // 这和我 Cell 以及 Cell Genomics 文章的计算公式是一致的，只是反过来而已
         if (chi_sqrt_value < LRT_THRESHOLD) { 
             // Take the null hypothesis and continue
             active_bases = var.bc[i_min];

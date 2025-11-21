@@ -484,7 +484,7 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::Genome
     
     for (auto && p: create_batchfile_processes) {
         // Run and make sure all processes are finished
-        // 一般来说，只有当 valid() 返回 true 的时候才调用 get() 去获取结果，这也是 C++ 文档推荐的操作。
+        // 一般来说，只有当 valid() 返回 true 的时候才调用 get() 去获取结果，这是 C++ 文档推荐的操作。
         if (p.valid()) {
             // get() 调用会改变其共享状态，不再可用，也就是说 get() 只能被调用一次，多次调用会触发异常。
             // 如果想要在多个线程中多次获取产出值需要使用 shared_future。
@@ -897,7 +897,6 @@ bool BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     return is_empty;
 }
 
-/// Functions for calling variants outside of 'BaseTypeRunner' class 
 // A unit for calling variants and let it run in a thread.
 bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batchfiles,  // total batchfiles in the region
                                            const std::vector<std::string> &sample_ids,  // total samples
@@ -914,8 +913,8 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
     if (ngslib::join(bf_smp_ids, ",") != ngslib::join(sample_ids, ","))
         throw std::runtime_error("[BUG] The order of sample ids in batchfiles must be the same as "
                                  "input bamfiles.\n" 
-                                 "Sample ids in batchfiles: " + ngslib::join(bf_smp_ids, ",") + "\n" 
-                                 "Sample ids in bamfiles  : " + ngslib::join(sample_ids, ",") + "\n");
+                                 "Sample ids in input bamfiles: " + ngslib::join(sample_ids, ",") + "\n"
+                                 "Sample ids in batchfiles    : " + ngslib::join(bf_smp_ids, ",") + "\n");
     
     // Open indexes and iterators
     std::vector<std::unique_ptr<tbx_t, void(*)(tbx_t*)>> indexes;

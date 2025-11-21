@@ -1,5 +1,4 @@
 // combinations.h, from https://stackoverflow.com/questions/9430568/generating-combinations-in-c
-
 #ifndef __INCLUDE_COMBINATIONS_H__
 #define __INCLUDE_COMBINATIONS_H__
 
@@ -10,7 +9,7 @@
  * You can iterate on an instance of Combinations class (e.g. or get() vector with all combinations, 
  * each combination is a vector of objects. This is written in C++11.
  * 
- * modify by Shujia Huang.
+ * Modify by Shujia Huang.
  * 
  * @tparam T 
  * 
@@ -19,17 +18,15 @@
 template<typename T> 
 class Combinations {
 // Combinations(std::vector<T> s, int m) iterate all Combinations without repetition
-// from set s of size m s = {0,1,2,3,4,5} all permuations are: {0, 1, 2}, {0, 1,3}, 
-// {0, 1, 4}, {0, 1, 5}, {0, 2, 3}, {0, 2, 4}, {0, 2, 5}, {0, 3, 4}, {0, 3, 5},
-// {0, 4, 5}, {1, 2, 3}, {1, 2, 4}, {1, 2, 5}, {1, 3, 4}, {1, 3, 5}, {1, 4, 5}, 
-// {2, 3, 4}, {2, 3, 5}, {2, 4, 5}, {3, 4, 5}
+// from set s of size m s = {0,1,2,3,4,5} all permuations are: 
+// {0, 1, 2}, {0, 1, 3}, {0, 1, 4}, {0, 1, 5}, {0, 2, 3}, {0, 2, 4}, {0, 2, 5}, 
+// {0, 3, 4}, {0, 3, 5}, {0, 4, 5}, {1, 2, 3}, {1, 2, 4}, {1, 2, 5}, {1, 3, 4}, 
+// {1, 3, 5}, {1, 4, 5}, {2, 3, 4}, {2, 3, 5}, {2, 4, 5}, {3, 4, 5}
 
 public:
     Combinations(std::vector<T> s, int m) : M(m), set(s), partial(std::vector<T>(M)), count(0) {
         N = s.size(); // unsigned long can't be casted to int in initialization
-
         out = std::vector<std::vector<T>>(comb(N,M), std::vector<T>(M)); // allocate space
-
         generate(0, N-1, M-1);
     };
 
@@ -41,12 +38,12 @@ public:
 
 private:
     void generate(int i, int j, int m);
-    unsigned long long comb(unsigned long long n, unsigned long long k); // C(n, k) = n! / (n-k)!
+    unsigned long long comb(unsigned long long n, unsigned long long k); // C(n, k) = n! / (k!(n-k)!)
 
     int N, M;
     std::vector<T> set;
     std::vector<T> partial;
-    std::vector<std::vector<T>> out;   
+    std::vector<std::vector<T>> out;
 
     int count;
 };
