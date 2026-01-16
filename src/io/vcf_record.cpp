@@ -3,6 +3,13 @@
 // Date: 2025-04-17
 
 #include "vcf_record.h"
+#include <htslib/vcf.h>
+#include <htslib/kstring.h> // For string manipulation if needed
+#include <vector>
+#include <string>
+#include <cstring> // For strcmp, strlen
+#include <stdexcept>
+#include <limits> // Required for numeric_limits
 
 namespace ngslib {
 
@@ -290,6 +297,7 @@ namespace ngslib {
 
     // --- FORMAT Field Accessors ---
     int VCFRecord::get_genotypes(const VCFHeader& hdr, std::vector<std::vector<int>>& genotypes) const {
+        genotypes.clear();
         if (!is_valid_unsafe() || !hdr.is_valid() || n_samples() == 0) 
             return -1;
         
@@ -299,8 +307,7 @@ namespace ngslib {
         //         return -1;
         //     }
         // }
-
-        int* gt_arr  = nullptr;
+        int* gt_arr = nullptr;
         int n_gt_arr = 0;
         int ret = bcf_get_genotypes(hdr.hts_header(), _b.get(), &gt_arr, &n_gt_arr);
 
@@ -313,7 +320,6 @@ namespace ngslib {
         int n_samp = n_samples();
         int ploidy = ret / n_samp;
 
-        genotypes.clear();
         genotypes.resize(n_samp);
         // 对每个样本单独处理
         for (int i = 0; i < n_samp; ++i) {
@@ -343,40 +349,57 @@ namespace ngslib {
         if (!is_valid_unsafe() || !hdr.is_valid() || n_samples() == 0) return BCF_ERR_TAG_INVALID;
 
         int32_t* buffer = nullptr;
-        int n_values_per_sample = 0; // htslib expects pointer to int
-        int ret = bcf_get_format_int32(hdr.hts_header(), _b.get(), tag.c_str(), &buffer, &n_values_per_sample);
+        int buffer_capacity = 0;  // 缓冲区容量（元素个数）
+        int total_values = bcf_get_format_int32(hdr.hts_header(), _b.get(), tag.c_str(), &buffer, &buffer_capacity);
 
-        if (ret < 0) {
+        // 错误处理
+        if (total_values < 0) {
             if (buffer) free(buffer);
-            return ret; // Return htslib error code
+            
+            /**
+             * @brief 
+             * return -1;  // 头文件中没有这个 FORMAT 字段
+             * return -2;  // 类型不匹配
+             * return -3;  // 该记录中不存在这个标签，或标签被标记为删除
+             * return -4;  // 内存分配失败
+             */
+            return total_values; // Return htslib error code
         }
 
-        int total_values = n_samples() * n_values_per_sample;
+        // 成功：复制数据到 vector
         if (total_values > 0 && buffer) {
             values.assign(buffer, buffer + total_values);
         }
         if (buffer) free(buffer);
-        return n_values_per_sample; // Return number of values *per sample*
+
+        int n_values_per_sample = (n_samples() > 0) ? (total_values / n_samples()) : 0;
+        return n_values_per_sample; // Return number of values *per-sample*
     }
 
     int VCFRecord::get_format_float(const VCFHeader& hdr, const std::string& tag, std::vector<float>& values) const {
         values.clear();
-        if (!is_valid_unsafe() || !hdr.is_valid() || n_samples() == 0) return BCF_ERR_TAG_INVALID;
-
-        float* buffer = nullptr;
-        int n_values_per_sample = 0;
-        int ret = bcf_get_format_float(hdr.hts_header(), _b.get(), tag.c_str(), &buffer, &n_values_per_sample);
-
-        if (ret < 0) {
-            if (buffer) free(buffer);
-            return ret;
+        if (!is_valid_unsafe() || !hdr.is_valid() || n_samples() == 0) {
+            return BCF_ERR_TAG_INVALID;
         }
 
-        int total_values = n_samples() * n_values_per_sample;
+        float* buffer = nullptr;
+        int buffer_capacity = 0;  // 缓冲区容量（元素个数）
+        int total_values = bcf_get_format_float(hdr.hts_header(), _b.get(), tag.c_str(), &buffer, &buffer_capacity);
+
+        // 错误处理
+        if (total_values < 0) {
+            if (buffer) free(buffer);
+            return total_values;  // 返回错误码
+        }
+
+        // 成功：复制数据到 vector
         if (total_values > 0 && buffer) {
             values.assign(buffer, buffer + total_values);
         }
         if (buffer) free(buffer);
+        
+        // 返回每个样本的值数量
+        int n_values_per_sample = (n_samples() > 0) ? (total_values / n_samples()) : 0;
         return n_values_per_sample;
     }
 
@@ -385,22 +408,21 @@ namespace ngslib {
         if (!is_valid_unsafe() || !hdr.is_valid() || n_samples() == 0) return BCF_ERR_TAG_INVALID;
 
         char** buffer = nullptr; // Array of strings
-        int n_values_per_sample = 0; // Number of strings per sample (usually 1)
-        int ret = bcf_get_format_string(hdr.hts_header(), _b.get(), tag.c_str(), &buffer, &n_values_per_sample);
+        int buffer_capacity = 0; // Number of strings per sample (usually 1)
+        int total_values = bcf_get_format_string(hdr.hts_header(), _b.get(), tag.c_str(), &buffer, &buffer_capacity);
 
-        if (ret < 0) {
+        if (total_values < 0) {
             // Note: bcf_get_format_string allocates buffer[0] contiguously for all strings.
             // Only need to free buffer[0] and buffer itself.
             if (buffer) {
                 if (buffer[0]) free(buffer[0]);
                 free(buffer);
             }
-            return ret;
+            return total_values;
         }
 
         int n_samp = n_samples();
-        values.resize(n_samp * n_values_per_sample); // Resize the output vector
-
+        values.resize(total_values); // Resize the output vector
         if (buffer && buffer[0]) {
              // Data is in buffer[0], laid out contiguously, separated by terminators?
              // Or is buffer an array of char* pointers? The docs are a bit ambiguous.
@@ -421,6 +443,7 @@ namespace ngslib {
              if (buffer[0]) free(buffer[0]);
              free(buffer);
         }
+        int n_values_per_sample = (n_samp > 0) ? (total_values / n_samp) : 0;
         return n_values_per_sample; // Usually 1 for strings
     }
 
@@ -691,7 +714,7 @@ namespace ngslib {
         VCFRecord subset_rec = copy_record();
         
         // Call bcf_subset with indices
-        // Note: bcf_subset modifies the record in place, so we need to pass the copy one
+        // Note: bcf_subset modifies the record in place, so we need to pass the copy
         // Signature: int bcf_subset(const bcf_hdr_t *h, bcf1_t *v, int n, int *imap);
         if (bcf_subset(hdr.hts_header(), subset_rec._b.get(), sample_indices.size(), sample_indices.data()) != 0) {
             throw std::runtime_error("Failed to subset record at " + chrom(hdr) + ":" + std::to_string(pos()+1));
@@ -731,10 +754,16 @@ namespace ngslib {
                 }
             }
         }
-
+    
         // 6. 检查是否需要清理
-        if (std::all_of(allele_used.begin(), allele_used.end(), [](bool v){ return v; })) {
-            return true;  // 所有等位基因都在使用，无需清理
+        bool all_alleles_used = std::all_of(allele_used.begin(), allele_used.end(), [](bool v){ return v; });
+        bool all_single_base = (current_ref.length() == 1) && std::all_of(
+            current_alts.begin(), current_alts.end(), [](const std::string& alt)
+            { return alt.length() == 1; }
+        );
+                              
+        if (all_alleles_used && all_single_base) {
+            return true;  // 所有等位基因都在使用且都是单碱基，无需清理
         }
     
         // 7. 创建新的等位基因列表
@@ -766,7 +795,6 @@ namespace ngslib {
                     new_gt.push_back(-1);  // 标记缺失值
                 }
             }
-
             new_genotypes.push_back(std::move(new_gt));
         }
     
@@ -785,8 +813,7 @@ namespace ngslib {
     }
 
     int VCFRecord::update_alleles(const VCFHeader& hdr, const std::string& ref, 
-                                  const std::vector<std::string>& alts)
-    {
+                                  const std::vector<std::string>& alts) {
         // 1. 安全性检查
         if (!is_valid_unsafe() || !hdr.is_valid() || alts.empty()) return -1;
         
@@ -922,10 +949,9 @@ namespace ngslib {
                 if (j < sample_gt.size()) {
                     // 实际的基因型值
                     if (sample_gt[j] < 0) {
-                        curr_sample[j] = bcf_gt_missing;
+                        curr_sample[j] = bcf_gt_missing;  // 标记缺失的基因型，输出为 ‘.’
                     } else {
                         curr_sample[j] = bcf_gt_is_phased(sample_gt[j]) ? bcf_gt_phased(sample_gt[j]) : bcf_gt_unphased(sample_gt[j]);
-                        // curr_sample[j] = bcf_gt_unphased(sample_gt[j]);
                     }
                 } else {
                     // 对于倍性较低的样本，用向量结束标记填充
