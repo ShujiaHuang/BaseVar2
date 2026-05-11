@@ -219,7 +219,7 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
             samplename = si > 0 && si != std::string::npos ? filename.substr(0, si) : filename;
         } else {
             // Get sampleID from BAM header, a bit time-consuming.
-            ngslib::BamHeader bh(_args->input_bf[i]);
+            ngslib::BamHeader bh(_args->input_bf[i], _args->reference);
             samplename = bh.get_sample_name();
         }
 
