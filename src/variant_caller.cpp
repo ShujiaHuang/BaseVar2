@@ -419,7 +419,7 @@ int BaseTypeRunner::run() {
     std::map<std::string, std::vector<size_t>>::iterator it = _groups_idx.begin();
     for(; it != _groups_idx.end(); ++it) {
         group_name.push_back(it->first);
-        add_group_info.push_back("##INFO=<ID=" + it->first + "_AF,Number=A,Type=Float,Description="
+        add_group_info.push_back("##INFO=<ID=AF_" + it->first + ",Number=A,Type=Float,Description="
                                  "\"Allele frequency in the " + it->first + " populations calculated "
                                  "base on LRT, in the range (0,1)\">");
     }
@@ -1295,7 +1295,7 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
             }
 
             if (!af.empty()) {
-                group_af_info.push_back(it->first + "_AF=" + ngslib::join(af, ",")); // groupID_AF=xxx,xxx
+                group_af_info.push_back("AF_" + it->first + "=" + ngslib::join(af, ",")); // AF_<group_id>=xxx,xxx
             }
         }
         info.insert(info.end(), group_af_info.begin(), group_af_info.end());
