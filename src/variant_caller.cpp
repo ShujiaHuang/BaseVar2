@@ -1250,7 +1250,7 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
             ai.total_alleles++;
         }
 
-        // Format sample string in GT:PL:AD:DP, returned string is likely "0/1:100,50,0:30:80"
+        // Format sample string in GT:PL:AD:DP, returned string looks like: "0/1:100,50,0:30:80"
         vcf_record.samples.push_back(format_sample_string(sa));
     }
 
@@ -1286,16 +1286,16 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
     if (!group_bt.empty()) {
         std::vector<std::string> group_af_info;
         for (std::map<std::string, BaseType>::const_iterator it(group_bt.begin()); it != group_bt.end(); ++it) {
-
             std::vector<double> af;
             for (auto b : it->second.get_active_bases()) { // must have the same order with ai.ref + ai.alts
                 if (b == ai.ref) continue;  // skip reference base
 
-                af.push_back(it->second.get_lrt_af(b));  // 由于 active-base 不完全一样，所以存在与 ai.alts 顺序不一致的风险，要改进
+                // 由于与 active-base 不完全一样，所以存在与 ai.alts 顺序不一致的风险，要改进
+                af.push_back(it->second.get_lrt_af(b));  
             }
 
             if (!af.empty()) {
-                group_af_info.push_back("AF_" + it->first + "=" + ngslib::join(af, ",")); // AF_<group_id>=xxx,xxx
+                group_af_info.push_back("AF_" + it->first + "=" + ngslib::join(af, ",")); // AF_group=xxx,xxx
             }
         }
         info.insert(info.end(), group_af_info.begin(), group_af_info.end());
