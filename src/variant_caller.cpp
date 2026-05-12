@@ -416,9 +416,12 @@ int BaseTypeRunner::run() {
 
     // Merge all VCF subfiles
     std::vector<std::string> add_group_info, group_name;
-    std::map<std::string, std::vector<size_t>>::iterator it = _groups_idx.begin();
-    for(; it != _groups_idx.end(); ++it) {
+    for(std::map<std::string, std::vector<size_t>>::iterator it = _groups_idx.begin(); it != _groups_idx.end(); ++it) {
         group_name.push_back(it->first);
+        add_group_info.push_back("##INFO=<ID=DP_" + it->first + ",Number=1,Type=Integer,Description="
+                                 "\"Total depth of all alleles in the " + it->first + " populations\">");
+    }
+    for(std::map<std::string, std::vector<size_t>>::iterator it = _groups_idx.begin(); it != _groups_idx.end(); ++it) {
         add_group_info.push_back("##INFO=<ID=AF_" + it->first + ",Number=A,Type=Float,Description="
                                  "\"Allele frequency in the " + it->first + " populations calculated "
                                  "base on LRT, in the range (0,1)\">");
@@ -1284,8 +1287,10 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
 
     // Add group allele frequency information if available
     if (!group_bt.empty()) {
-        std::vector<std::string> group_af_info;
+        std::vector<std::string> group_af_info, group_dp_info;
         for (std::map<std::string, BaseType>::const_iterator it(group_bt.begin()); it != group_bt.end(); ++it) {
+            group_dp_info.push_back("DP_" + it->first + "=" + std::to_string(it->second.get_total_depth())); // DP_group=xxx
+
             std::vector<double> af;
             for (auto b : it->second.get_active_bases()) { // must have the same order with ai.ref + ai.alts
                 if (b == ai.ref) continue;  // skip reference base
@@ -1298,6 +1303,7 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
                 group_af_info.push_back("AF_" + it->first + "=" + ngslib::join(af, ",")); // AF_group=xxx,xxx
             }
         }
+        info.insert(info.end(), group_dp_info.begin(), group_dp_info.end());
         info.insert(info.end(), group_af_info.begin(), group_af_info.end());
     }
 
