@@ -444,8 +444,9 @@ int BaseTypeRunner::run() {
     return 0; // SUCCESS
 }
 
-std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::GenomeRegion gr, 
-                                                            const std::string bf_prefix) 
+std::vector<std::string> BaseTypeRunner::_create_batchfiles(
+    const ngslib::GenomeRegion gr, 
+    const std::string bf_prefix) 
 {
     ThreadPool thread_pool(_args->thread_num);  // set multiple-thread
     std::vector<std::future<bool>> create_batchfile_processes;
@@ -481,8 +482,8 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(const ngslib::Genome
                                          batch_sample_ids,   // 局部变量，会变，必拷贝，不可传引用，否则线程执行时将丢失该值
                                          std::cref(fa_seq),  // 外部变量，不变，传引用，省内存
                                          gr,
-                                         batchfile)));
-        
+                                         batchfile))
+        );
     }
     
     for (auto && p: create_batchfile_processes) {
@@ -851,7 +852,6 @@ bool BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     // Split the region into multiple sub-regions for multiple-thread calling
     // Each sub-region is about 'STEP_LEN' bp length
     // Then merge all the sub-vcf files into one file.
-
     if (batchfiles.empty()) {
         throw std::invalid_argument("[ERROR] No batchfiles for calling variants in " + gr.to_string() + "\n");
     }
@@ -864,7 +864,6 @@ bool BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     // prepare multiple-thread
     ThreadPool thread_pool(_args->thread_num);  
     std::vector<std::future<bool>> call_variants_processes;
-
     std::vector<std::string> subvcfs;
     for (uint32_t i(gr.start), j(1); i < gr.end + 1; i += STEP_LEN, ++j) {
         std::string tmp_vcf_fn = out_vcf_fn + "." + std::to_string(j) + "_" + std::to_string(bn);
@@ -943,7 +942,6 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
 
     // Output VCF file
     ngslib::BGZFile VCF_OUT(tmp_vcf_fn.c_str(), "w");
-
     std::vector<std::string> smp_bf_line_vector;
     smp_bf_line_vector.reserve(batchfiles.size());
 
@@ -969,8 +967,6 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
             std::cout << "[INFO] Processed " << n << " lines.\n";
         }
     }
-
-    // close VCF file
     VCF_OUT.close();
 
     // Time information
@@ -1102,11 +1098,12 @@ bool BaseTypeRunner::_basevar_caller(const std::vector<std::string> &smp_bf_line
 
     if (depth == 0) return false; // no data at this position, return false
 
-    // check data
     if (all_smps_bi_vector.size() != n_sample) {
-        throw std::runtime_error("[ERROR] The number of samples does not match. It should be " + std::to_string(n_sample) + 
-                                 " but got " + std::to_string(all_smps_bi_vector.size()) + " samples in batchfiles for " + 
-                                 ref_id + " " + std::to_string(ref_pos) + ".\n");
+        throw std::runtime_error(
+            "[ERROR] The number of samples does not match. It should be " + std::to_string(n_sample) + 
+            " but got " + std::to_string(all_smps_bi_vector.size()) + " samples in batchfiles for " + 
+            ref_id + " " + std::to_string(ref_pos) + ".\n"
+        );
     }
     
     // Detect variant at this position by using all samples
@@ -1116,8 +1113,7 @@ bool BaseTypeRunner::_basevar_caller(const std::vector<std::string> &smp_bf_line
     bool is_variant = (global_vi.ale_bases.size() > 1) || 
                       (!global_vi.ale_bases.empty() && 
                         global_vi.ale_bases[0][0] !=
-                        global_vi.ref_bases[0][0]);  // 'ale_bases' and 'ref_bases' are all upper case already.
-    
+                        global_vi.ref_bases[0][0]);  // 'ale_bases' and 'ref_bases' are all upper case already. 
     if (is_variant) { 
         // Collect and normalize allele information. Return the variant and allele information of this
         // position and replace the align_bases in samples_batchinfo_vector with the normalized bases.
@@ -1278,7 +1274,7 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
         "AF="  + ngslib::join(af, ","), 
         "CAF=" + ngslib::join(caf, ","),
         "AC="  + ngslib::join(ac, ","),
-        "AN="  + std::to_string(ai.total_alleles),  // AN,total number of alleles
+        "AN="  + std::to_string(ai.total_alleles),  // AN, total number of alleles
         "DP="  + std::to_string(ai.total_dp),       // DP, total depth of coverage
         "DP4=" + ngslib::join(dp4, ","),
         "FS="  + ngslib::join(fs, ","),
@@ -1306,7 +1302,6 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
         info.insert(info.end(), group_dp_info.begin(), group_dp_info.end());
         info.insert(info.end(), group_af_info.begin(), group_af_info.end());
     }
-
     vcf_record.info = ngslib::join(info, ";");
 
     return vcf_record;
