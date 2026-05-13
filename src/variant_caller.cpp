@@ -350,13 +350,6 @@ int BaseTypeRunner::run() {
     std::string cache_outdir = outdir + "/cache_" + stem_bn;
     ngslib::safe_mkdir(cache_outdir);  // make cache directory for batchfiles
 
-    if (_args->smart_rerun) {
-        // Remove and rollback `thread_num` last modification files. 
-        // Must do this before calling '_create_batchfiles'
-        for (size_t i(0); i < _args->thread_num; ++i)
-            ngslib::safe_remove(ngslib::get_last_modification_file(cache_outdir));
-    }
-
     std::cout << "---- Start calling variants ----\n" << std::endl;
 
     // 以区间为单位进行变异检测, 每个区间里调用多线程
@@ -460,12 +453,13 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(
     for (size_t i(0), j(1); i < _args->input_bf.size(); i+=_args->batchcount, ++j) {
         // set name of batchfile and must be compressed by BGZF.
         std::string batchfile = bf_prefix + "." + std::to_string(j) + "_" + std::to_string(bn) + ".bf.gz";
+        std::string batchfile_tbi = bf_prefix + "." + std::to_string(j) + "_" + std::to_string(bn) + ".bf.gz.tbi";
         batchfiles.push_back(batchfile);   // Store the name of batchfile into a vector
 
-        if (_args->smart_rerun && ngslib::is_readable(batchfile)) {
+        if (_args->smart_rerun && ngslib::is_readable(batchfile) && ngslib::is_readable(batchfile_tbi)) {
             // do not create the existed batchfile again if set `--smart-rerun`
-            std::cout << "[INFO] " + batchfile + " already exists, we don't have to "
-                         "create it again, when we set `--smart-rerun`.\n";
+            std::cout << "[INFO] " + batchfile + " and " + batchfile_tbi + " already exist, we don't have to "
+                         "create them again, when we set `--smart-rerun`.\n";
             continue;
         }
 
