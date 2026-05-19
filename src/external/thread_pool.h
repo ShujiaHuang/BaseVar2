@@ -25,7 +25,7 @@
 class ThreadPool {
 public:
     // 构造函数，初始化线程池
-    explicit ThreadPool(size_t threadCount = std::thread::hardware_concurrency()): stop(false) {
+    explicit ThreadPool(size_t threadCount = std::thread::hardware_concurrency()): stop(false), hasError(false) {
         for (size_t i = 0; i < threadCount; ++i) {
             workers.emplace_back([this] {
                 while (true) {
