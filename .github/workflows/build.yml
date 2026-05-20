@@ -9,9 +9,12 @@ on:
     types: [created]
 
 jobs:
+  # -----------------------------------------------------------
+  # Job 1: Build + Test (dynamic linking, for CI verification)
+  # -----------------------------------------------------------
   build:
-    name: Build on ${{matrix.os}}
-    runs-on: ${{matrix.os}}
+    name: Build & Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -22,7 +25,7 @@ jobs:
             artifact_name: basevar-macos
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
 
@@ -40,38 +43,148 @@ jobs:
 
     - name: Configure CMake
       run: |
-        cmake -B ${{github.workspace}}/build \
+        cmake -B ${{ github.workspace }}/build \
               -DCMAKE_BUILD_TYPE=Release \
               -DBUILD_TESTING=ON
 
     - name: Build
-      run: cmake --build ${{github.workspace}}/build --config Release
+      run: cmake --build ${{ github.workspace }}/build --config Release
 
     - name: Test
-      working-directory: ${{github.workspace}}/build
+      working-directory: ${{ github.workspace }}/build
       run: ctest -C Release --output-on-failure
 
     - name: Prepare artifacts
       run: |
         mkdir -p dist
-        cp bin/basevar dist/${{matrix.artifact_name}}
-        
+        cp bin/basevar dist/${{ matrix.artifact_name }}
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: ${{matrix.artifact_name}}
-        path: dist/${{matrix.artifact_name}}
+        name: ${{ matrix.artifact_name }}
+        path: dist/${{ matrix.artifact_name }}
 
     - name: Upload Release Assets
       if: github.event_name == 'release'
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
-        files: dist/${{matrix.artifact_name}}
-    
+        files: dist/${{ matrix.artifact_name }}
+
     - name: Show artifact location
       run: |
         echo "Build artifacts have been uploaded to:"
-        echo "- Actions tab: ${{github.server_url}}/${{github.repository}}/actions/runs/${{github.run_id}}"
-        if [["${{github.event_name}}" == "release"]]; then
-          echo "- Release page: ${{github.server_url}}/${{github.repository}}/releases/latest"
+        echo "- Actions tab: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        if [[ "${{ github.event_name }}" == "release" ]]; then
+          echo "- Release page: ${{ github.server_url }}/${{ github.repository }}/releases/latest"
         fi
+
+  # -----------------------------------------------------------
+  # Job 2: Static build (for release distribution)
+  #
+  # Linux : Alpine Docker + musl → fully static, portable binary
+  #         that runs on CentOS, Ubuntu, Debian, etc. without
+  #         any shared-library dependencies.
+  # macOS : Best-effort static linking (-static-libgcc
+  #         -static-libstdc++ + third-party .a). Only system
+  #         frameworks remain dynamic (Apple limitation).
+  # -----------------------------------------------------------
+  build-static:
+    name: Static Build (${{ matrix.config.os_name }})
+    needs: build
+    runs-on: ${{ matrix.config.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - os: ubuntu-latest
+            os_name: linux-x86_64
+            artifact_name: basevar-linux-static
+          - os: macos-latest
+            os_name: macos-arm64
+            artifact_name: basevar-macos-static
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    # ========== Linux: Alpine Docker (musl) static build ==========
+    - name: Build static binary (Linux / Alpine-musl)
+      if: runner.os == 'Linux'
+      run: |
+        docker run --rm \
+          -v "${{ github.workspace }}:/src" \
+          -w /src \
+          alpine:3.20 \
+          sh -c '
+            set -e
+            echo "=== Installing build dependencies ==="
+            apk add --no-cache \
+              build-base cmake autoconf automake \
+              zlib-dev bzip2-dev xz-dev curl-dev openssl-dev
+
+            echo "=== Cleaning stale htslib artifacts ==="
+            find htslib -type f -name "*.o"   -delete 2>/dev/null || true
+            find htslib -type f -name "libhts.*" -not -name "libhts.map" -delete 2>/dev/null || true
+
+            echo "=== Configuring (STATIC_BUILD=ON) ==="
+            cmake -B build-static \
+              -DSTATIC_BUILD=ON \
+              -DCMAKE_BUILD_TYPE=Release
+
+            echo "=== Building ==="
+            cmake --build build-static --config Release
+
+            echo "=== Verifying static binary ==="
+            file bin/basevar
+            if ldd bin/basevar 2>&1 | grep -q "not a dynamic executable\|statically linked"; then
+              echo "OK: Binary is fully static."
+            else
+              echo "WARNING: Binary has dynamic dependencies:" && ldd bin/basevar 2>&1 || true
+            fi
+          '
+
+    # ========== macOS: best-effort static build ===================
+    - name: Install Dependencies (macOS)
+      if: runner.os == 'macOS'
+      run: brew install autoconf automake zlib bzip2 xz curl openssl@3
+
+    - name: Build static binary (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        # Clean stale htslib artifacts from the repo
+        find htslib -type f -name "*.o" -delete 2>/dev/null || true
+        find htslib -type f -name "libhts.*" -not -name "libhts.map" -delete 2>/dev/null || true
+
+        cmake -B build-static \
+          -DSTATIC_BUILD=ON \
+          -DCMAKE_BUILD_TYPE=Release
+        cmake --build build-static --config Release
+
+    - name: Verify binary (macOS)
+      if: runner.os == 'macOS'
+      run: |
+        echo "=== Binary info ==="
+        file bin/basevar
+        echo "=== Dynamic library dependencies ==="
+        otool -L bin/basevar
+
+    # ========== Common: artifact & release ========================
+    - name: Prepare artifacts
+      run: |
+        mkdir -p dist
+        cp bin/basevar dist/${{ matrix.config.artifact_name }}
+        chmod +x dist/${{ matrix.config.artifact_name }}
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.config.artifact_name }}
+        path: dist/${{ matrix.config.artifact_name }}
+
+    - name: Upload Release Assets
+      if: github.event_name == 'release'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/${{ matrix.config.artifact_name }}
