@@ -8,6 +8,10 @@ on:
   release:
     types: [created]
 
+# Required for softprops/action-gh-release to upload release assets
+permissions:
+  contents: write
+
 jobs:
   # -----------------------------------------------------------
   # Job 1: Build + Test (dynamic linking, for CI verification)
@@ -69,29 +73,19 @@ jobs:
       if: github.event_name == 'release'
       uses: softprops/action-gh-release@v2
       with:
+        tag_name: ${{ github.ref_name }}
         files: dist/${{ matrix.artifact_name }}
-
-    - name: Show artifact location
-      run: |
-        echo "Build artifacts have been uploaded to:"
-        echo "- Actions tab: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        if [[ "${{ github.event_name }}" == "release" ]]; then
-          echo "- Release page: ${{ github.server_url }}/${{ github.repository }}/releases/latest"
-        fi
 
   # -----------------------------------------------------------
   # Job 2: Static build (for release distribution)
   #
-  # Linux : Alpine Docker + musl → fully static, portable binary
+  # Linux : Alpine Docker + musl -> fully static, portable binary
   #         that runs on CentOS, Ubuntu, Debian, etc. without
   #         any shared-library dependencies.
-  # macOS : Best-effort static linking. Only system frameworks
-  #         (libSystem, libc++, libcurl) remain dynamic.
+  # macOS : Best-effort static; only system frameworks remain dynamic.
   #
-  # This job runs independently of 'build' so that on release events
-  # the static binaries are uploaded even if the dynamic build job
-  # has not finished yet. On push/PR it also runs in parallel, which
-  # is fine because each job checks out the code independently.
+  # Runs independently (no 'needs') so static binaries are always
+  # uploaded on release events without waiting for the dynamic build.
   # -----------------------------------------------------------
   build-static:
     name: Static Build (${{ matrix.config.os_name }})
@@ -130,9 +124,6 @@ jobs:
               xz-dev xz-static \
               openssl-dev openssl-libs-static
 
-            echo "=== htslib will be configured with --disable-libcurl ==="
-            echo "=== (BaseVar only reads local files; no remote URL support needed) ==="
-
             echo "=== Cleaning stale htslib artifacts ==="
             find htslib -type f -name "*.o"   -delete 2>/dev/null || true
             find htslib -type f -name "libhts.*" -not -name "libhts.map" -delete 2>/dev/null || true
@@ -147,11 +138,7 @@ jobs:
 
             echo "=== Verifying static binary ==="
             file bin/basevar
-            if ldd bin/basevar 2>&1 | grep -q "not a dynamic executable\|statically linked"; then
-              echo "OK: Binary is fully static."
-            else
-              echo "WARNING: Binary has dynamic dependencies:" && ldd bin/basevar 2>&1 || true
-            fi
+            ldd bin/basevar 2>&1 || true
           '
 
     # ========== macOS: best-effort static build ===================
@@ -162,10 +149,8 @@ jobs:
     - name: Build static binary (macOS)
       if: runner.os == 'macOS'
       run: |
-        # Clean stale htslib artifacts from the repo
         find htslib -type f -name "*.o" -delete 2>/dev/null || true
         find htslib -type f -name "libhts.*" -not -name "libhts.map" -delete 2>/dev/null || true
-
         cmake -B build-static \
           -DSTATIC_BUILD=ON \
           -DCMAKE_BUILD_TYPE=Release
@@ -174,9 +159,7 @@ jobs:
     - name: Verify binary (macOS)
       if: runner.os == 'macOS'
       run: |
-        echo "=== Binary info ==="
         file bin/basevar
-        echo "=== Dynamic library dependencies ==="
         otool -L bin/basevar
 
     # ========== Common: artifact & release ========================
@@ -186,7 +169,7 @@ jobs:
         cp bin/basevar dist/${{ matrix.config.artifact_name }}
         chmod +x dist/${{ matrix.config.artifact_name }}
 
-    - name: Upload artifacts
+    - name: Upload artifacts (CI)
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.config.artifact_name }}
@@ -196,4 +179,5 @@ jobs:
       if: github.event_name == 'release'
       uses: softprops/action-gh-release@v2
       with:
+        tag_name: ${{ github.ref_name }}
         files: dist/${{ matrix.config.artifact_name }}
