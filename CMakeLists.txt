@@ -62,10 +62,20 @@ if(STATIC_BUILD)
     endif()
 endif()
 
-# Ensure htslib is built before the main executable
+# Ensure htslib is built before the main executable.
+# For static builds on Linux, disable libcurl in htslib: BaseVar only reads
+# local BAM/CRAM/FASTA files, so remote-URL support is not needed.
+# This removes curl (and its transitive deps: brotli, zstd, psl, etc.)
+# from the link graph, making the static build much simpler.
+if(STATIC_BUILD AND NOT APPLE)
+    set(HTSLIB_CONFIGURE_FLAGS --disable-libcurl)
+else()
+    set(HTSLIB_CONFIGURE_FLAGS "")
+endif()
+
 add_custom_target(
     Buildhts ALL
-    COMMAND autoreconf -i && ./configure && make
+    COMMAND autoreconf -i && ./configure ${HTSLIB_CONFIGURE_FLAGS} && make
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/htslib
 )
 
@@ -127,14 +137,9 @@ if(STATIC_BUILD AND APPLE)
     )
 elseif(STATIC_BUILD AND NOT APPLE)
     # ---- Linux fully static build (Alpine musl recommended) ----
-    # Use pkg-config --static to resolve the complete set of link flags
-    # that libcurl needs (idn2, unistring, nghttp2, cares, ssl, crypto, z, etc.).
-    # This avoids manually tracking curl's transitive static dependencies,
-    # which vary by Alpine version and build configuration.
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(CURL_STATIC REQUIRED IMPORTED_TARGET libcurl)
-
-    # Locate remaining .a archives explicitly
+    # htslib is configured with --disable-libcurl (see Buildhts above),
+    # so curl and all its transitive deps (brotli, zstd, psl, etc.) are
+    # not needed. Only the core compression libs + ssl are required.
     find_library(ZLIB_STATIC   NAMES libz.a     REQUIRED)
     find_library(BZ2_STATIC    NAMES libbz2.a   REQUIRED)
     find_library(LZMA_STATIC   NAMES liblzma.a  REQUIRED)
@@ -144,21 +149,17 @@ elseif(STATIC_BUILD AND NOT APPLE)
     message(STATUS "Linux static libs:")
     message(STATUS "  zlib=${ZLIB_STATIC} bz2=${BZ2_STATIC} lzma=${LZMA_STATIC}")
     message(STATUS "  ssl=${SSL_STATIC} crypto=${CRYPTO_STATIC}")
-    message(STATUS "  curl static flags: ${CURL_STATIC_STATIC_LIBRARIES}")
 
     # Force static linker flag
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
 
     target_link_libraries(basevar
         ${HTSLIB}
-        # pkg-config resolves libcurl.a + all its transitive static deps
-        # (libidn2, libunistring, libnghttp2, libcares, libssl, libcrypto, etc.)
-        -Wl,--start-group
-        ${CURL_STATIC_STATIC_LIBRARIES}
+        ${SSL_STATIC}
+        ${CRYPTO_STATIC}
         ${LZMA_STATIC}
         ${BZ2_STATIC}
         ${ZLIB_STATIC}
-        -Wl,--end-group
         pthread
         m
         dl
