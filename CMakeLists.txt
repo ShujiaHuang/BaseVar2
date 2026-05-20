@@ -56,6 +56,10 @@ if(STATIC_BUILD)
         # by replacing the -l<name> flags with explicit .a paths.
         message(STATUS "STATIC_BUILD is ON (macOS) — linking third-party libs statically via explicit .a paths")
     else()
+        # Linux static build: use -static linker flag.
+        # We do NOT use -lz/-lbz2/etc. because -static requires the .a archives
+        # to be findable by name, which may fail if only -dev (not -static)
+        # packages are installed.  Instead we locate each .a explicitly below.
         set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
         message(STATUS "STATIC_BUILD is ON (Linux) — producing a fully static basevar")
     endif()
@@ -92,19 +96,13 @@ set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 add_executable(basevar ${SRC_LIST})
 add_dependencies(basevar Buildhts)  # Ensure htslib is built before basevar
 
-# Link libraries: on macOS+STATIC_BUILD, resolve third-party .a paths
-# explicitly so the linker picks the static archive instead of the dylib.
+# Link libraries
 if(STATIC_BUILD AND APPLE)
-    # On macOS, Apple does not support fully static executables.
-    # Strategy: statically link zlib, bz2, lzma (third-party compression libs
-    # with version history concerns), while keeping curl, ssl, crypto as
-    # dynamic system frameworks.
-    #
-    # Note: Homebrew's libcurl.a is compiled with ngtcp2 (QUIC/HTTP3) and
-    # libicucore (IDN) support, which pulls in additional static archives
-    # that are not straightforward to link statically on macOS. Using the
-    # system curl dylib avoids this complexity and is safe since macOS ships
-    # a compatible curl in /usr/lib for all supported macOS versions.
+    # ---- macOS best-effort static build ----
+    # Apple does not support fully static executables.
+    # Strategy: statically link zlib, bz2, lzma via Homebrew .a archives.
+    # Homebrew's libcurl.a requires ngtcp2/libicucore (QUIC/HTTP3+IDN) which
+    # are complex to resolve as .a on macOS — use system curl dylib instead.
     #
     # Homebrew on Apple Silicon: /opt/homebrew/opt/<pkg>
     # Homebrew on Intel Macs:    /usr/local/opt/<pkg>
@@ -130,6 +128,55 @@ if(STATIC_BUILD AND APPLE)
         pthread
         m
     )
+elseif(STATIC_BUILD AND NOT APPLE)
+    # ---- Linux fully static build (Alpine musl recommended) ----
+    # Locate each .a archive explicitly to avoid -lname lookup failures
+    # when only *-dev (not *-static) packages are installed.
+    find_library(ZLIB_STATIC   NAMES libz.a     REQUIRED)
+    find_library(BZ2_STATIC    NAMES libbz2.a   REQUIRED)
+    find_library(LZMA_STATIC   NAMES liblzma.a  REQUIRED)
+    find_library(CURL_STATIC   NAMES libcurl.a  REQUIRED)
+    find_library(SSL_STATIC    NAMES libssl.a   REQUIRED)
+    find_library(CRYPTO_STATIC NAMES libcrypto.a REQUIRED)
+
+    # curl on Alpine (musl) needs these companion libs when linked statically
+    find_library(NGHTTP2_STATIC  NAMES libnghttp2.a  QUIET)
+    find_library(NGHTTP3_STATIC  NAMES libnghttp3.a  QUIET)
+    find_library(IDN2_STATIC     NAMES libidn2.a     QUIET)
+    find_library(PSL_STATIC      NAMES libpsl.a      QUIET)
+    find_library(ZSTD_STATIC     NAMES libzstd.a     QUIET)
+    find_library(BROTLIDEC_STATIC NAMES libbrotlidec.a QUIET)
+    find_library(BROTLICOMMON_STATIC NAMES libbrotlicommon.a QUIET)
+    find_library(UNISTRING_STATIC NAMES libunistring.a QUIET)
+
+    message(STATUS "Linux static libs:")
+    message(STATUS "  zlib=${ZLIB_STATIC} bz2=${BZ2_STATIC} lzma=${LZMA_STATIC}")
+    message(STATUS "  curl=${CURL_STATIC} ssl=${SSL_STATIC} crypto=${CRYPTO_STATIC}")
+
+    # Build the list of optional companion libs (only append if found)
+    set(CURL_COMPANION_LIBS "")
+    foreach(_lib IN ITEMS
+            NGHTTP2_STATIC NGHTTP3_STATIC IDN2_STATIC PSL_STATIC
+            ZSTD_STATIC BROTLIDEC_STATIC BROTLICOMMON_STATIC UNISTRING_STATIC)
+        if(${_lib})
+            list(APPEND CURL_COMPANION_LIBS ${${_lib}})
+        endif()
+    endforeach()
+
+    target_link_libraries(basevar
+        ${HTSLIB}
+        ${CURL_STATIC}
+        ${SSL_STATIC}
+        ${CRYPTO_STATIC}
+        ${CURL_COMPANION_LIBS}
+        ${LZMA_STATIC}
+        ${BZ2_STATIC}
+        ${ZLIB_STATIC}
+        pthread
+        m
+        dl
+    )
 else()
+    # ---- Standard dynamic build ----
     target_link_libraries(basevar ${HTSLIB} ${COMMON_SYS_LIB})
 endif()
