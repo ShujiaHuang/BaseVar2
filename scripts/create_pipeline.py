@@ -5,6 +5,7 @@ Date: 2017-01-19
 import os
 import sys
 import argparse
+import shutil
 
 def load_reference_fai(in_fai, chroms=None):
 
@@ -23,10 +24,33 @@ def load_reference_fai(in_fai, chroms=None):
     return ref
 
 
-def creat_basetype_pipe():
+def executable(cmd):
+    """Return True if `cmd` (a command string or path) refers to an executable.
+    If `cmd` contains arguments, only the program name (first token) is checked.
+    """
+    if not cmd:
+        return False
+    prog = cmd.strip().split()[0]
+    # If prog contains a path separator or is a relative path, check directly
+    if os.path.sep in prog or prog.startswith('.'):
+        return os.path.exists(prog) and os.access(prog, os.X_OK)
+        
+    # Otherwise use shutil.which to find it on PATH
+    return shutil.which(prog) is not None
 
-    pardir = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), os.path.pardir))
-    exe_prog = pardir + '/bin/basevar caller'
+
+def creat_basetype_pipe():
+    # get basevar from enviroment
+    basevar = os.environ.get('basevar')
+    if basevar:
+        exe_prog = basevar + ' caller' # basevar caller
+    else:
+        pardir = os.path.abspath(os.path.join(os.path.dirname(sys.argv[0]), os.path.pardir))
+        exe_prog = os.path.join(pardir, 'bin', 'basevar caller')
+    
+    if not executable(exe_prog):
+        print(f'Error: {exe_prog} is not executable', file=sys.stderr)
+        sys.exit(1)
 
     optp = argparse.ArgumentParser()
     optp.add_argument('-o', '--outdir', metavar='STR', dest='outdir',
