@@ -56,11 +56,8 @@ if(STATIC_BUILD)
         # by replacing the -l<name> flags with explicit .a paths.
         message(STATUS "STATIC_BUILD is ON (macOS) — linking third-party libs statically via explicit .a paths")
     else()
-        # Linux static build: use -static linker flag.
-        # We do NOT use -lz/-lbz2/etc. because -static requires the .a archives
-        # to be findable by name, which may fail if only -dev (not -static)
-        # packages are installed.  Instead we locate each .a explicitly below.
-        set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
+        # Linux static build: -static linker flag is set in the
+        # target_link_libraries section below, after pkg-config detection.
         message(STATUS "STATIC_BUILD is ON (Linux) — producing a fully static basevar")
     endif()
 endif()
@@ -130,42 +127,38 @@ if(STATIC_BUILD AND APPLE)
     )
 elseif(STATIC_BUILD AND NOT APPLE)
     # ---- Linux fully static build (Alpine musl recommended) ----
-    # Locate each .a archive explicitly to avoid -lname lookup failures
-    # when only *-dev (not *-static) packages are installed.
+    # Use pkg-config --static to resolve the complete set of link flags
+    # that libcurl needs (idn2, unistring, nghttp2, cares, ssl, crypto, z, etc.).
+    # This avoids manually tracking curl's transitive static dependencies,
+    # which vary by Alpine version and build configuration.
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(CURL_STATIC REQUIRED IMPORTED_TARGET libcurl)
+
+    # Locate remaining .a archives explicitly
     find_library(ZLIB_STATIC   NAMES libz.a     REQUIRED)
     find_library(BZ2_STATIC    NAMES libbz2.a   REQUIRED)
     find_library(LZMA_STATIC   NAMES liblzma.a  REQUIRED)
-    find_library(CURL_STATIC   NAMES libcurl.a  REQUIRED)
     find_library(SSL_STATIC    NAMES libssl.a   REQUIRED)
     find_library(CRYPTO_STATIC NAMES libcrypto.a REQUIRED)
 
-    # curl on Alpine (musl) may need these companion libs when linked statically.
-    # Only nghttp2 and c-ares exist as *-static packages in Alpine 3.20;
-    # nghttp3, brotli, zstd, idn2, psl are NOT available as static archives there.
-    find_library(NGHTTP2_STATIC  NAMES libnghttp2.a  QUIET)
-    find_library(CARES_STATIC    NAMES libcares.a    QUIET)
-
     message(STATUS "Linux static libs:")
     message(STATUS "  zlib=${ZLIB_STATIC} bz2=${BZ2_STATIC} lzma=${LZMA_STATIC}")
-    message(STATUS "  curl=${CURL_STATIC} ssl=${SSL_STATIC} crypto=${CRYPTO_STATIC}")
+    message(STATUS "  ssl=${SSL_STATIC} crypto=${CRYPTO_STATIC}")
+    message(STATUS "  curl static flags: ${CURL_STATIC_STATIC_LIBRARIES}")
 
-    # Build the list of optional companion libs (only append if found)
-    set(CURL_COMPANION_LIBS "")
-    foreach(_lib IN ITEMS NGHTTP2_STATIC CARES_STATIC)
-        if(${_lib})
-            list(APPEND CURL_COMPANION_LIBS ${${_lib}})
-        endif()
-    endforeach()
+    # Force static linker flag
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
 
     target_link_libraries(basevar
         ${HTSLIB}
-        ${CURL_STATIC}
-        ${SSL_STATIC}
-        ${CRYPTO_STATIC}
-        ${CURL_COMPANION_LIBS}
+        # pkg-config resolves libcurl.a + all its transitive static deps
+        # (libidn2, libunistring, libnghttp2, libcares, libssl, libcrypto, etc.)
+        -Wl,--start-group
+        ${CURL_STATIC_STATIC_LIBRARIES}
         ${LZMA_STATIC}
         ${BZ2_STATIC}
         ${ZLIB_STATIC}
+        -Wl,--end-group
         pthread
         m
         dl

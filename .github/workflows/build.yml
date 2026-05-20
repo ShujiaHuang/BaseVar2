@@ -121,13 +121,19 @@ jobs:
             set -e
             echo "=== Installing build dependencies ==="
             apk add --no-cache \
-              build-base cmake autoconf automake \
+              build-base cmake autoconf automake pkgconf \
               zlib-dev zlib-static \
               bzip2-dev bzip2-static \
               xz-dev xz-static \
               curl-dev curl-static \
               openssl-dev openssl-libs-static \
-              nghttp2-static c-ares-static
+              nghttp2-dev nghttp2-static \
+              libidn2-dev libidn2-static \
+              libunistring-dev libunistring-static \
+              c-ares-dev c-ares-static
+
+            echo "=== curl static link flags ==="
+            pkg-config --static --libs libcurl || true
 
             echo "=== Cleaning stale htslib artifacts ==="
             find htslib -type f -name "*.o"   -delete 2>/dev/null || true
