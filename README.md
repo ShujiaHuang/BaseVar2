@@ -24,23 +24,23 @@ If you use BaseVar in your research, please cite:
 
 Pre-built static binaries are available on the [GitHub Releases page](https://github.com/ShujiaHuang/BaseVar2/releases).
 
-| Platform | Binary |
-|----------|--------|
-| Linux (x86_64, glibc-free) | `basevar-linux-static` |
-| macOS (arm64 / Intel) | `basevar-macos-static` |
+| Platform | Download | Notes |
+|----------|----------|-------|
+| Linux (x86_64) | [basevar-linux-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.1.1/basevar-linux-static) | Fully static, zero runtime deps |
+| macOS (arm64 / Intel) | [basevar-macos-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.1.1/basevar-macos-static) | Best-effort static, requires macOS 12+ |
 
 The Linux static binary has **zero runtime dependencies** and runs on any modern Linux distribution (CentOS 7+, Ubuntu 16.04+, Debian 9+, etc.) without installing any libraries.
 
 ```bash
-# Linux example
-wget https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static
+# Linux
+wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.1.1/basevar-linux-static
 chmod +x basevar-linux-static
 ./basevar-linux-static --help
 ```
 
 ```bash
-# macOS example
-curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-macos-static
+# macOS
+curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.1.1/basevar-macos-static
 chmod +x basevar-macos-static
 ./basevar-macos-static --help
 ```
@@ -88,7 +88,8 @@ cmake --build build-static
 ```bash
 docker run --rm -v "$PWD:/src" -w /src alpine:3.20 sh -c '
   apk add --no-cache build-base cmake autoconf automake \
-    zlib-dev bzip2-dev xz-dev curl-dev openssl-dev &&
+    zlib-dev zlib-static bzip2-dev bzip2-static \
+    xz-dev xz-static openssl-dev openssl-libs-static &&
   cmake -B build-static -DSTATIC_BUILD=ON -DCMAKE_BUILD_TYPE=Release &&
   cmake --build build-static
 '
