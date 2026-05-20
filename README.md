@@ -2,7 +2,7 @@
 
 [![BaseVar Logo](https://github.com/ShujiaHuang/basevar/blob/main/docs/assets/images/basevar.png)](https://github.com/ShujiaHuang/basevar2)
 
-*BaseVar* is a specialized tool for variant calling from ultra low-depth (<1x) sequencing data, with particular focus on non-invasive prenatal testing (NIPT) and large-scale population genomics. Leveraging maximum likelihood and likelihood ratio models, BaseVar accurately identifies polymorphisms at genomic positions and estimates allele frequencies across thousands of samples simultaneously. For the mathematical foundations, refer to the publication [here](https://doi.org/10.1016/j.xgen.2024.100669).
+*BaseVar* is a specialized tool for variant calling from ultra low-depth (<1x) sequencing data, with particular focus on non-invasive prenatal testing (NIPT) and large-scale population genomics. Leveraging maximum likelihood and likelihood ratio models, BaseVar accurately identifies polymorphisms at genomic positions and estimates allele frequencies across thousands of samples simultaneously. For the mathematical foundations, refer to the [BaseVar publication in Cell Genomics](https://doi.org/10.1016/j.xgen.2024.100669).
 
 BaseVar is fully implemented in C++17 and delivers over **10×** the speed of its [original Python counterpart](https://github.com/ShujiaHuang/basevar/tree/python-version-0.6.1.1), while using dramatically less memory. With `-B 200` and one thread, memory usage is typically 3–4 GB per thread — compared to 20+ GB in the Python version.
 
@@ -21,7 +21,7 @@ If you use BaseVar in your research, please cite:
 Pre-built static binaries are available on the [GitHub Releases page](https://github.com/ShujiaHuang/BaseVar2/releases).
 
 | Platform | Download | Notes |
-|----------|----------|-------|
+| -------- | -------- | ----- |
 | Linux (x86_64) | [basevar-linux-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.0/basevar-linux-static) | Fully static, zero runtime deps |
 | macOS (arm64 / Intel) | [basevar-macos-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.0/basevar-macos-static) | Best-effort static, requires macOS 12+ |
 
@@ -104,6 +104,7 @@ cd htslib && autoreconf -i && ./configure && make && cd ..
 Then compile manually:
 
 **Linux:**
+
 ```bash
 cd bin/
 g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a \
@@ -111,6 +112,7 @@ g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a \
 ```
 
 **macOS:**
+
 ```bash
 cd bin/
 g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a \
@@ -123,7 +125,7 @@ g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a \
 
 ## Commands overview
 
-```
+```bash
 Usage: basevar <command> [options]
 
 Commands:
@@ -139,9 +141,9 @@ Commands:
 
 ### Full parameter reference
 
-```
+```bash
 About: Call variants and estimate allele frequency by BaseVar.
-Usage: basevar caller [options] <-f Fasta> <-o output_file> [-L bam.list] in1.bam [in2.bam ...] ...
+Usage: basevar caller [options] <-f Fasta> <-o output_file> [-L bam.list/cram.list] in1.bam [in2.bam ...] ...
 
 Required arguments:
   -f, --reference FILE         Input reference FASTA file.
@@ -170,7 +172,8 @@ Optional options:
 
 ### Usage examples
 
-**Minimal call from a list of BAM files:**
+**Minimal call from a list of BAM files (or CRAM files):**
+
 ```bash
 basevar caller \
     -f reference.fasta \
@@ -179,6 +182,7 @@ basevar caller \
 ```
 
 **Recommended call with quality filters and sample name optimization:**
+
 ```bash
 basevar caller \
     -f reference.fasta \
@@ -189,6 +193,7 @@ basevar caller \
 ```
 
 **Call a specific region:**
+
 ```bash
 basevar caller \
     -f reference.fasta \
@@ -200,6 +205,7 @@ basevar caller \
 ```
 
 **Call multiple disjoint regions in one run:**
+
 ```bash
 basevar caller \
     -f reference.fasta \
@@ -210,6 +216,7 @@ basevar caller \
 ```
 
 **Include BAM files directly on the command line:**
+
 ```bash
 basevar caller \
     -f reference.fasta \
@@ -217,10 +224,11 @@ basevar caller \
     -Q 20 -q 30 -B 500 \
     --filename-has-samplename \
     -L bamfile.list \
-    sample1.bam sample2.bam sample3.bam
+    sample1.cram sample2.bam sample3.bam
 ```
 
 **Per-population allele frequency calculation:**
+
 ```bash
 basevar caller \
     -f reference.fasta \
@@ -231,9 +239,10 @@ basevar caller \
     -L bamfile.list
 ```
 
-The `sample_group.info` format can be found [here](https://github.com/ShujiaHuang/BaseVar2/blob/main/tests/data/sample_group.info).
+See the [example `sample_group.info` file](https://github.com/ShujiaHuang/BaseVar2/blob/main/tests/data/sample_group.info) for the expected format.
 
 **Resume an interrupted run:**
+
 ```bash
 basevar caller \
     -f reference.fasta \
@@ -255,7 +264,7 @@ For whole-genome variant calling, the `pipeline` subcommand splits the genome in
 ### Pipeline-specific options
 
 | Option | Description | Default |
-|--------|-------------|---------|
+| ------ | ----------- | ------- |
 | `-o, --outdir` | Output directory for VCF files and logs | **required** |
 | `--ref_fai` | Reference FASTA index file (`.fai`) | **required** |
 | `-d, --delta` | Size of each sub-region (bp) | `2000000` |
@@ -268,6 +277,7 @@ When `-r/--regions` is supplied, those regions are further split into `--delta`-
 ### Examples
 
 **Generate whole-genome pipeline (all chromosomes, 2 Mb windows):**
+
 ```bash
 basevar pipeline \
     -o /path/to/outdir \
@@ -280,6 +290,7 @@ basevar pipeline \
 ```
 
 **Generate pipeline for a single chromosome (5 Mb windows):**
+
 ```bash
 basevar pipeline \
     -o /path/to/outdir \
@@ -293,6 +304,7 @@ basevar pipeline \
 ```
 
 **Generate pipeline for specific regions (split into 1 Mb windows):**
+
 ```bash
 basevar pipeline \
     -o /path/to/outdir \
@@ -307,6 +319,7 @@ basevar pipeline \
 ```
 
 **Run the generated pipeline:**
+
 ```bash
 # Sequential (local):
 bash basevar.chr20.sh
@@ -335,7 +348,7 @@ basevar concat -L vcf.list -o final_output.vcf.gz
 
 Concatenate per-region VCF files produced by `basevar caller` into a single VCF. The files must be provided in the correct genomic order (the tool does not sort positions).
 
-```
+```bash
 Usage: basevar concat [options] <-o output.vcf.gz> [-L vcf.list] in1.vcf.gz [in2.vcf.gz ...]
 
 Required:
@@ -346,6 +359,7 @@ Optional:
 ```
 
 **Example:**
+
 ```bash
 # From a file list
 ls outdir/*.vcf.gz | sort -V > vcf.list
@@ -363,7 +377,7 @@ basevar concat chr1_1_2000000.vcf.gz chr1_2000001_4000000.vcf.gz -o chr1.vcf.gz
 
 Extract a subset of samples from a BaseVar VCF and output a new VCF with recalculated INFO fields (AC/AN/AF).
 
-```
+```bash
 Usage: basevar subsam [options] -i <input.vcf[.gz]> -o <output.vcf[.gz]> [-s <samplelist>]
 
 Options:
@@ -377,6 +391,7 @@ Options:
 ```
 
 **Examples:**
+
 ```bash
 # Extract samples listed in a file
 basevar subsam \
