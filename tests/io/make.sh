@@ -13,6 +13,8 @@ g++ -O3 -fPIC test_threadpool.cpp -I ../../src -o test_threadpool && ./test_thre
 g++ -O3 -fPIC test_utils.cpp ../../src/io/utils.cpp -I ../../src -o test_utils && ./test_utils && rm -f test_utils
 g++ -O3 -fPIC test_algorithm.cpp ../../htslib/libhts.a -I ../../src -I ../../htslib -o test_algorithm && ./test_algorithm && rm -f test_algorithm
 
+g++ -std=c++17 -O3 -fPIC test_pipeline.cpp ../../src/pipeline.cpp ../../src/io/utils.cpp -I ../../src -I ../../htslib -o test_pipeline && ./test_pipeline && rm -f test_pipeline
+
 gcc -O3 -Wall -I ../../src -std=c++11 -lstdc++ -o test_combinations test_combinations.cpp && ./test_combinations && rm -f test_combinations
 
 g++ -O3 -fPIC test_algorithm.cpp ../../htslib/libhts.a -I ../../src -I ../../htslib -o test_algorithm && ./test_algorithm && rm -f test_algorithm

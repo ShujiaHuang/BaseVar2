@@ -1,10 +1,6 @@
 # BaseVar: Call variants from ultra low-pass WGS data
 
-<div align="center">
-  <a href="https://github.com/ShujiaHuang/basevar2">
-    <img src="https://github.com/ShujiaHuang/basevar/blob/main/docs/assets/images/basevar.png" alt="BaseVar Logo">
-  </a>
-</div>
+[![BaseVar Logo](https://github.com/ShujiaHuang/basevar/blob/main/docs/assets/images/basevar.png)](https://github.com/ShujiaHuang/basevar2)
 
 *BaseVar* is a specialized tool for variant calling from ultra low-depth (<1x) sequencing data, with particular focus on non-invasive prenatal testing (NIPT) and large-scale population genomics. Leveraging maximum likelihood and likelihood ratio models, BaseVar accurately identifies polymorphisms at genomic positions and estimates allele frequencies across thousands of samples simultaneously. For the mathematical foundations, refer to the publication [here](https://doi.org/10.1016/j.xgen.2024.100669).
 
@@ -26,21 +22,21 @@ Pre-built static binaries are available on the [GitHub Releases page](https://gi
 
 | Platform | Download | Notes |
 |----------|----------|-------|
-| Linux (x86_64) | [basevar-linux-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.1.1/basevar-linux-static) | Fully static, zero runtime deps |
-| macOS (arm64 / Intel) | [basevar-macos-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.1.1/basevar-macos-static) | Best-effort static, requires macOS 12+ |
+| Linux (x86_64) | [basevar-linux-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.0/basevar-linux-static) | Fully static, zero runtime deps |
+| macOS (arm64 / Intel) | [basevar-macos-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.0/basevar-macos-static) | Best-effort static, requires macOS 12+ |
 
 The Linux static binary has **zero runtime dependencies** and runs on any modern Linux distribution (CentOS 7+, Ubuntu 16.04+, Debian 9+, etc.) without installing any libraries.
 
 ```bash
 # Linux
-wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.1.1/basevar-linux-static
+wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.0/basevar-linux-static
 chmod +x basevar-linux-static
 ./basevar-linux-static --help
 ```
 
 ```bash
 # macOS
-curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.1.1/basevar-macos-static
+curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.0/basevar-macos-static
 chmod +x basevar-macos-static
 ./basevar-macos-static --help
 ```
@@ -132,6 +128,7 @@ Usage: basevar <command> [options]
 
 Commands:
   caller    Call variants and estimate allele frequencies
+  pipeline  Generate per-region `basevar caller` commands for whole-genome calling
   concat    Concatenate per-region VCF files into a whole-genome VCF
   subsam    Extract a subset of samples from a VCF file
 ```
@@ -249,9 +246,11 @@ basevar caller \
 
 ---
 
-## Whole-genome pipeline with `create_pipeline.py`
+## `basevar pipeline` — Whole-genome pipeline generator
 
-For whole-genome variant calling, the pipeline generator script splits the genome into sub-regions and generates one `basevar caller` command per region. These commands can be executed in parallel on a compute cluster or with a job scheduler.
+For whole-genome variant calling, the `pipeline` subcommand splits the genome into sub-regions and prints one `basevar caller` command per sub-region to stdout. The resulting shell script can be executed sequentially, in parallel with GNU `parallel`, or submitted to a job scheduler (SGE / SLURM / PBS).
+
+> Since **v2.2.0**, this functionality is built directly into the `basevar` binary as a native C++ subcommand. The older `scripts/create_pipeline.py` Python script is still shipped for backward compatibility and produces identical output.
 
 ### Pipeline-specific options
 
@@ -262,36 +261,52 @@ For whole-genome variant calling, the pipeline generator script splits the genom
 | `-d, --delta` | Size of each sub-region (bp) | `2000000` |
 | `-c, --chrom` | Restrict to comma-separated chromosome(s) | all chromosomes |
 
-All other options (e.g., `-f`, `-L`, `-Q`, `-q`, `-B`, `-t`, `--filename-has-samplename`, `--pop-group`) are passed through directly to `basevar caller`.
+All other options (`-f`, `-L`, `-r`, `-Q`, `-q`, `-B`, `-t`, `--filename-has-samplename`, `--pop-group`, ...) are passed through verbatim to `basevar caller`. This means any new `caller` option works automatically without changes to the pipeline subcommand.
+
+When `-r/--regions` is supplied, those regions are further split into `--delta`-sized windows; otherwise every chromosome in the `.fai` (filtered by `--chrom` if set) is processed.
 
 ### Examples
 
 **Generate whole-genome pipeline (all chromosomes, 2 Mb windows):**
 ```bash
-python scripts/create_pipeline.py \
-    -f reference.fasta \
+basevar pipeline \
+    -o /path/to/outdir \
     --ref_fai reference.fasta.fai \
+    -f reference.fasta \
+    -L bamfile.list \
     -Q 20 -q 30 -B 500 -t 4 \
     --filename-has-samplename \
-    -L bamfile.list \
-    -o /path/to/outdir \
     > basevar_wgs.sh
 ```
 
 **Generate pipeline for a single chromosome (5 Mb windows):**
 ```bash
-python scripts/create_pipeline.py \
-    -f reference.fasta \
+basevar pipeline \
+    -o /path/to/outdir \
     --ref_fai reference.fasta.fai \
+    -c chr20 -d 5000000 \
+    -f reference.fasta \
+    -L bamfile.list \
     -Q 20 -q 30 -B 500 -t 4 \
     --filename-has-samplename \
-    -c chr20 -d 5000000 \
-    -L bamfile.list \
-    -o /path/to/outdir \
     > basevar.chr20.sh
 ```
 
-**Run the pipeline:**
+**Generate pipeline for specific regions (split into 1 Mb windows):**
+```bash
+basevar pipeline \
+    -o /path/to/outdir \
+    --ref_fai reference.fasta.fai \
+    -d 1000000 \
+    -r chr11:5000000-7000000,chr17 \
+    -f reference.fasta \
+    -L bamfile.list \
+    -Q 20 -q 30 -B 500 -t 4 \
+    --filename-has-samplename \
+    > basevar.targets.sh
+```
+
+**Run the generated pipeline:**
 ```bash
 # Sequential (local):
 bash basevar.chr20.sh
@@ -311,6 +326,8 @@ After all sub-jobs finish, concatenate the per-region VCFs:
 ls /path/to/outdir/*.vcf.gz | sort -V > vcf.list
 basevar concat -L vcf.list -o final_output.vcf.gz
 ```
+
+> The legacy Python script `scripts/create_pipeline.py` remains available and produces byte-identical output; replace `basevar pipeline` with `basevar=./bin/basevar python scripts/create_pipeline.py` to use it instead.
 
 ---
 
