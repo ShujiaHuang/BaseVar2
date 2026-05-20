@@ -85,13 +85,16 @@ jobs:
   # Linux : Alpine Docker + musl → fully static, portable binary
   #         that runs on CentOS, Ubuntu, Debian, etc. without
   #         any shared-library dependencies.
-  # macOS : Best-effort static linking (-static-libgcc
-  #         -static-libstdc++ + third-party .a). Only system
-  #         frameworks remain dynamic (Apple limitation).
+  # macOS : Best-effort static linking. Only system frameworks
+  #         (libSystem, libc++, libcurl) remain dynamic.
+  #
+  # This job runs independently of 'build' so that on release events
+  # the static binaries are uploaded even if the dynamic build job
+  # has not finished yet. On push/PR it also runs in parallel, which
+  # is fine because each job checks out the code independently.
   # -----------------------------------------------------------
   build-static:
     name: Static Build (${{ matrix.config.os_name }})
-    needs: build
     runs-on: ${{ matrix.config.os }}
     strategy:
       fail-fast: false
