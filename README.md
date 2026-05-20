@@ -6,175 +6,400 @@
   </a>
 </div>
 
-*BaseVar* is a specialized tool tailored for variant calling using ultra low-depth (<1x) sequencing data, particularly catering to non-invasive prenatal test (NIPT) data in human genetic studies. Leveraging maximum likelihood and likelihood ratio models, BaseVar accurately identifies polymorphisms at genomic positions and calculates allele frequencies. For in-depth mathematical explanations, refer to the comprehensive documentation available [here](https://doi.org/10.1016/j.cell.2018.08.016).
+*BaseVar* is a specialized tool for variant calling from ultra low-depth (<1x) sequencing data, with particular focus on non-invasive prenatal testing (NIPT) and large-scale population genomics. Leveraging maximum likelihood and likelihood ratio models, BaseVar accurately identifies polymorphisms at genomic positions and estimates allele frequencies across thousands of samples simultaneously. For the mathematical foundations, refer to the publication [here](https://doi.org/10.1016/j.xgen.2024.100669).
 
-Now, BaseVar has been fully implemented by C++. BaseVar showcases significant enhancements over its [original Python counterpart](https://github.com/ShujiaHuang/basevar/tree/python-version-0.6.1.1). The C++ implementation delivers a computing speed exceeding 10 times that of the Python version, all while demanding substantially less memory. Typically, each thread (-t/--thread) consumes merely 3GB to 4GB of memory when the -B (--batch-count) option is configured to 200, a stark contrast to the Python version's requirement of over 20GB.
+BaseVar is fully implemented in C++17 and delivers over **10×** the speed of its [original Python counterpart](https://github.com/ShujiaHuang/basevar/tree/python-version-0.6.1.1), while using dramatically less memory. With `-B 200` and one thread, memory usage is typically 3–4 GB per thread — compared to 20+ GB in the Python version.
 
 ## Citation
 
-Please cite the following papers if you use BaseVar in your published projects or papers.
+If you use BaseVar in your research, please cite:
 
-> - Liu, S., Liu, Y., Gu, Y., Lin, X., Zhu, H., Liu, H., Xu, Z., Cheng, S., Lan, X., Li, L., Huang, M., Li, H., Nielsen, R., Davies, RW., Albrechtsen, A., Chen, GB., Qiu, X., Jin, X., **Huang, S.**, (2024). Utilizing non-invasive prenatal test sequencing data for human genetic investigation. *Cell Genomics* 4(10), 100669 [doi:10.1016/j.xgen.2024.100669](https://www.cell.com/cell-genomics/fulltext/S2666-979X(24)00288-X)
+> Liu, S., Liu, Y., Gu, Y., Lin, X., Zhu, H., Liu, H., Xu, Z., Cheng, S., Lan, X., Li, L., Huang, M., Li, H., Nielsen, R., Davies, RW., Albrechtsen, A., Chen, GB., Qiu, X., Jin, X., **Huang, S.**, (2024). Utilizing non-invasive prenatal test sequencing data for human genetic investigation. *Cell Genomics* 4(10), 100669. [doi:10.1016/j.xgen.2024.100669](https://www.cell.com/cell-genomics/fulltext/S2666-979X(24)00288-X)
+
+---
 
 ## Installation
 
-*BaseVar requires C++17 or above.* Compile `basevar` from source codes step-by-step.
+### Option 1 — Download pre-built binary (Recommended, no compilation needed)
 
-You can install `basevar` using either of the following two methods.
+Pre-built static binaries are available on the [GitHub Releases page](https://github.com/ShujiaHuang/BaseVar2/releases).
 
-### Method 1. Install `basevar` by using cmake (Recommend)
+| Platform | Binary |
+|----------|--------|
+| Linux (x86_64, glibc-free) | `basevar-linux-static` |
+| macOS (arm64 / Intel) | `basevar-macos-static` |
 
-This is the simplest way of installing basevar by *cmake*
-
-```bash
-git clone https://github.com/ShujiaHuang/basevar2.git
-cd basevar
-mkdir build
-cmake ..
-make 
-
-```
-
-> If you have problems downloading, please try several times.
-
-If everything is smooth, you'll find an exectutable file named `basevar` in `bin/` folder.
-
-### Method 2. Manually install processes (Optional)
-
-Sometimes, you may need to complete the installation manually if the above command fails to install **BaseVar**.
-
-**1. Download BaseVar from github**
-
-BaseVar is hosted on Github and can be downloaded with the following command:
+The Linux static binary has **zero runtime dependencies** and runs on any modern Linux distribution (CentOS 7+, Ubuntu 16.04+, Debian 9+, etc.) without installing any libraries.
 
 ```bash
-git clone https://github.com/ShujiaHuang/basevar2.git
-
+# Linux example
+wget https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static
+chmod +x basevar-linux-static
+./basevar-linux-static --help
 ```
-
-> **WARNING**: Please try several times if fail to clone the data causing by the network problem.
-
-**2. Navigate into `htslib` folder and run the following commands**
-
-After cloing, navigate into the `basevar` folder and execute the following:
 
 ```bash
-
-cd htslib
-autoreconf -i
-./configure
-make
-
+# macOS example
+curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-macos-static
+chmod +x basevar-macos-static
+./basevar-macos-static --help
 ```
 
-**Note**: If you encounter an error message similar to the following during the compilation of htslib, you can safely disregard it as the code should continue to function properly:
+---
+
+### Option 2 — Compile from source
+
+*Requires: C++17 compiler (GCC 7+ or Apple Clang 10+), CMake ≥ 3.12, and system libraries: zlib, bzip2, xz-utils, libcurl.*
+
+#### Step 1 — Clone the repository (including htslib submodule)
 
 ```bash
-test/test_khash.c: In function 'write_stats_str2int':
-test/test_khash.c:53:9: warning: implicit declaration of function 'kh_stats' [-Wimplicit-function-declaration]
-   53 |     if (kh_stats(str2int, h, &empty, &deleted, &hist_size, &hist) == 0) {
-      |         ^~~~~~~~
-test/test_khash.c:53:18: error: 'str2int' undeclared (first use in this function)
-   53 |     if (kh_stats(str2int, h, &empty, &deleted, &hist_size, &hist) == 0) {
-      |                  ^~~~~~~
-test/test_khash.c:53:18: note: each undeclared identifier is reported only once for each function it appears in
-make: *** [test/test_khash.o] Error 1
+git clone --recursive https://github.com/ShujiaHuang/basevar2.git
+cd basevar2
 ```
 
-Feel free to proceed with your installation tasks despite encountering this error during the compilation process.
+> If you forgot `--recursive`, run: `git submodule update --init --recursive`
 
-**3. Go back to the upper directory and install `basevar` by running the commands below**
+#### Step 2 — Build with CMake (standard dynamic build)
 
-Navigate into `bin/` folder firstly and execute the following commands:
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
 
-**Manually install in Linux**
+The executable `bin/basevar` will be produced. Verify with:
 
+```bash
+./bin/basevar --help
+```
+
+#### Step 3 (Optional) — Build a static binary locally
+
+**macOS** (requires Homebrew):
+
+```bash
+brew install zlib bzip2 xz
+cmake -B build-static -DSTATIC_BUILD=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build-static
+```
+
+**Linux** (fully static via Alpine Docker):
+
+```bash
+docker run --rm -v "$PWD:/src" -w /src alpine:3.20 sh -c '
+  apk add --no-cache build-base cmake autoconf automake \
+    zlib-dev bzip2-dev xz-dev curl-dev openssl-dev &&
+  cmake -B build-static -DSTATIC_BUILD=ON -DCMAKE_BUILD_TYPE=Release &&
+  cmake --build build-static
+'
+```
+
+---
+
+### Option 3 — Manual g++ compilation (fallback)
+
+First, build htslib:
+
+```bash
+cd htslib && autoreconf -i && ./configure && make && cd ..
+```
+
+Then compile manually:
+
+**Linux:**
 ```bash
 cd bin/
-g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -lssl -lcrypto -o basevar
-
+g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a \
+    -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -lssl -lcrypto -o basevar
 ```
 
-**Manually install in MacOS**
-
+**macOS:**
 ```bash
 cd bin/
-g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -o basevar
-
-
+g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a \
+    -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -o basevar
 ```
 
-To review each of the parameters, you can type `basevar caller -h` in the Linux/MacOS Terminal. 
+> **Note:** If you encounter a `test/test_khash.c` compilation error during `make` in htslib, you can safely ignore it — the required `libhts.a` archive is still produced correctly.
 
-```bash
-$ /path/to/basevar caller -h
+---
 
+## Commands overview
+
+```
+Usage: basevar <command> [options]
+
+Commands:
+  caller    Call variants and estimate allele frequencies
+  concat    Concatenate per-region VCF files into a whole-genome VCF
+  subsam    Extract a subset of samples from a VCF file
+```
+
+---
+
+## `basevar caller` — Variant calling
+
+### Full parameter reference
+
+```
 About: Call variants and estimate allele frequency by BaseVar.
-Usage: basevar caller [options] <-f Fasta> <--output-vcf output_file> [-L bam.list] in1.bam [in2.bam ...] ...
+Usage: basevar caller [options] <-f Fasta> <-o output_file> [-L bam.list] in1.bam [in2.bam ...] ...
 
 Required arguments:
-  -f, --reference FILE         Input reference fasta file.
-  -o, --output    FILE         Output VCF file.
+  -f, --reference FILE         Input reference FASTA file.
+  -o, --output    FILE         Output VCF file (supports .vcf.gz).
 
 Optional options:
   -L, --align-file-list=FILE   BAM/CRAM files list, one file per row.
-  -r, --regions=REG[,...]      Skip positions which not in these regions. This parameter could be a list
-                               of comma deleimited genome regions(e.g.: chr:start-end).
-  -G, --pop-group=FILE         Calculating the allele frequency for specific population.
+  -r, --regions=REG[,...]      Restrict calling to these regions (comma-separated).
+                               Formats: chr  |  chr:start  |  chr:start-end
+                               Example: chr1,chr2:1000000,chr3:5000000-10000000
+  -G, --pop-group=FILE         Calculate allele frequency per population group.
 
-  -m, --min-af=float           Setting prior precision of MAF and skip ineffective caller positions,
-                               a typical approach involves setting it to min(0.001000, 100/x), where x
-                               represents the number of input BAM files min(0.001000, 100/x). In most
-                               cases, users need not be overly concerned about this parameter, as it
-                               is generally handled automatically by the program.
-  -Q, --min-BQ INT             Skip bases with base quality < INT [10]
-  -q, --mapq=INT               Skip reads with mapping quality < INT [5]
-  -B, --batch-count=INT        INT simples per batchfile. [500]
-  -t, --thread=INT             Number of threads. [14]
+  -m, --min-af=float           Prior MAF threshold; positions below this are skipped.
+                               Default: min(0.001, 100/num_samples). Usually auto-set.
+  -Q, --min-BQ INT             Minimum base quality [10]
+  -q, --mapq=INT               Minimum mapping quality [5]
+  -B, --batch-count=INT        Samples per batch file [500]
+  -t, --thread=INT             Number of threads [14]
 
-  --filename-has-samplename    If the prefix name of bamfiles/cramfiles start with 'Sample ID', something like 'SampleID.bam', set this
-                               argrument could save a lot of time during get the sample id from BAMfile.
-  --smart-rerun                Rerun process by checking batchfiles.
+  --filename-has-samplename    If BAM/CRAM filenames start with the sample ID
+                               (e.g. SampleID.bam), set this flag to skip reading
+                               the BAM header for sample names — saves significant time.
+  --smart-rerun                Skip completed batch files and resume an interrupted run.
   -h, --help                   Show this help message and exit.
-
-Example usage:
-  [1]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 500 --filename-has-samplename -L bam.list
-  [2]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 500 --filename-has-samplename -L bam.list sample1.bam sample2.bam
-  [3]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 500 --filename-has-samplename -L bam.list -r chr1 sample1.bam sample2.bam
-
 ```
 
-This command will provide detailed information about parameters of `basevar`.
+### Usage examples
 
-## Quick start
-
-### Call variants from several bamfiles
-
+**Minimal call from a list of BAM files:**
 ```bash
-basevar caller -f reference.fasta \
+basevar caller \
+    -f reference.fasta \
+    -o output.vcf.gz \
+    -L bamfile.list
+```
+
+**Recommended call with quality filters and sample name optimization:**
+```bash
+basevar caller \
+    -f reference.fasta \
+    -o output.vcf.gz \
     -Q 20 -q 30 -B 500 -t 24 \
-    --pop-group=sample_group.info \
-    --regions=chr11:5246595-5248428,chr17:41197764-41276135 \
-    --output test.vcf.gz 00alzqq6jw.bam 09t3r9n2rg.bam 0fkpl1p55b.bam ...
+    --filename-has-samplename \
+    -L bamfile.list
 ```
 
-The format of `sample_group.info` could be found [here](https://github.com/ShujiaHuang/BaseVar2/blob/main/tests/data/sample_group.info).
-
-### Or call variants from bamlist
-
+**Call a specific region:**
 ```bash
-basevar caller -f reference.fasta \
+basevar caller \
+    -f reference.fasta \
+    -o chr11_region.vcf.gz \
     -Q 20 -q 30 -B 500 -t 24 \
-    -L bamfile.list \ 
-    --regions=chr11:5246595-5248428,chr17:41197764-41276135 \
-    --pop-group=sample_group.info \
-    --output test.vcf.gz 
+    --filename-has-samplename \
+    -r chr11:5246595-5248428 \
+    -L bamfile.list
 ```
 
-For stramlinened variant calling across the entire genome, you can use the pipeline generator [**create_pipeline.py**](https://github.com/ShujiaHuang/BaseVar2/blob/main/scripts/create_pipeline.py), which distributes the computational tasks based on the --delta parameter across a specific chromosome defined by the -c parameter.
+**Call multiple disjoint regions in one run:**
+```bash
+basevar caller \
+    -f reference.fasta \
+    -o multi_region.vcf.gz \
+    -Q 20 -q 30 -B 500 -t 24 \
+    --regions chr11:5246595-5248428,chr17:41197764-41276135 \
+    -L bamfile.list
+```
+
+**Include BAM files directly on the command line:**
+```bash
+basevar caller \
+    -f reference.fasta \
+    -o output.vcf.gz \
+    -Q 20 -q 30 -B 500 \
+    --filename-has-samplename \
+    -L bamfile.list \
+    sample1.bam sample2.bam sample3.bam
+```
+
+**Per-population allele frequency calculation:**
+```bash
+basevar caller \
+    -f reference.fasta \
+    -o output.vcf.gz \
+    -Q 20 -q 30 -B 500 -t 24 \
+    --filename-has-samplename \
+    --pop-group sample_group.info \
+    -L bamfile.list
+```
+
+The `sample_group.info` format can be found [here](https://github.com/ShujiaHuang/BaseVar2/blob/main/tests/data/sample_group.info).
+
+**Resume an interrupted run:**
+```bash
+basevar caller \
+    -f reference.fasta \
+    -o output.vcf.gz \
+    -Q 20 -q 30 -B 500 -t 24 \
+    --filename-has-samplename \
+    --smart-rerun \
+    -L bamfile.list
+```
+
+---
+
+## Whole-genome pipeline with `create_pipeline.py`
+
+For whole-genome variant calling, the pipeline generator script splits the genome into sub-regions and generates one `basevar caller` command per region. These commands can be executed in parallel on a compute cluster or with a job scheduler.
+
+### Pipeline-specific options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-o, --outdir` | Output directory for VCF files and logs | **required** |
+| `--ref_fai` | Reference FASTA index file (`.fai`) | **required** |
+| `-d, --delta` | Size of each sub-region (bp) | `2000000` |
+| `-c, --chrom` | Restrict to comma-separated chromosome(s) | all chromosomes |
+
+All other options (e.g., `-f`, `-L`, `-Q`, `-q`, `-B`, `-t`, `--filename-has-samplename`, `--pop-group`) are passed through directly to `basevar caller`.
+
+### Examples
+
+**Generate whole-genome pipeline (all chromosomes, 2 Mb windows):**
+```bash
+python scripts/create_pipeline.py \
+    -f reference.fasta \
+    --ref_fai reference.fasta.fai \
+    -Q 20 -q 30 -B 500 -t 4 \
+    --filename-has-samplename \
+    -L bamfile.list \
+    -o /path/to/outdir \
+    > basevar_wgs.sh
+```
+
+**Generate pipeline for a single chromosome (5 Mb windows):**
+```bash
+python scripts/create_pipeline.py \
+    -f reference.fasta \
+    --ref_fai reference.fasta.fai \
+    -Q 20 -q 30 -B 500 -t 4 \
+    --filename-has-samplename \
+    -c chr20 -d 5000000 \
+    -L bamfile.list \
+    -o /path/to/outdir \
+    > basevar.chr20.sh
+```
+
+**Run the pipeline:**
+```bash
+# Sequential (local):
+bash basevar.chr20.sh
+
+# Parallel with GNU parallel:
+cat basevar_wgs.sh | parallel -j 8
+
+# Or submit each line as a cluster job (SGE/SLURM example):
+while IFS= read -r cmd; do
+    echo "$cmd" | qsub -V -cwd -pe smp 4
+done < basevar_wgs.sh
+```
+
+After all sub-jobs finish, concatenate the per-region VCFs:
 
 ```bash
-python create_pipeline.py -Q 20 -q 30 -f reference.fa --ref_fai reference_fa.fai -c chr20 --delta 5000000 -t 24 -L bamfile.list -o outdir > basevar.chr20.sh
+ls /path/to/outdir/*.vcf.gz | sort -V > vcf.list
+basevar concat -L vcf.list -o final_output.vcf.gz
 ```
 
-**BaseVar** is under active development. Obtain the newest version by pulling the newest version and compilling again.
+---
+
+## `basevar concat` — Concatenate VCF files
+
+Concatenate per-region VCF files produced by `basevar caller` into a single VCF. The files must be provided in the correct genomic order (the tool does not sort positions).
+
+```
+Usage: basevar concat [options] <-o output.vcf.gz> [-L vcf.list] in1.vcf.gz [in2.vcf.gz ...]
+
+Required:
+  -o, --output=FILE      Output VCF file.
+
+Optional:
+  -L, --file-list=FILE   List of input VCF files, one per line.
+```
+
+**Example:**
+```bash
+# From a file list
+ls outdir/*.vcf.gz | sort -V > vcf.list
+basevar concat -L vcf.list -o merged.vcf.gz
+
+# From inline file arguments
+basevar concat chr1_1_2000000.vcf.gz chr1_2000001_4000000.vcf.gz -o chr1.vcf.gz
+```
+
+> You may also use `bcftools concat` as a drop-in alternative.
+
+---
+
+## `basevar subsam` — Extract samples from VCF
+
+Extract a subset of samples from a BaseVar VCF and output a new VCF with recalculated INFO fields (AC/AN/AF).
+
+```
+Usage: basevar subsam [options] -i <input.vcf[.gz]> -o <output.vcf[.gz]> [-s <samplelist>]
+
+Options:
+  -i, --input FILE      Input VCF/BCF file (required).
+  -o, --output FILE     Output VCF/BCF file (required).
+  -s, --sample FILE     File with sample names to keep (one per line).
+  -O, --output-type     v: VCF | z: bgzipped VCF | b: BCF | u: uncompressed BCF
+                        Default: inferred from output filename extension.
+  --no-update-info      Do not recalculate AC/AN/AF INFO fields.
+  --keep-all-site       Retain sites that become reference-only after subsetting.
+```
+
+**Examples:**
+```bash
+# Extract samples listed in a file
+basevar subsam \
+    -i full_cohort.vcf.gz \
+    -o subset.vcf.gz \
+    -s sample_names.txt
+
+# Extract two specific samples, output as plain VCF
+basevar subsam \
+    -i full_cohort.vcf.gz \
+    -o subset.vcf \
+    -O v \
+    SampleA SampleB
+
+# Keep all sites (including ref-only after subsetting) and skip INFO update
+basevar subsam \
+    -i full_cohort.vcf.gz \
+    -o subset.vcf.gz \
+    -s sample_names.txt \
+    --keep-all-site --no-update-info
+```
+
+---
+
+## Tips and best practices
+
+- **`-B / --batch-count`**: Controls how many samples are processed per batch. Lower values reduce per-thread memory but increase I/O. For large cohorts (>5000 samples) `-B 500` is a good starting point.
+- **`--filename-has-samplename`**: If your BAM files are named `{SampleID}.bam` or `{SampleID}.cram`, always set this flag — it avoids reading every BAM header and can save hours on large cohorts.
+- **`--smart-rerun`**: Safe to add on any re-run; the program checks existing batch files and skips completed work.
+- **Memory estimation**: `threads × batch_size / 200 × ~3–4 GB`. E.g., 24 threads, `-B 200` → ~72–96 GB total.
+- **Output compression**: Always use `.vcf.gz` as the output filename — BaseVar automatically writes bgzipped output when the extension is `.vcf.gz`.
+
+---
+
+## Development
+
+BaseVar is under active development. To update to the latest version:
+
+```bash
+git pull
+git submodule update --recursive
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build
+```
