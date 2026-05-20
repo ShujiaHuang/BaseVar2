@@ -139,15 +139,11 @@ elseif(STATIC_BUILD AND NOT APPLE)
     find_library(SSL_STATIC    NAMES libssl.a   REQUIRED)
     find_library(CRYPTO_STATIC NAMES libcrypto.a REQUIRED)
 
-    # curl on Alpine (musl) needs these companion libs when linked statically
+    # curl on Alpine (musl) may need these companion libs when linked statically.
+    # Only nghttp2 and c-ares exist as *-static packages in Alpine 3.20;
+    # nghttp3, brotli, zstd, idn2, psl are NOT available as static archives there.
     find_library(NGHTTP2_STATIC  NAMES libnghttp2.a  QUIET)
-    find_library(NGHTTP3_STATIC  NAMES libnghttp3.a  QUIET)
-    find_library(IDN2_STATIC     NAMES libidn2.a     QUIET)
-    find_library(PSL_STATIC      NAMES libpsl.a      QUIET)
-    find_library(ZSTD_STATIC     NAMES libzstd.a     QUIET)
-    find_library(BROTLIDEC_STATIC NAMES libbrotlidec.a QUIET)
-    find_library(BROTLICOMMON_STATIC NAMES libbrotlicommon.a QUIET)
-    find_library(UNISTRING_STATIC NAMES libunistring.a QUIET)
+    find_library(CARES_STATIC    NAMES libcares.a    QUIET)
 
     message(STATUS "Linux static libs:")
     message(STATUS "  zlib=${ZLIB_STATIC} bz2=${BZ2_STATIC} lzma=${LZMA_STATIC}")
@@ -155,9 +151,7 @@ elseif(STATIC_BUILD AND NOT APPLE)
 
     # Build the list of optional companion libs (only append if found)
     set(CURL_COMPANION_LIBS "")
-    foreach(_lib IN ITEMS
-            NGHTTP2_STATIC NGHTTP3_STATIC IDN2_STATIC PSL_STATIC
-            ZSTD_STATIC BROTLIDEC_STATIC BROTLICOMMON_STATIC UNISTRING_STATIC)
+    foreach(_lib IN ITEMS NGHTTP2_STATIC CARES_STATIC)
         if(${_lib})
             list(APPEND CURL_COMPANION_LIBS ${${_lib}})
         endif()
