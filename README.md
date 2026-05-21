@@ -1,6 +1,16 @@
 # BaseVar: Call variants from ultra low-pass WGS data
 
-[![BaseVar Logo](https://github.com/ShujiaHuang/basevar/blob/main/docs/assets/images/basevar.png)](https://github.com/ShujiaHuang/basevar2)
+<p align="center">
+  <img src="docs/assets/images/basevar_logo.svg" alt="BaseVar2 Logo" width="600">
+</p>
+
+---
+
+<p align="center">
+  <img src="docs/assets/images/basevar.png" alt="BaseVar2 Logo" width="400">
+</p>
+
+<!-- [![BaseVar](https://github.com/ShujiaHuang/basevar/blob/main/docs/assets/images/basevar.png)](https://github.com/ShujiaHuang/basevar2) -->
 
 *BaseVar* is a specialized tool for variant calling from ultra low-depth (<1x) sequencing data, with particular focus on non-invasive prenatal testing (NIPT) and large-scale population genomics. Leveraging maximum likelihood and likelihood ratio models, BaseVar accurately identifies polymorphisms at genomic positions and estimates allele frequencies across thousands of samples simultaneously. For the mathematical foundations, refer to the [BaseVar publication in Cell Genomics](https://doi.org/10.1016/j.xgen.2024.100669).
 
@@ -8,7 +18,7 @@ BaseVar is fully implemented in C++17 and delivers over **10×** the speed of it
 
 ## Citation
 
-If you use BaseVar in your research, please cite:
+If you use `BaseVar` in your research work, please cite the following paper:
 
 > Liu, S., Liu, Y., Gu, Y., Lin, X., Zhu, H., Liu, H., Xu, Z., Cheng, S., Lan, X., Li, L., Huang, M., Li, H., Nielsen, R., Davies, RW., Albrechtsen, A., Chen, GB., Qiu, X., Jin, X., **Huang, S.**, (2024). Utilizing non-invasive prenatal test sequencing data for human genetic investigation. *Cell Genomics* 4(10), 100669. [doi:10.1016/j.xgen.2024.100669](https://www.cell.com/cell-genomics/fulltext/S2666-979X(24)00288-X)
 
@@ -58,7 +68,7 @@ ldd --version | head -1
 
 A typical incompatibility error looks like:
 
-```
+```bash
 ./basevar-linux-static: /lib64/libc.so.6: version `GLIBC_2.35' not found (required by ./basevar-linux-static)
 ```
 
