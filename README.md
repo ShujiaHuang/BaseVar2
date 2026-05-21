@@ -22,10 +22,47 @@ Pre-built static binaries are available on the [GitHub Releases page](https://gi
 
 | Platform | Download | Notes |
 | -------- | -------- | ----- |
-| Linux (x86_64) | [basevar-linux-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-linux-static) | Portable, glibc ≥ 2.31 (Ubuntu 20.04+, Debian 11+, RHEL/CentOS 8+, Fedora 32+) |
-| macOS (arm64 / Intel) | [basevar-macos-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-macos-static) | Best-effort static, requires macOS 12+ |
+| Linux (x86_64) | [basevar-linux-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-linux-static) | Requires **glibc ≥ 2.35** (see below) |
+| macOS (arm64 / Intel) | [basevar-macos-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-macos-static) | Requires **macOS 12+** |
 
-The Linux static binary bundles `libstdc++`, `libgcc`, `htslib`, `zlib`, `bzip2`, `xz` and `openssl` statically; only the system C library (glibc) is linked dynamically. It runs unmodified on any modern glibc-based distribution — no extra packages need to be installed.
+#### System requirements for `basevar-linux-static`
+
+The Linux binary is a partial-static build (built on Ubuntu 22.04 / glibc 2.35 in CI). It bundles `libstdc++`, `libgcc`, `htslib`, `zlib`, `bzip2`, `xz` and `openssl` statically; only the system C library (**glibc**) is linked dynamically — and glibc symbol versions are forward-compatible only, so the binary requires the **host glibc to be ≥ 2.35**.
+
+**Confirmed compatible distributions** (glibc ≥ 2.35):
+
+| Distribution | glibc | `basevar-linux-static` |
+| ------------ | ----- | :--------------------: |
+| Ubuntu 22.04 LTS | 2.35 | ✅ |
+| Ubuntu 24.04 LTS | 2.39 | ✅ |
+| Debian 12 (bookworm) | 2.36 | ✅ |
+| Fedora 36+ | 2.35+ | ✅ |
+| openSUSE Tumbleweed | rolling | ✅ |
+
+**Distributions where `basevar-linux-static` will NOT run** (glibc too old — please [compile from source](#option-2--compile-from-source) instead):
+
+| Distribution | glibc | `basevar-linux-static` |
+| ------------ | ----- | :--------------------: |
+| CentOS 7 / RHEL 7 | 2.17 | ❌ |
+| CentOS 8 / RHEL 8 / Rocky 8 / Alma 8 | 2.28 | ❌ |
+| CentOS 9 / RHEL 9 / Rocky 9 / Alma 9 | 2.34 | ❌ |
+| Ubuntu 18.04 / 20.04 | 2.27 / 2.31 | ❌ |
+| Debian 10 / 11 | 2.28 / 2.31 | ❌ |
+
+**Quick check on your machine:**
+
+```bash
+# If the printed glibc version is >= 2.35, basevar-linux-static will run.
+ldd --version | head -1
+```
+
+A typical incompatibility error looks like:
+
+```
+./basevar-linux-static: /lib64/libc.so.6: version `GLIBC_2.35' not found (required by ./basevar-linux-static)
+```
+
+If you see this — or you are on CentOS / RHEL / Rocky / AlmaLinux / older Ubuntu / older Debian — please use [Option 2: compile from source](#option-2--compile-from-source). The build is straightforward and takes only a few minutes.
 
 ```bash
 # Linux
@@ -88,7 +125,7 @@ cmake -B build-static -DSTATIC_BUILD=ON -DCMAKE_BUILD_TYPE=Release
 cmake --build build-static
 ```
 
-This bundles `libstdc++`, `libgcc`, `htslib`, and the compression libs statically; glibc remains dynamic. The result runs on any glibc ≥ 2.31 system.
+This bundles `libstdc++`, `libgcc`, `htslib`, and the compression libs statically; glibc remains dynamic. The resulting binary runs on the build host and on any other host with the same-or-newer glibc.
 
 ---
 
