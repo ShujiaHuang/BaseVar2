@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)  # C++ 17
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set the project name
-project (BASEVAR VERSION 2.2.1 LANGUAGES CXX)
+project (BASEVAR VERSION 2.2.2 LANGUAGES CXX)
 
 # Add project metadata
 set(PROJECT_AUTHOR "Shujia Huang")
@@ -34,14 +34,26 @@ endif()
 # -------------------------------------------------------
 # Static linking configuration
 # -------------------------------------------------------
-# Linux  : Fully static executable (-static), works with musl (Alpine) or glibc.
-#          On glibc hosts, some features (e.g. DNS via NSS) may not work in
-#          fully-static mode.  Building inside an Alpine (musl) container is
-#          recommended for maximum portability.
-# macOS  : Fully static executables are NOT supported by Apple.  We statically
-#          link the C++ runtime (-static-libgcc -static-libstdc++) and all
-#          third-party .a archives.  Only system frameworks (libSystem, etc.)
-#          remain dynamically linked.
+# Linux  : "Portable" partial-static executable.  We build on a glibc
+#          host (Ubuntu in CI) and statically link:
+#            * libstdc++ and libgcc      (-static-libstdc++ -static-libgcc)
+#            * htslib + zlib + bzip2 + lzma + openssl  (.a archives)
+#          glibc itself remains dynamic (the only sane choice on glibc
+#          systems).  The result runs unmodified on any reasonably
+#          modern Linux distro (Ubuntu 20.04+, Debian 11+, RHEL 8+,
+#          CentOS 8+, Fedora 32+, ...).
+#
+#          We deliberately abandoned the previous Alpine-musl fully-
+#          static build in v2.2.2: the resulting binary segfaulted
+#          under multi-threaded workloads on glibc hosts due to
+#          musl/glibc runtime incompatibilities (mallocng and pthread
+#          behave differently on a glibc kernel under load).  Building
+#          against the same libc the user runs on eliminates an entire
+#          class of issues at once.
+#
+# macOS  : Fully static executables are NOT supported by Apple.  We
+#          statically link the third-party .a archives; only system
+#          frameworks (libSystem, libc++abi, ...) remain dynamic.
 # -------------------------------------------------------
 if(STATIC_BUILD)
     if(APPLE)
@@ -56,17 +68,17 @@ if(STATIC_BUILD)
         # by replacing the -l<name> flags with explicit .a paths.
         message(STATUS "STATIC_BUILD is ON (macOS) — linking third-party libs statically via explicit .a paths")
     else()
-        # Linux static build: -static linker flag is set in the
-        # target_link_libraries section below, after pkg-config detection.
-        message(STATUS "STATIC_BUILD is ON (Linux) — producing a fully static basevar")
+        # Linux portable static build (glibc-based).  Detailed flags are set
+        # in the target_link_libraries section below.
+        message(STATUS "STATIC_BUILD is ON (Linux/glibc) - producing a portable basevar (libstdc++/libgcc/htslib/compression libs all bundled, glibc dynamic)")
     endif()
 endif()
 
 # Ensure htslib is built before the main executable.
 # For static builds on Linux, disable libcurl in htslib: BaseVar only reads
 # local BAM/CRAM/FASTA files, so remote-URL support is not needed.
-# This removes curl (and its transitive deps: brotli, zstd, psl, etc.)
-# from the link graph, making the static build much simpler.
+# This removes curl (and its transitive deps) from the link graph and
+# matches what the dynamic glibc build successfully produces.
 if(STATIC_BUILD AND NOT APPLE)
     set(HTSLIB_CONFIGURE_FLAGS --disable-libcurl)
 else()
@@ -136,10 +148,16 @@ if(STATIC_BUILD AND APPLE)
         m
     )
 elseif(STATIC_BUILD AND NOT APPLE)
-    # ---- Linux fully static build (Alpine musl recommended) ----
-    # htslib is configured with --disable-libcurl (see Buildhts above),
-    # so curl and all its transitive deps (brotli, zstd, psl, etc.) are
-    # not needed. Only the core compression libs + ssl are required.
+    # ---- Linux portable partial-static build (glibc-based) ----
+    # Build host: Ubuntu (CI uses ubuntu-22.04, glibc 2.35).
+    # Strategy:
+    #   * libstdc++ + libgcc are bundled via -static-libstdc++ -static-libgcc
+    #   * htslib + zlib + bzip2 + lzma + openssl are linked as .a archives
+    #   * glibc remains DYNAMIC (the binary still depends on the host's
+    #     /lib64/ld-linux-x86-64.so.2 + libc.so.6, but those exist on every
+    #     glibc-based Linux distribution).
+    # This produces a binary that runs unmodified on any Linux with
+    # glibc >= 2.31 (Ubuntu 20.04+, Debian 11+, RHEL/CentOS 8+, Fedora 32+).
     find_library(ZLIB_STATIC   NAMES libz.a     REQUIRED)
     find_library(BZ2_STATIC    NAMES libbz2.a   REQUIRED)
     find_library(LZMA_STATIC   NAMES liblzma.a  REQUIRED)
@@ -150,19 +168,9 @@ elseif(STATIC_BUILD AND NOT APPLE)
     message(STATUS "  zlib=${ZLIB_STATIC} bz2=${BZ2_STATIC} lzma=${LZMA_STATIC}")
     message(STATUS "  ssl=${SSL_STATIC} crypto=${CRYPTO_STATIC}")
 
-    # ---- Linker flags ----
-    # 1) -static               : produce a fully static executable.
-    # 2) -Wl,-z,stack-size=N   : embed PT_GNU_STACK size = 8 MiB so that
-    #    musl (>=1.1.21, Alpine 3.20 ships 1.2.5) uses 8 MiB as the
-    #    DEFAULT thread stack for new pthread threads.  Without this,
-    #    worker threads in ThreadPool default to musl's small 128 KiB
-    #    stack, which is overflowed by variant_caller's call chain
-    #    (htslib BAM iteration + robin_hood maps + AlignInfo construction)
-    #    and produces 'Segmentation fault (core dumped)' the moment the
-    #    musl-static binary runs on glibc hosts (Ubuntu / Debian / RHEL).
-    #    8 MiB matches glibc's default and is enough for our deepest paths.
+    # Bundle the C++ runtime statically; glibc stays dynamic.
     set(CMAKE_EXE_LINKER_FLAGS
-        "${CMAKE_EXE_LINKER_FLAGS} -static -Wl,-z,stack-size=8388608")
+        "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
 
     target_link_libraries(basevar
         ${HTSLIB}

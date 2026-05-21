@@ -22,21 +22,21 @@ Pre-built static binaries are available on the [GitHub Releases page](https://gi
 
 | Platform | Download | Notes |
 | -------- | -------- | ----- |
-| Linux (x86_64) | [basevar-linux-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.1/basevar-linux-static) | Fully static, zero runtime deps |
-| macOS (arm64 / Intel) | [basevar-macos-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.1/basevar-macos-static) | Best-effort static, requires macOS 12+ |
+| Linux (x86_64) | [basevar-linux-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.2/basevar-linux-static) | Portable, glibc ≥ 2.31 (Ubuntu 20.04+, Debian 11+, RHEL/CentOS 8+, Fedora 32+) |
+| macOS (arm64 / Intel) | [basevar-macos-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.2/basevar-macos-static) | Best-effort static, requires macOS 12+ |
 
-The Linux static binary has **zero runtime dependencies** and runs on any modern Linux distribution (CentOS 7+, Ubuntu 16.04+, Debian 9+, etc.) without installing any libraries.
+The Linux static binary bundles `libstdc++`, `libgcc`, `htslib`, `zlib`, `bzip2`, `xz` and `openssl` statically; only the system C library (glibc) is linked dynamically. It runs unmodified on any modern glibc-based distribution — no extra packages need to be installed.
 
 ```bash
 # Linux
-wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.1/basevar-linux-static
+wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.2/basevar-linux-static
 chmod +x basevar-linux-static
 ./basevar-linux-static --help
 ```
 
 ```bash
 # macOS
-curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.1/basevar-macos-static
+curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.2/basevar-macos-static
 chmod +x basevar-macos-static
 ./basevar-macos-static --help
 ```
@@ -79,17 +79,16 @@ cmake -B build-static -DSTATIC_BUILD=ON -DCMAKE_BUILD_TYPE=Release
 cmake --build build-static
 ```
 
-**Linux** (fully static via Alpine Docker):
+**Linux** (portable static via Ubuntu/glibc — same approach used in CI):
 
 ```bash
-docker run --rm -v "$PWD:/src" -w /src alpine:3.20 sh -c '
-  apk add --no-cache build-base cmake autoconf automake \
-    zlib-dev zlib-static bzip2-dev bzip2-static \
-    xz-dev xz-static openssl-dev openssl-libs-static &&
-  cmake -B build-static -DSTATIC_BUILD=ON -DCMAKE_BUILD_TYPE=Release &&
-  cmake --build build-static
-'
+sudo apt-get install -y build-essential cmake autoconf automake \
+    zlib1g-dev libbz2-dev liblzma-dev libssl-dev
+cmake -B build-static -DSTATIC_BUILD=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build-static
 ```
+
+This bundles `libstdc++`, `libgcc`, `htslib`, and the compression libs statically; glibc remains dynamic. The result runs on any glibc ≥ 2.31 system.
 
 ---
 

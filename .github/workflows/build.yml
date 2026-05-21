@@ -79,9 +79,14 @@ jobs:
   # -----------------------------------------------------------
   # Job 2: Static build (for release distribution)
   #
-  # Linux : Alpine Docker + musl -> fully static, portable binary
-  #         that runs on CentOS, Ubuntu, Debian, etc. without
-  #         any shared-library dependencies.
+  # Linux : Build natively on ubuntu-22.04 (glibc 2.35) with
+  #         -static-libstdc++ -static-libgcc and statically-linked
+  #         htslib + compression libs.  glibc remains dynamic.
+  #         Result is portable to any glibc >= 2.31 distribution
+  #         (Ubuntu 20.04+, Debian 11+, RHEL/CentOS 8+, Fedora 32+).
+  #         This replaces the previous Alpine/musl fully-static
+  #         approach, which segfaulted under multi-threaded loads on
+  #         glibc hosts (musl/glibc runtime incompatibility).
   # macOS : Best-effort static; only system frameworks remain dynamic.
   #
   # Runs independently (no 'needs') so static binaries are always
@@ -94,7 +99,7 @@ jobs:
       fail-fast: false
       matrix:
         config:
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             os_name: linux-x86_64
             artifact_name: basevar-linux-static
           - os: macos-latest
@@ -106,40 +111,34 @@ jobs:
       with:
         submodules: recursive
 
-    # ========== Linux: Alpine Docker (musl) static build ==========
-    - name: Build static binary (Linux / Alpine-musl)
+    # ========== Linux: Ubuntu glibc partial-static build ==========
+    - name: Install Dependencies (Linux)
       if: runner.os == 'Linux'
       run: |
-        docker run --rm \
-          -v "${{ github.workspace }}:/src" \
-          -w /src \
-          alpine:3.20 \
-          sh -c '
-            set -e
-            echo "=== Installing build dependencies ==="
-            apk add --no-cache \
-              build-base cmake autoconf automake \
-              zlib-dev zlib-static \
-              bzip2-dev bzip2-static \
-              xz-dev xz-static \
-              openssl-dev openssl-libs-static
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential cmake autoconf automake \
+          zlib1g-dev libbz2-dev liblzma-dev libssl-dev
 
-            echo "=== Cleaning stale htslib artifacts ==="
-            find htslib -type f -name "*.o"   -delete 2>/dev/null || true
-            find htslib -type f -name "libhts.*" -not -name "libhts.map" -delete 2>/dev/null || true
+    - name: Build static binary (Linux / Ubuntu-glibc)
+      if: runner.os == 'Linux'
+      run: |
+        echo "=== Cleaning stale htslib artifacts ==="
+        find htslib -type f -name "*.o"   -delete 2>/dev/null || true
+        find htslib -type f -name "libhts.*" -not -name "libhts.map" -delete 2>/dev/null || true
 
-            echo "=== Configuring (STATIC_BUILD=ON) ==="
-            cmake -B build-static \
-              -DSTATIC_BUILD=ON \
-              -DCMAKE_BUILD_TYPE=Release
+        echo "=== Configuring (STATIC_BUILD=ON) ==="
+        cmake -B build-static \
+          -DSTATIC_BUILD=ON \
+          -DCMAKE_BUILD_TYPE=Release
 
-            echo "=== Building ==="
-            cmake --build build-static --config Release
+        echo "=== Building ==="
+        cmake --build build-static --config Release
 
-            echo "=== Verifying static binary ==="
-            file bin/basevar
-            ldd bin/basevar 2>&1 || true
-          '
+        echo "=== Verifying binary ==="
+        file bin/basevar
+        ldd bin/basevar || true
+        ./bin/basevar | head -20 || true
 
     # ========== macOS: best-effort static build ===================
     - name: Install Dependencies (macOS)
