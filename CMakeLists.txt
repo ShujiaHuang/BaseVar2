@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)  # C++ 17
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set the project name
-project (BASEVAR VERSION 2.2.0 LANGUAGES CXX)
+project (BASEVAR VERSION 2.2.1 LANGUAGES CXX)
 
 # Add project metadata
 set(PROJECT_AUTHOR "Shujia Huang")
@@ -150,8 +150,19 @@ elseif(STATIC_BUILD AND NOT APPLE)
     message(STATUS "  zlib=${ZLIB_STATIC} bz2=${BZ2_STATIC} lzma=${LZMA_STATIC}")
     message(STATUS "  ssl=${SSL_STATIC} crypto=${CRYPTO_STATIC}")
 
-    # Force static linker flag
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
+    # ---- Linker flags ----
+    # 1) -static               : produce a fully static executable.
+    # 2) -Wl,-z,stack-size=N   : embed PT_GNU_STACK size = 8 MiB so that
+    #    musl (>=1.1.21, Alpine 3.20 ships 1.2.5) uses 8 MiB as the
+    #    DEFAULT thread stack for new pthread threads.  Without this,
+    #    worker threads in ThreadPool default to musl's small 128 KiB
+    #    stack, which is overflowed by variant_caller's call chain
+    #    (htslib BAM iteration + robin_hood maps + AlignInfo construction)
+    #    and produces 'Segmentation fault (core dumped)' the moment the
+    #    musl-static binary runs on glibc hosts (Ubuntu / Debian / RHEL).
+    #    8 MiB matches glibc's default and is enough for our deepest paths.
+    set(CMAKE_EXE_LINKER_FLAGS
+        "${CMAKE_EXE_LINKER_FLAGS} -static -Wl,-z,stack-size=8388608")
 
     target_link_libraries(basevar
         ${HTSLIB}

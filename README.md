@@ -22,21 +22,21 @@ Pre-built static binaries are available on the [GitHub Releases page](https://gi
 
 | Platform | Download | Notes |
 | -------- | -------- | ----- |
-| Linux (x86_64) | [basevar-linux-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.0/basevar-linux-static) | Fully static, zero runtime deps |
-| macOS (arm64 / Intel) | [basevar-macos-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.0/basevar-macos-static) | Best-effort static, requires macOS 12+ |
+| Linux (x86_64) | [basevar-linux-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.1/basevar-linux-static) | Fully static, zero runtime deps |
+| macOS (arm64 / Intel) | [basevar-macos-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.1/basevar-macos-static) | Best-effort static, requires macOS 12+ |
 
 The Linux static binary has **zero runtime dependencies** and runs on any modern Linux distribution (CentOS 7+, Ubuntu 16.04+, Debian 9+, etc.) without installing any libraries.
 
 ```bash
 # Linux
-wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.0/basevar-linux-static
+wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.1/basevar-linux-static
 chmod +x basevar-linux-static
 ./basevar-linux-static --help
 ```
 
 ```bash
 # macOS
-curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.0/basevar-macos-static
+curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.1/basevar-macos-static
 chmod +x basevar-macos-static
 ./basevar-macos-static --help
 ```
