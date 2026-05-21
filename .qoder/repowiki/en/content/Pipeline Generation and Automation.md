@@ -12,18 +12,17 @@
 - [CMakeLists.txt](file://CMakeLists.txt)
 - [README.md](file://README.md)
 - [create_pipeline.py](file://scripts/create_pipeline.py)
-- [example.sh](file://scripts/example.sh)
+- [_example.sh](file://scripts/_example.sh)
 - [test_pipeline.cpp](file://tests/io/test_pipeline.cpp)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Complete replacement of Python-based pipeline generation script with native C++ implementation
-- New C++ pipeline subcommand provides zero-dependency execution and improved performance
-- Maintains backward compatibility with legacy Python script interface
-- Enhanced region parsing capabilities with sophisticated validation and error handling
-- Automatic integration with new caller options without script modifications
-- Comprehensive testing framework for pipeline functionality
+- Complete removal of deprecated Python script reference (scripts/example.sh) - only _example.sh remains
+- Emphasis on zero-dependency C++ pipeline implementation as the primary execution method
+- Enhanced documentation of native C++ pipeline capabilities and performance benefits
+- Updated backward compatibility information for legacy Python script
+- Comprehensive testing framework documentation for pipeline functionality
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -46,7 +45,7 @@ This document explains BaseVar2's pipeline generation and automation tools with 
 - Advanced workflow customization and seamless integration with cluster computing environments
 - Practical examples, performance optimization, monitoring, error handling, and result aggregation
 
-BaseVar2 provides a C++ implementation of variant calling optimized for ultra-low-coverage whole-genome sequencing data. The new native C++ pipeline generation script replaces the legacy Python implementation, offering zero-dependency execution, improved performance, automatic integration with new caller options, and maintains backward compatibility with existing workflows.
+BaseVar2 provides a C++ implementation of variant calling optimized for ultra-low-coverage whole-genome sequencing data. The native C++ pipeline generation system offers zero-dependency execution, improved performance, automatic integration with new caller options, and maintains backward compatibility with existing workflows.
 
 **Updated** Complete replacement of Python-based pipeline generation with native C++ implementation. The new C++ pipeline provides zero-dependency execution, enhanced performance, automatic integration with new caller options, and maintains backward compatibility with the legacy Python script interface.
 
@@ -66,7 +65,7 @@ MAIN["src/main.cpp<br/>Command Router"]
 end
 subgraph "Legacy Python Pipeline (Deprecated)"
 OLD["scripts/create_pipeline.py<br/>Legacy Python Script"]
-end
+END
 subgraph "Core Executable"
 CORE["src/main.cpp"]
 VC_H["src/variant_caller.h"]
@@ -79,7 +78,7 @@ subgraph "Build & Docs"
 CMAKE["CMakeLists.txt"]
 READM["README.md"]
 TESTS["tests/io/test_pipeline.cpp<br/>Comprehensive Testing"]
-end
+END
 PIPE --> CORE
 PIPE_H --> PIPE
 MAIN --> PIPE
@@ -436,7 +435,7 @@ basevar pipeline -o outdir --ref_fai ref.fa.fai -f ref.fa -L bam.list -r "$SGE_T
 
 **Section sources**
 - [pipeline.cpp](file://src/pipeline.cpp)
-- [example.sh](file://scripts/example.sh)
+- [_example.sh](file://scripts/_example.sh)
 
 ### Enhanced Workflow Monitoring and Logging
 **Updated** Enhanced monitoring with sophisticated validation:
@@ -549,7 +548,7 @@ Each job generates comprehensive log files:
 - **Local Grid Systems**: Scale from single-node to multi-node cluster execution
 
 **Section sources**
-- [example.sh](file://scripts/example.sh)
+- [_example.sh](file://scripts/_example.sh)
 - [README.md](file://README.md)
 
 ## Architecture Overview
@@ -813,7 +812,7 @@ basevar pipeline \
 ```
 
 ### Legacy Python Pipeline Compatibility
-**Deprecated** The legacy Python pipeline script remains available for backward compatibility:
+**Updated** The legacy Python pipeline script remains available for backward compatibility:
 - Full feature parity maintained with native C++ implementation
 - Same command-line interface and output format
 - Gradual migration path from Python to C++ implementation
@@ -821,4 +820,4 @@ basevar pipeline \
 
 **Section sources**
 - [create_pipeline.py](file://scripts/create_pipeline.py)
-- [example.sh](file://scripts/example.sh)
+- [_example.sh](file://scripts/_example.sh)

@@ -17,10 +17,10 @@
 
 ## Update Summary
 **Changes Made**
-- Updated version information to reflect 2.1.1 release with improved build reliability
-- Enhanced cross-platform compatibility documentation for static builds
-- Added detailed build system improvements and platform-specific optimizations
-- Updated installation instructions to reflect new static binary availability
+- Updated version information to reflect 2.2.3 release with simplified build approach
+- Removed manylinux2014 compatibility claims in favor of honest glibc >= 2.35 requirement
+- Streamlined build system documentation reflecting simplified static binary approach
+- Updated installation instructions to reflect current version and requirements
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -35,17 +35,17 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-BaseVar2 is a specialized ultra-low-depth whole genome sequencing (ULDS/WGS) variant caller designed for non-invasive prenatal testing (NIPT) and related human genetic research. The latest 2.1.1 release introduces significant improvements in build reliability and cross-platform compatibility, delivering enhanced performance and deployment flexibility. It targets single-nucleotide polymorphism (SNP) and insertion–deletion (Indel) detection from sub-single-read coverage data (<1x), enabling cost-effective, population-scale NIPT studies. The tool emphasizes:
+BaseVar2 is a specialized ultra-low-depth whole genome sequencing (ULDS/WGS) variant caller designed for non-invasive prenatal testing (NIPT) and related human genetic research. The latest 2.2.3 release maintains the high-performance C++ implementation while introducing a simplified build approach and honest system requirements. It targets single-nucleotide polymorphism (SNP) and insertion–deletion (Indel) detection from sub-single-read coverage data (<1x), enabling cost-effective, population-scale NIPT studies. The tool emphasizes:
 - Accurate variant detection via likelihood-based inference
 - Population-level allele frequency estimation from sparse coverage
 - High-performance C++ implementation with substantial speed and memory improvements over the original Python version
-- **New in 2.1.1**: Improved build system with enhanced cross-platform compatibility and static binary distribution
+- **Updated**: Simplified build system with streamlined static binary distribution
 
 Key scientific and technical goals:
 - Robust detection of rare variants in extremely shallow coverage
 - Reliable estimation of minor allele frequencies (MAF) and genotype likelihoods
 - Scalable, parallelized processing suitable for large cohorts and whole-genome analyses
-- **Enhanced**: Zero-dependency static binaries for seamless deployment across diverse environments
+- **Enhanced**: Honest system requirements with glibc >= 2.35 for Linux static binaries
 
 Citation and publication details:
 - Liu et al. (2024). Utilizing non-invasive prenatal test sequencing data for human genetic investigation. Cell Genomics 4(10), 100669. https://doi.org/10.1016/j.xgen.2024.100669
@@ -58,7 +58,7 @@ High-level organization:
 - I/O wrappers for FASTA, BAM/CRAM, and VCF
 - Pipeline generation script for chromosome-wise or region-wise parallelization
 - HTSlib integration for efficient NGS file parsing
-- Build automation and CI workflows with enhanced cross-platform support
+- Build automation and CI workflows with simplified cross-platform support
 
 ```mermaid
 graph TB
@@ -71,24 +71,24 @@ A --> G["Concat/Subset Tools<br/>src/concat.h, src/vcf_subset_samples.h"]
 A --> H["Pipeline Generator<br/>scripts/create_pipeline.py"]
 B --> I["HTSlib Integration<br/>htslib/*"]
 J[".github/workflows/build.yml"] --> K["Enhanced Build & Test Automation"]
-L["CMakeLists.txt<br/>Version 2.1.1"] --> M["Improved Build System"]
+L["CMakeLists.txt<br/>Version 2.2.3"] --> M["Simplified Build System"]
 ```
 
 **Diagram sources**
-- [src/main.cpp:1-93](file://src/main.cpp#L1-L93)
+- [src/main.cpp:1-105](file://src/main.cpp#L1-L105)
 - [src/variant_caller.h:1-180](file://src/variant_caller.h#L1-L180)
 - [src/basetype.h:1-146](file://src/basetype.h#L1-L146)
 - [src/algorithm.h:1-180](file://src/algorithm.h#L1-L180)
 - [scripts/create_pipeline.py:1-103](file://scripts/create_pipeline.py#L1-L103)
-- [.github/workflows/build.yml:1-197](file://.github/workflows/build.yml#L1-L197)
-- [CMakeLists.txt:1-171](file://CMakeLists.txt#L1-L171)
+- [.github/workflows/build.yml:1-183](file://.github/workflows/build.yml#L1-L183)
+- [CMakeLists.txt:1-197](file://CMakeLists.txt#L1-L197)
 
 **Section sources**
-- [README.md:1-403](file://README.md#L1-L403)
-- [src/main.cpp:1-93](file://src/main.cpp#L1-L93)
+- [README.md:1-475](file://README.md#L1-L475)
+- [src/main.cpp:1-105](file://src/main.cpp#L1-L105)
 - [scripts/create_pipeline.py:1-103](file://scripts/create_pipeline.py#L1-L103)
-- [.github/workflows/build.yml:1-197](file://.github/workflows/build.yml#L1-L197)
-- [CMakeLists.txt:1-171](file://CMakeLists.txt#L1-L171)
+- [.github/workflows/build.yml:1-183](file://.github/workflows/build.yml#L1-L183)
+- [CMakeLists.txt:1-197](file://CMakeLists.txt#L1-L197)
 
 ## Core Components
 - CLI and Commands
@@ -116,7 +116,7 @@ Practical examples (usage patterns):
 - Whole-genome parallelization using the pipeline generator
 
 **Section sources**
-- [src/main.cpp:17-30](file://src/main.cpp#L17-L30)
+- [src/main.cpp:18-32](file://src/main.cpp#L18-L32)
 - [src/version.h:1-13](file://src/version.h#L1-L13)
 - [src/variant_caller.h:41-174](file://src/variant_caller.h#L41-L174)
 - [src/algorithm.h:90-178](file://src/algorithm.h#L90-L178)
@@ -159,7 +159,7 @@ CLI-->>U : "Report completion and timings"
 ```
 
 **Diagram sources**
-- [src/main.cpp:43-92](file://src/main.cpp#L43-L92)
+- [src/main.cpp:45-104](file://src/main.cpp#L45-L104)
 - [src/variant_caller.h:120-137](file://src/variant_caller.h#L120-L137)
 - [src/basetype.h:95-143](file://src/basetype.h#L95-L143)
 - [src/algorithm.h:150-178](file://src/algorithm.h#L150-L178)
@@ -189,11 +189,11 @@ RunSubsam --> End
 ```
 
 **Diagram sources**
-- [src/main.cpp:43-92](file://src/main.cpp#L43-L92)
+- [src/main.cpp:45-104](file://src/main.cpp#L45-L104)
 
 **Section sources**
-- [src/main.cpp:17-30](file://src/main.cpp#L17-L30)
-- [src/main.cpp:43-92](file://src/main.cpp#L43-L92)
+- [src/main.cpp:18-32](file://src/main.cpp#L18-L32)
+- [src/main.cpp:45-104](file://src/main.cpp#L45-L104)
 - [src/version.h:1-13](file://src/version.h#L1-L13)
 
 ### Variant Calling Engine
@@ -291,7 +291,7 @@ Target scenarios:
 - Research applications needing robust variant detection and frequency estimation
 
 **Section sources**
-- [README.md:13-403](file://README.md#L13-L403)
+- [README.md:13-475](file://README.md#L13-L475)
 - [tests/data/sample_group.info:1-44](file://tests/data/sample_group.info#L1-L44)
 
 ## Dependency Analysis
@@ -330,7 +330,7 @@ ALG --> HTS
 - Per-thread memory consumption scales with batch size and region size; tuning batch count and threads improves throughput
 - Quality filters (min MAPQ and base quality) reduce noise and improve accuracy without heavy computational overhead
 - Parallelization via region-wise pipelines accelerates whole-genome analyses
-- **Enhanced in 2.1.1**: Improved build system reduces compilation time and build failures across platforms
+- **Updated**: Simplified build system reduces compilation time and build failures across platforms
 
 [No sources needed since this section provides general guidance]
 
@@ -344,9 +344,9 @@ Common issues and resolutions:
   - Reduce batch size or thread count; adjust batch count and region granularity
 - Incorrect population grouping
   - Verify the population group file format matches sample IDs in BAM headers
-- **New in 2.1.1**: Static binary compatibility issues
+- **Updated**: Static binary compatibility issues
   - Use pre-built static binaries for zero-dependency deployment
-  - Linux static binaries run on any modern distribution without runtime dependencies
+  - Linux static binaries require glibc >= 2.35 (Ubuntu 22.04+, Debian 12+, Fedora 36+)
   - macOS static binaries require macOS 12+ and have minimal system dependencies
 
 **Section sources**
@@ -355,7 +355,7 @@ Common issues and resolutions:
 - [update_note.md:7-31](file://update_note.md#L7-L31)
 
 ## Conclusion
-BaseVar2 advances the state-of-the-art for ULDS variant discovery by combining rigorous statistical modeling with high-performance C++ implementation. The 2.1.1 release introduces significant improvements in build reliability and cross-platform compatibility, making deployment more straightforward across diverse computing environments. Its focus on accurate variant detection and reliable allele frequency estimation from <1x data makes it especially suited for NIPT and population-scale studies. The modular architecture, robust I/O layer, and automated parallelization pipeline enable scalable, reproducible workflows from shallow coverage datasets.
+BaseVar2 advances the state-of-the-art for ULDS variant discovery by combining rigorous statistical modeling with high-performance C++ implementation. The 2.2.3 release maintains significant improvements in build reliability and cross-platform compatibility while adopting a simplified build approach. Its focus on accurate variant detection and reliable allele frequency estimation from <1x data makes it especially suited for NIPT and population-scale studies. The modular architecture, robust I/O layer, and automated parallelization pipeline enable scalable, reproducible workflows from shallow coverage datasets.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -375,18 +375,18 @@ BaseVar2 advances the state-of-the-art for ULDS variant discovery by combining r
 
 [No sources needed since this section provides general guidance]
 
-### Version 2.1.1 Build Improvements
-**Enhanced Build System Features:**
-- **Improved Cross-Platform Compatibility**: Enhanced static linking support for both Linux and macOS
-- **Zero-Dependency Static Binaries**: Pre-built binaries available for immediate deployment
-- **Streamlined Installation Process**: Simplified build process with better error handling
-- **Enhanced CI/CD Pipeline**: More reliable automated testing and release process
+### Version 2.2.3 Build Improvements
+**Simplified Build System Features:**
+- **Streamlined Static Linking**: Simplified approach focusing on glibc >= 2.35 compatibility
+- **Honest System Requirements**: Clear glibc version requirements for Linux static binaries
+- **Reduced Build Complexity**: Eliminated manylinux2014 compatibility claims in favor of realistic requirements
+- **Improved Reliability**: Better error handling and clearer build instructions
 
 **Static Binary Availability:**
-- **Linux (x86_64)**: Fully static binary with zero runtime dependencies
+- **Linux (x86_64)**: Partial-static binary with glibc >= 2.35 requirement
 - **macOS (arm64/Intel)**: Best-effort static binary with minimal system requirements
 
 **Section sources**
 - [README.md:19-43](file://README.md#L19-L43)
-- [.github/workflows/build.yml:82-197](file://.github/workflows/build.yml#L82-L197)
+- [.github/workflows/build.yml:82-183](file://.github/workflows/build.yml#L82-L183)
 - [CMakeLists.txt:46-63](file://CMakeLists.txt#L46-L63)

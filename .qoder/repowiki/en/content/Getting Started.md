@@ -11,15 +11,17 @@
 - [tests/io/make.sh](file://tests/io/make.sh)
 - [htslib/INSTALL](file://htslib/INSTALL)
 - [src/version.h.in](file://src/version.h.in)
-- [build-static/Makefile](file://build-static/Makefile)
+- [build/CMakeCache.txt](file://build/CMakeCache.txt)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Removed Option 3: Manual g++ Compilation section as the manual_install.sh script has been completely removed from the codebase
-- Updated installation options to focus on pre-built static binaries and CMake compilation methods only
-- Revised troubleshooting guidance to reflect the removal of manual compilation option
-- Updated system requirements and verification procedures to match current available installation methods
+- Updated version references from 2.2.5 to 2.2.3 throughout the Getting Started documentation
+- Corrected download links in installation examples to point to v2.2.3 releases
+- Updated system requirements to reflect glibc >= 2.35 requirement for basevar-linux-static
+- Added comprehensive system requirements section with compatibility matrix and troubleshooting guidance
+- Enhanced static binary compatibility notes for Linux glibc environments
+- Updated troubleshooting guidance to reflect improved static binary compatibility fixes
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -48,14 +50,14 @@ Download pre-built static binaries that require zero runtime dependencies and ru
 
 **Linux (x86_64, glibc-free)**:
 ```bash
-wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.0/basevar-linux-static
+wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-linux-static
 chmod +x basevar-linux-static
 ./basevar-linux-static --help
 ```
 
 **macOS (arm64 / Intel)**:
 ```bash
-curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.0/basevar-macos-static
+curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-macos-static
 chmod +x basevar-macos-static
 ./basevar-macos-static --help
 ```
@@ -66,6 +68,8 @@ chmod +x basevar-macos-static
 | Linux (x86_64) | `basevar-linux-static` | Zero | Runs on CentOS 7+, Ubuntu 16.04+, Debian 9+ |
 | macOS (Intel) | `basevar-macos-static` | Zero | Compatible with macOS versions shipped with BaseVar2 |
 | macOS (Apple Silicon) | `basevar-macos-static` | Zero | Native arm64 support |
+
+**Updated** Download links now point to version 2.2.3 releases with improved static binary compatibility.
 
 **Section sources**
 - [README.md:19-42](file://README.md#L19-L42)
@@ -99,15 +103,15 @@ cmake -B build-static -DSTATIC_BUILD=ON -DCMAKE_BUILD_TYPE=Release
 cmake --build build-static
 ```
 
-**Linux** (fully static via Alpine Docker):
+**Linux** (fully static via Ubuntu/glibc — same approach used in CI):
 ```bash
-docker run --rm -v "$PWD:/src" -w /src alpine:3.20 sh -c '
-  apk add --no-cache build-base cmake autoconf automake \
-    zlib-dev bzip2-dev xz-dev curl-dev openssl-dev &&
-  cmake -B build-static -DSTATIC_BUILD=ON -DCMAKE_BUILD_TYPE=Release &&
-  cmake --build build-static
-'
+sudo apt-get install -y build-essential cmake autoconf automake \
+    zlib1g-dev libbz2-dev liblzma-dev libssl-dev
+cmake -B build-static -DSTATIC_BUILD=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build-static
 ```
+
+**Updated** Static binary compatibility has been improved with better glibc environment support and enhanced linker flags.
 
 **Section sources**
 - [README.md:46-94](file://README.md#L46-L94)
@@ -251,6 +255,8 @@ Optional:
   -c, --chrom=STR              Comma-separated chromosomes to process
 ```
 
+**Updated** Pipeline functionality is now built directly into the basevar binary as a native C++ subcommand, with the legacy Python script remaining for backward compatibility.
+
 **Section sources**
 - [README.md:249-267](file://README.md#L249-L267)
 
@@ -301,6 +307,8 @@ For whole-genome variant calling, the pipeline generator creates sub-region comm
 | `--ref_fai` | Reference FASTA index file (`.fai`) | **required** |
 | `-d, --delta` | Size of each sub-region (bp) | `2000000` |
 | `-c, --chrom` | Restrict to comma-separated chromosome(s) | all chromosomes |
+
+**Updated** The pipeline functionality is now integrated into the main basevar binary, providing better performance and reliability compared to the legacy Python implementation.
 
 **Section sources**
 - [README.md:255-264](file://README.md#L255-L264)
@@ -391,6 +399,43 @@ basevar concat -L vcf.list -o final_output.vcf.gz
 - **Storage**: Depends on cohort size and reference genome
 - **CPU**: Multi-core systems recommended for parallel processing
 
+### Linux Static Binary Requirements
+
+**Important**: The Linux static binary (`basevar-linux-static`) has specific system requirements due to its partial-static build approach.
+
+**glibc Requirement**: The Linux binary requires **glibc ≥ 2.35** because it's built on Ubuntu 22.04 (glibc 2.35) in CI. This is a hard requirement for the static binary.
+
+**Confirmed Compatible Distributions**:
+| Distribution | glibc | `basevar-linux-static` |
+|------------|-------|:---------------------:|
+| Ubuntu 22.04 LTS | 2.35 | ✅ |
+| Ubuntu 24.04 LTS | 2.39 | ✅ |
+| Debian 12 (bookworm) | 2.36 | ✅ |
+| Fedora 36+ | 2.35+ | ✅ |
+| openSUSE Tumbleweed | rolling | ✅ |
+
+**Distributions Where `basevar-linux-static` Will NOT Run**:
+| Distribution | glibc | `basevar-linux-static` |
+|------------|-------|:---------------------:|
+| CentOS 7 / RHEL 7 | 2.17 | ❌ |
+| CentOS 8 / RHEL 8 / Rocky 8 / Alma 8 | 2.28 | ❌ |
+| CentOS 9 / RHEL 9 / Rocky 9 / Alma 9 | 2.34 | ❌ |
+| Ubuntu 18.04 / 20.04 | 2.27 / 2.31 | ❌ |
+| Debian 10 / 11 | 2.28 / 2.31 | ❌ |
+
+**Quick Compatibility Check**:
+```bash
+# If the printed glibc version is >= 2.35, basevar-linux-static will run.
+ldd --version | head -1
+```
+
+**Typical Incompatibility Error**:
+```
+./basevar-linux-static: /lib64/libc.so.6: version `GLIBC_2.35' not found (required by ./basevar-linux-static)
+```
+
+**Resolution**: If you see this error or are on an incompatible distribution, use Option 2 (compile from source) instead.
+
 **Section sources**
 - [README.md:48](file://README.md#L48)
 - [CMakeLists.txt:4-6](file://CMakeLists.txt#L4-L6)
@@ -480,14 +525,18 @@ basevar caller \
 ### Static Build Issues
 
 **Linux static builds**
-- Use Alpine Docker container for maximum portability
+- Use Ubuntu/glibc container for maximum portability (same approach as CI)
+- Improved compatibility with glibc environments
+- Enhanced stack size handling resolves segmentation faults on glibc hosts
 - Some features (e.g., DNS via NSS) may not work in fully-static mode
-- Building inside Alpine (musl) container is recommended for maximum portability
+- Building inside Ubuntu (glibc) container is recommended for maximum portability
 
 **macOS static builds**
 - Apple Clang does NOT support fully static executables
 - Strategy: statically link C++ runtime and third-party archives, keep system frameworks dynamic
 - Only system frameworks (libSystem, etc.) remain dynamically linked
+
+**Updated** Static binary compatibility has been significantly improved with better glibc environment support and enhanced linker flags to prevent segmentation faults.
 
 ### Runtime Issues
 
@@ -501,10 +550,18 @@ basevar caller \
 - With `-B 200` and one thread, memory usage is typically 3–4 GB per thread
 - Monitor memory usage and adjust batch size accordingly
 
-**Verification steps**
+**Version verification**
 - Confirm the executable responds to the caller help option
+- Check that the version displays 2.2.3
 - Run a small test with a minimal dataset to validate correctness
 - Check that output VCF files are properly compressed and indexed
+
+**Linux static binary compatibility**
+- If encountering glibc version errors, use the dynamic build or compile from source
+- The static binary requires glibc ≥ 2.35 due to its build environment
+- Use `ldd --version` to check your system's glibc version
+
+**Updated** Version is now 2.2.3 with improved static binary compatibility and better environment detection.
 
 **Section sources**
 - [README.md:48](file://README.md#L48)
@@ -528,12 +585,15 @@ basevar caller \
 
 ### B. Version Metadata
 - Version and author metadata are configured via CMake and templated into the version header
-- Current version: 2.2.0
+- Current version: 2.2.3
 - Author: Shujia Huang
+
+**Updated** Version has been reverted to 2.2.3 with improved static binary compatibility and bug fixes.
 
 **Section sources**
 - [src/version.h.in:1-13](file://src/version.h.in#L1-L13)
 - [CMakeLists.txt:8-20](file://CMakeLists.txt#L8-L20)
+- [build/CMakeCache.txt:150](file://build/CMakeCache.txt#L150)
 
 ### C. Test Utilities
 - The tests/io/make.sh script demonstrates linking and running unit tests for IO components, which can serve as a reference for verifying your own linking

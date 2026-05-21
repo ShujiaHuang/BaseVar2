@@ -5,7 +5,6 @@
 - [CMakeLists.txt](file://CMakeLists.txt)
 - [README.md](file://README.md)
 - [.github/workflows/build.yml](file://.github/workflows/build.yml)
-- [bin/manual_install.sh](file://bin/manual_install.sh)
 - [htslib/config.mk](file://htslib/config.mk)
 - [htslib/htslib.mk](file://htslib/htslib.mk)
 - [htslib/htslib_static.mk](file://htslib/htslib_static.mk)
@@ -16,11 +15,12 @@
 
 ## Update Summary
 **Changes Made**
-- Enhanced documentation for GitHub Actions CI/CD workflow with improved permissions configuration
-- Updated CI/CD architecture documentation to reflect parallel execution model
-- Added documentation for release asset upload enhancements with explicit tag targeting
-- Updated static build job documentation to reflect independent execution without sequential dependencies
-- Enhanced troubleshooting guide with improved CI/CD workflow verification steps
+- Updated version information from 2.2.3 to 2.2.5 across build configuration
+- Reverted from manylinux2014 Docker-based build back to native Ubuntu 22.04 build with simplified CI/CD workflow
+- Removed references to Alpine/musl fully-static approach and musl/glibc compatibility issues
+- Updated static build configuration to use ubuntu-22.04 runners with glibc 2.35 compatibility
+- Simplified CI/CD workflow removing Docker-based complexity
+- Updated platform compatibility requirements to glibc ≥ 2.35 for Ubuntu 22.04
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -43,8 +43,9 @@ This document explains BaseVar2's build system and configuration management with
 - Compilation and linking requirements
 - Runtime dependencies and development environment setup
 - Compiler requirements and optimization flags
-- **NEW**: Enhanced GitHub Actions CI/CD workflow with improved permissions configuration, parallel execution architecture, and release asset upload enhancements
-- **NEW**: Independent static build jobs with explicit tag targeting for release assets
+- **NEW**: Reverted from manylinux2014 Docker-based build back to native Ubuntu 22.04 build with simplified CI/CD workflow
+- **NEW**: Updated static build configuration to use ubuntu-22.04 runners with glibc 2.35 compatibility
+- **NEW**: Simplified CI/CD workflow removing Docker-based complexity and musl/glibc compatibility issues
 
 ## Project Structure
 BaseVar2 integrates a C++ application with an embedded htslib submodule. The build system orchestrates:
@@ -52,25 +53,27 @@ BaseVar2 integrates a C++ application with an embedded htslib submodule. The bui
 - A custom CMake target to build htslib using autotools
 - Inclusion of htslib headers and linking against the static htslib archive
 - Platform-specific compiler flags and system libraries
-- **NEW**: Enhanced CI/CD workflow with parallel execution and improved release asset management
+- **NEW**: Native Ubuntu 22.04 build system with glibc 2.35 compatibility
+- **NEW**: Simplified CI/CD workflow with parallel execution of dynamic and static build jobs
 
 ```mermaid
 graph TB
-A["CMakeLists.txt"] --> B["Configure version header<br/>src/version.h.in → src/version.h"]
+A["CMakeLists.txt"] --> B["Configure version header<br/>src/version.h.in → src/version.h<br/>(v2.2.5)"]
 A --> C["Custom target Buildhts<br/>autoreconf/configure/make in htslib"]
 A --> D["Collect sources<br/>src/*.cpp + src/io/*.cpp"]
 A --> E["Executable basevar"]
 A --> F["Static Build Option<br/>STATIC_BUILD=ON"]
 A --> G["Link libraries<br/>htslib static + system libs"]
-A --> H["Parallel CI/CD Execution<br/>Independent build jobs"]
-C --> I["htslib/libhts.a"]
-F --> J["Platform-specific static flags"]
-G --> I
-G --> K["System libs<br/>pthread, z, bz2, m, lzma, curl, ssl, crypto"]
-J --> L["Linux: -static + pkg-config --static"]
-J --> M["macOS: static .a paths"]
-H --> N["Independent build jobs<br/>No sequential dependencies"]
-H --> O["Enhanced release asset upload<br/>Explicit tag targeting"]
+A --> H["Native Ubuntu 22.04 Build<br/>glibc 2.35 compatibility"]
+A --> I["Simplified CI/CD Workflow<br/>Parallel execution"]
+C --> J["htslib/libhts.a"]
+F --> K["Platform-specific static flags"]
+G --> J
+G --> L["System libs<br/>pthread, z, bz2, m, lzma, curl, ssl, crypto"]
+K --> M["Linux: -static-libstdc++ -static-libgcc + bundled libs"]
+K --> N["macOS: static .a paths"]
+H --> O["Eliminates musl/glibc incompatibility issues"]
+I --> P["Parallel dynamic and static builds"]
 ```
 
 **Diagram sources**
@@ -81,39 +84,42 @@ H --> O["Enhanced release asset upload<br/>Explicit tag targeting"]
 - [CMakeLists.txt:49](file://CMakeLists.txt#L49)
 - [CMakeLists.txt:23](file://CMakeLists.txt#L23)
 - [CMakeLists.txt:43-46](file://CMakeLists.txt#L43-L46)
-- [CMakeLists.txt:128-165](file://CMakeLists.txt#L128-L165)
-- [.github/workflows/build.yml:12-13](file://.github/workflows/build.yml#L12-L13)
-- [.github/workflows/build.yml:87-88](file://.github/workflows/build.yml#L87-L88)
-- [.github/workflows/build.yml:72-77](file://.github/workflows/build.yml#L72-L77)
+- [CMakeLists.txt:158-192](file://CMakeLists.txt#L158-L192)
+- [CMakeLists.txt:159-167](file://CMakeLists.txt#L159-L167)
+- [.github/workflows/build.yml:82-93](file://.github/workflows/build.yml#L82-L93)
+- [.github/workflows/build.yml:19-28](file://.github/workflows/build.yml#L19-L28)
 
 **Section sources**
-- [CMakeLists.txt:1-171](file://CMakeLists.txt#L1-L171)
-- [.github/workflows/build.yml:1-184](file://.github/workflows/build.yml#L1-L184)
+- [CMakeLists.txt:1-197](file://CMakeLists.txt#L1-L197)
+- [.github/workflows/build.yml:1-183](file://.github/workflows/build.yml#L1-L183)
 
 ## Core Components
 - CMake configuration enforces C++17, sets optimization flags, and configures platform-specific flags.
 - A custom target builds htslib using autotools and places the resulting static library into the expected path.
 - The main executable links against the static htslib archive and system libraries.
 - Version metadata is templated into a generated header during configuration.
-- **NEW**: Enhanced CI/CD workflow with improved permissions configuration for release asset uploads and parallel execution architecture.
+- **NEW**: Native Ubuntu 22.04 build system with glibc 2.35 ensuring compatibility with modern Linux distributions.
+- **NEW**: Simplified CI/CD workflow with parallel execution of dynamic and static build jobs.
+- **NEW**: Eliminated musl/glibc compatibility issues that previously caused segmentation faults.
 
 Key implementation references:
 - C++ standard and flags: [CMakeLists.txt:5](file://CMakeLists.txt#L5), [CMakeLists.txt:26-29](file://CMakeLists.txt#L26-L29)
 - htslib build target: [CMakeLists.txt:32-36](file://CMakeLists.txt#L32-L36)
 - Include directories and library linkage: [CMakeLists.txt:39-46](file://CMakeLists.txt#L39-L46), [CMakeLists.txt:49](file://CMakeLists.txt#L49), [CMakeLists.txt:61](file://CMakeLists.txt#L61)
 - Version header generation: [CMakeLists.txt:17-20](file://CMakeLists.txt#L17-L20), [src/version.h.in:1-13](file://src/version.h.in#L1-L13), [src/version.h:1-13](file://src/version.h#L1-L13)
-- Static build option: [CMakeLists.txt:23](file://CMakeLists.txt#L23), [CMakeLists.txt:46-62](file://CMakeLists.txt#L46-L62)
-- **NEW**: Enhanced CI/CD workflow: [CMakeLists.txt:128-165](file://CMakeLists.txt#L128-L165), [.github/workflows/build.yml:12-13](file://.github/workflows/build.yml#L12-L13), [.github/workflows/build.yml:87-88](file://.github/workflows/build.yml#L87-L88)
+- Static build option: [CMakeLists.txt:23](file://CMakeLists.txt#L23), [CMakeLists.txt:58-75](file://CMakeLists.txt#L58-L75)
+- **NEW**: Native Ubuntu 22.04 configuration: [CMakeLists.txt:158-192](file://CMakeLists.txt#L158-L192)
+- **NEW**: glibc 2.35 compatibility: [CMakeLists.txt:159-167](file://CMakeLists.txt#L159-L167)
+- **NEW**: Simplified distribution support: [CMakeLists.txt:42-45](file://CMakeLists.txt#L42-L45)
 
 **Section sources**
-- [CMakeLists.txt:1-171](file://CMakeLists.txt#L1-L171)
+- [CMakeLists.txt:1-197](file://CMakeLists.txt#L1-L197)
 - [src/version.h.in:1-13](file://src/version.h.in#L1-L13)
 - [src/version.h:1-13](file://src/version.h#L1-L13)
-- [.github/workflows/build.yml:12-13](file://.github/workflows/build.yml#L12-L13)
-- [.github/workflows/build.yml:87-88](file://.github/workflows/build.yml#L87-L88)
+- [.github/workflows/build.yml:82-93](file://.github/workflows/build.yml#L82-L93)
 
 ## Architecture Overview
-The build architecture ties together CMake, htslib's autotools build, and system libraries. The enhanced CI/CD workflow now features parallel execution with independent build jobs and improved release asset management.
+The build architecture ties together CMake, htslib's autotools build, and system libraries. The native Ubuntu 22.04 build system ensures compatibility with modern Linux distributions by basing the build on glibc 2.35. **NEW**: Reverted from Docker-based approach back to native Ubuntu 22.04 build for improved simplicity and reliability.
 
 ```mermaid
 sequenceDiagram
@@ -123,6 +129,7 @@ participant HTS as "htslib (autotools)"
 participant GCC as "Compiler/linker"
 participant SYS as "System libs"
 participant CI as "GitHub Actions"
+participant Runner as "ubuntu-22.04 Runner"
 participant Release as "GitHub Releases"
 Dev->>CMake : Configure (C++17, flags, STATIC_BUILD?)
 CMake->>HTS : add_custom_target(Buildhts)<br/>autoreconf -i && ./configure && make
@@ -134,13 +141,16 @@ GCC->>HTS : Link libhts.a
 GCC->>SYS : Link pthread, z, bz2, m, lzma, curl, [ssl, crypto]
 else STATIC_BUILD=ON
 GCC->>HTS : Link libhts.a with static flags
-GCC->>SYS : Link system libs statically
+GCC->>SYS : Link system libs with bundled C++ runtime
+note over GCC : Bundles libstdc++ + libgcc<br/>keeps glibc dynamic
 end
 GCC-->>Dev : bin/basevar
-Note over CI : Enhanced parallel CI/CD workflow
+Note over CI : Native Ubuntu 22.04 Runner<br/>glibc 2.35 compatibility
+CI->>Runner : Build static binary (Linux)
+Runner->>Runner : Build with -static-libstdc++ -static-libgcc
 CI->>CI : Job 1 : Build & Test (dynamic linking)
-CI->>CI : Job 2 : Static Build (independent execution)
-CI->>Release : Upload release assets with explicit tag targeting
+CI->>CI : Job 2 : Static Build (ubuntu-22.04)
+CI->>Release : Upload release assets with tag targeting
 ```
 
 **Diagram sources**
@@ -149,10 +159,10 @@ CI->>Release : Upload release assets with explicit tag targeting
 - [CMakeLists.txt:59](file://CMakeLists.txt#L59)
 - [CMakeLists.txt:61](file://CMakeLists.txt#L61)
 - [CMakeLists.txt:43-46](file://CMakeLists.txt#L43-L46)
-- [CMakeLists.txt:128-165](file://CMakeLists.txt#L128-L165)
-- [.github/workflows/build.yml:12-13](file://.github/workflows/build.yml#L12-L13)
-- [.github/workflows/build.yml:87-88](file://.github/workflows/build.yml#L87-L88)
-- [.github/workflows/build.yml:72-77](file://.github/workflows/build.yml#L72-L77)
+- [CMakeLists.txt:158-192](file://CMakeLists.txt#L158-L192)
+- [.github/workflows/build.yml:82-93](file://.github/workflows/build.yml#L82-L93)
+- [.github/workflows/build.yml:114-141](file://.github/workflows/build.yml#L114-141)
+- [.github/workflows/build.yml:19-28](file://.github/workflows/build.yml#L19-L28)
 
 ## Detailed Component Analysis
 
@@ -162,7 +172,8 @@ CI->>Release : Upload release assets with explicit tag targeting
 - Generates a version header from a template using CMake's configure_file mechanism.
 - Declares a custom target to build htslib via autotools and ensures it completes before building the main executable.
 - Includes htslib headers and links the static htslib archive with system libraries.
-- **NEW**: Implements enhanced conditional static linking based on the STATIC_BUILD option with Alpine 3.20 improvements.
+- **NEW**: Native Ubuntu 22.04 static linking with glibc 2.35 compatibility.
+- **NEW**: Simplified CI/CD workflow with parallel execution of build jobs.
 
 ```mermaid
 flowchart TD
@@ -170,13 +181,13 @@ Start(["CMake configure"]) --> Std["Set C++17 standard"]
 Std --> Flags["Set CXX flags:<br/>-O3 -fPIC (+ macOS -Wl,-no_compact_unwind)"]
 Flags --> StaticCheck{"STATIC_BUILD?"}
 StaticCheck --> |ON| StaticCfg["Apply platform-specific static flags"]
-StaticCheck --> |OFF| VerHdr["configure_file(version.h.in → version.h)"]
-StaticCfg --> LinuxStatic["Linux: -static linker flag + pkg-config --static"]
+StaticCheck --> |OFF| VerHdr["configure_file(version.h.in → version.h)<br/>v2.2.5"]
+StaticCfg --> LinuxStatic["Linux: -static-libstdc++ -static-libgcc<br/>+ bundled compression libs"]
 StaticCfg --> MacStatic["macOS: static .a paths strategy"]
-StaticCfg --> Alpine["Alpine 3.20: Enhanced dependency resolution"]
+StaticCfg --> Ubuntu2204["ubuntu-22.04: glibc 2.35<br/>+ dynamic glibc support"]
 StaticCfg --> VerHdr
-Alpine --> CurlFlags["pkg-config --static libcurl for transitive deps"]
-VerHdr --> HTSBuild["add_custom_target(Buildhts)<br/>autotools in htslib"]
+Ubuntu2204 --> CurlFlags["Direct system curl linking"]
+VerHdr --> HTSBuild["add_custom_target(Buildhts)<br/>autoreconf -i && ./configure && make"]
 HTSBuild --> Srcs["Collect sources:<br/>src/*.cpp + src/io/*.cpp"]
 Srcs --> Exec["add_executable(basevar)"]
 Exec --> Deps["add_dependencies(basevar Buildhts)"]
@@ -189,21 +200,23 @@ Link --> End(["bin/basevar ready"])
 - [CMakeLists.txt:26-29](file://CMakeLists.txt#L26-L29)
 - [CMakeLists.txt:17-20](file://CMakeLists.txt#L17-L20)
 - [CMakeLists.txt:23](file://CMakeLists.txt#L23)
-- [CMakeLists.txt:46-62](file://CMakeLists.txt#L46-L62)
-- [CMakeLists.txt:128-165](file://CMakeLists.txt#L128-L165)
+- [CMakeLists.txt:58-75](file://CMakeLists.txt#L58-L75)
+- [CMakeLists.txt:158-192](file://CMakeLists.txt#L158-L192)
 - [CMakeLists.txt:32-36](file://CMakeLists.txt#L32-L36)
 - [CMakeLists.txt:52-55](file://CMakeLists.txt#L52-L55)
 - [CMakeLists.txt:59](file://CMakeLists.txt#L59)
 - [CMakeLists.txt:61](file://CMakeLists.txt#L61)
 
 **Section sources**
-- [CMakeLists.txt:1-171](file://CMakeLists.txt#L1-L171)
+- [CMakeLists.txt:1-197](file://CMakeLists.txt#L1-L197)
 
 ### htslib Integration and Embedded Setup
 - htslib is built using autotools within the custom target and produces a static library at a fixed path expected by the main build.
 - The main build includes htslib headers and links against the static archive.
 - htslib's Makefile-based build supports optional plugins and compression libraries; the static archive is sufficient for BaseVar2's needs.
-- **NEW**: Enhanced static linking with pkg-config --static for better dependency resolution in Alpine environments.
+- **NEW**: Native Ubuntu 22.04 build system ensuring consistent static library availability.
+- **NEW**: Direct system curl linking for better compatibility in static builds.
+- **NEW**: Simplified CI/CD workflow with parallel execution of build jobs.
 
 ```mermaid
 graph LR
@@ -211,8 +224,9 @@ A["CMakeLists.txt: Buildhts"] --> B["htslib/configure + make"]
 B --> C["htslib/libhts.a"]
 D["CMakeLists.txt: include_directories(htslib)"] --> E["Headers visible to basevar"]
 F["CMakeLists.txt: target_link_libraries(... libhts.a ...)"] --> C
-G["Alpine 3.20: pkg-config --static"] --> H["Resolve transitive static deps"]
-H --> F
+G["ubuntu-22.04 Runner"] --> H["glibc 2.35 compatibility"]
+H --> I["Direct system curl linking"]
+I --> F
 ```
 
 **Diagram sources**
@@ -220,7 +234,8 @@ H --> F
 - [CMakeLists.txt:39](file://CMakeLists.txt#L39)
 - [CMakeLists.txt:49](file://CMakeLists.txt#L49)
 - [CMakeLists.txt:61](file://CMakeLists.txt#L61)
-- [CMakeLists.txt:134-135](file://CMakeLists.txt#L134-L135)
+- [CMakeLists.txt:158-192](file://CMakeLists.txt#L158-L192)
+- [CMakeLists.txt:160-171](file://CMakeLists.txt#L160-L171)
 
 **Section sources**
 - [CMakeLists.txt:32-36](file://CMakeLists.txt#L32-L36)
@@ -232,8 +247,10 @@ H --> F
 - Common system libraries: pthread, z (zlib), bz2 (bzip2), m (math), lzma (xz), curl.
 - On non-macOS platforms, OpenSSL libraries (ssl and crypto) are appended.
 - macOS-specific linker flag to disable compact unwind information is conditionally added.
-- **NEW**: Enhanced static linking strategies vary by platform with different approaches for Linux and macOS, including Alpine 3.20 support.
-- **NEW**: Linux static builds now use pkg-config --static to resolve complete set of link flags for libcurl and its transitive dependencies.
+- **NEW**: Native Ubuntu 22.04 static linking strategies with glibc 2.35 compatibility.
+- **NEW**: Linux static builds bundle libstdc++ and libgcc while keeping glibc dynamic for compatibility with glibc ≥ 2.35.
+- **NEW**: Platform compatibility requirement updated to glibc ≥ 2.35 for modern Linux distribution support.
+- **NEW**: Simplified CI/CD workflow with parallel execution of build jobs.
 
 ```mermaid
 flowchart TD
@@ -242,12 +259,13 @@ A --> |non-macOS| N["Append ssl + crypto"]
 M --> L["Link system libs:<br/>pthread, z, bz2, m, lzma, curl, [ssl, crypto]"]
 N --> L
 A --> |STATIC_BUILD=ON| S["Static linking mode"]
-S --> |Linux| LS["-static linker flag + pkg-config --static"]
-S --> |Linux Alpine 3.20| LA["musl libc + enhanced deps"]
+S --> |Linux| LS["-static-libstdc++ -static-libgcc<br/>+ bundled compression libs"]
+S --> |Linux ubuntu-22.04| LU["glibc 2.35 compatibility<br/>+ dynamic glibc support"]
 S --> |macOS| MS["Static .a paths strategy"]
-LS --> CurlDeps["Resolve curl transitive deps via pkg-config"]
-LA --> CurlDeps
-LS --> SL["Fully static executable"]
+LS --> CurlDeps["Direct system curl linking"]
+LU --> CurlDeps
+LS --> SL["Portable static executable<br/>+ eliminates compatibility issues"]
+LU --> LC["Ubuntu 22.04 base<br/>+ modern distribution support"]
 MS --> SM["Best-effort static linking"]
 ```
 
@@ -255,17 +273,20 @@ MS --> SM["Best-effort static linking"]
 - [CMakeLists.txt:27-29](file://CMakeLists.txt#L27-L29)
 - [CMakeLists.txt:44-46](file://CMakeLists.txt#L44-L46)
 - [CMakeLists.txt:46-62](file://CMakeLists.txt#L46-L62)
-- [CMakeLists.txt:128-165](file://CMakeLists.txt#L128-L165)
+- [CMakeLists.txt:158-192](file://CMakeLists.txt#L158-L192)
+- [CMakeLists.txt:159-167](file://CMakeLists.txt#L159-L167)
 
 **Section sources**
 - [CMakeLists.txt:27-29](file://CMakeLists.txt#L27-L29)
 - [CMakeLists.txt:44-46](file://CMakeLists.txt#L44-L46)
 - [CMakeLists.txt:46-62](file://CMakeLists.txt#L46-L62)
-- [CMakeLists.txt:128-165](file://CMakeLists.txt#L128-L165)
+- [CMakeLists.txt:158-192](file://CMakeLists.txt#L158-L192)
+- [CMakeLists.txt:159-167](file://CMakeLists.txt#L159-L167)
 
 ### Version Header Generation
 - A CMake configure_file step transforms a version template into a generated header containing project metadata.
 - The template fields are populated from CMake project version and metadata variables.
+- **NEW**: Version updated to 2.2.5 across all build configuration files.
 
 ```mermaid
 sequenceDiagram
@@ -273,7 +294,7 @@ participant CMake as "CMake configure"
 participant Tmpl as "src/version.h.in"
 participant Out as "src/version.h"
 CMake->>Tmpl : Read template
-CMake->>Out : Write generated header with version info
+CMake->>Out : Write generated header with version info<br/>(v2.2.5)
 ```
 
 **Diagram sources**
@@ -287,52 +308,51 @@ CMake->>Out : Write generated header with version info
 - [src/version.h:1-13](file://src/version.h#L1-L13)
 
 ### Enhanced CI/CD Build Workflow
-- GitHub Actions builds on Ubuntu and macOS runners with parallel execution architecture.
-- **NEW**: Enhanced permissions configuration with `permissions: contents: write` for proper release asset uploads.
-- **NEW**: Independent static build jobs that run without sequential dependencies, allowing parallel execution.
-- **NEW**: Explicit tag targeting for release assets using `${{ github.ref_name }}`.
+- GitHub Actions builds on ubuntu-latest and macos-latest runners with native Ubuntu 22.04 runner for Linux static builds.
+- **NEW**: Reverted to native Ubuntu 22.04 build system eliminating Docker-based complexity.
+- **NEW**: Native Ubuntu 22.04 build system with glibc 2.35 ensuring consistent static library availability.
+- **NEW**: Simplified CI/CD workflow with parallel execution of dynamic and static build jobs.
 - Installs dependencies via package managers (apt on Linux, Homebrew on macOS).
 - Configures CMake with Release build type and enables testing.
 - Builds and runs tests, then packages the binary artifact.
-- **NEW**: Separate static build jobs for Linux (Alpine 3.20 Docker) and macOS with enhanced verification steps and Alpine-specific dependency resolution.
+- **NEW**: Separate static build jobs for Linux (ubuntu-22.04) and macOS with improved compatibility.
+- **NEW**: Simplified verification process showing glibc version and symbol dependencies.
 
 ```mermaid
 sequenceDiagram
 participant GH as "GitHub Actions"
 participant Perm as "Permissions Config"
-participant Linux as "Ubuntu runner"
-participant Mac as "macOS runner"
-participant Alpine as "Alpine 3.20 Container"
+participant Ubuntu as "ubuntu-latest runner"
+participant Mac as "macos-latest runner"
+participant Runner as "ubuntu-22.04 Runner"
 participant Cfg as "CMake configure"
 participant Bld as "CMake build"
 participant Tst as "ctest"
 GH->>Perm : Configure permissions : contents : write
-GH->>Linux : Job 1 : Build & Test (dynamic linking)
+GH->>Ubuntu : Job 1 : Build & Test (dynamic linking)
 GH->>Mac : Job 1 : Build & Test (dynamic linking)
-GH->>Linux : Job 2 : Static Build (Linux/Alpine)
-GH->>Mac : Job 2 : Static Build (macOS)
-Note over GH : Parallel execution - no sequential dependencies
+GH->>Runner : Job 2 : Static Build (Linux/ubuntu-22.04)
+Runner->>Runner : Build with -static-libstdc++ -static-libgcc
+Runner->>Runner : Verify glibc 2.35 compatibility
 GH->>Cfg : cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
 GH->>Bld : cmake --build build --config Release
 GH->>Tst : ctest -C Release --output-on-failure
 GH->>GH : Upload artifacts (bin/basevar)
-Note over GH : Enhanced release asset upload
-GH->>GH : Upload Release Assets with explicit tag targeting
+GH->>GH : Upload Release Assets with tag targeting
 ```
 
 **Diagram sources**
 - [.github/workflows/build.yml:12-13](file://.github/workflows/build.yml#L12-L13)
-- [.github/workflows/build.yml:87-88](file://.github/workflows/build.yml#L87-L88)
-- [.github/workflows/build.yml:72-77](file://.github/workflows/build.yml#L72-L77)
+- [.github/workflows/build.yml:19-28](file://.github/workflows/build.yml#L19-L28)
+- [.github/workflows/build.yml:82-93](file://.github/workflows/build.yml#L82-L93)
+- [.github/workflows/build.yml:114-141](file://.github/workflows/build.yml#L114-141)
 - [.github/workflows/build.yml:25-48](file://.github/workflows/build.yml#L25-L48)
 - [.github/workflows/build.yml:50-52](file://.github/workflows/build.yml#L50-L52)
 - [.github/workflows/build.yml:54-63](file://.github/workflows/build.yml#L54-L63)
-- [.github/workflows/build.yml:112-146](file://.github/workflows/build.yml#L112-L146)
-- [.github/workflows/build.yml:153-171](file://.github/workflows/build.yml#L153-L171)
-- [.github/workflows/build.yml:114-157](file://.github/workflows/build.yml#L114-L157)
+- [.github/workflows/build.yml:177-183](file://.github/workflows/build.yml#L177-L183)
 
 **Section sources**
-- [.github/workflows/build.yml:1-184](file://.github/workflows/build.yml#L1-L184)
+- [.github/workflows/build.yml:1-183](file://.github/workflows/build.yml#L1-L183)
 
 ## Static Build Configuration
 
@@ -341,25 +361,27 @@ BaseVar2 introduces a comprehensive static linking capability through the `STATI
 
 **Key Features:**
 - **Cross-platform support**: Different strategies for Linux and macOS
-- **Zero-dependency distribution**: Fully static Linux binaries with no runtime dependencies
+- **NEW**: Native Ubuntu 22.04 static linking with glibc 2.35 compatibility
+- **NEW**: Simplified CI/CD workflow with parallel execution of build jobs
 - **Best-effort static linking**: macOS static linking with system framework exceptions
-- **Enhanced CI/CD**: Dedicated GitHub Actions jobs for static binary builds with Alpine 3.20 support
-- **NEW**: Improved dependency resolution through pkg-config --static for better error handling
+- **NEW**: Eliminates musl/glibc runtime incompatibility issues causing segmentation faults
+- **NEW**: Updated platform compatibility requirements to glibc ≥ 2.35
 
-### Linux Static Linking Strategy with Alpine 3.20
-On Linux, the static build uses the `-static` linker flag combined with pkg-config --static to produce fully static executables with enhanced dependency resolution:
+### Linux Static Linking Strategy with Ubuntu 22.04
+On Linux, the static build uses native Ubuntu 22.04 runner providing glibc 2.35 compatibility. The strategy bundles libstdc++ and libgcc while keeping glibc dynamic for maximum compatibility. **NEW**: Reverted from Docker-based approach back to native Ubuntu 22.04 build for improved simplicity and reliability.
 
 ```cmake
 if(STATIC_BUILD AND NOT APPLE)
-    # ---- Linux fully static build (Alpine musl recommended) ----
-    # Use pkg-config --static to resolve the complete set of link flags
-    # that libcurl needs (idn2, unistring, nghttp2, cares, ssl, crypto, z, etc.).
-    # This avoids manually tracking curl's transitive dependencies,
-    # which vary by Alpine version and build configuration.
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(CURL_STATIC REQUIRED IMPORTED_TARGET libcurl)
-
-    # Locate remaining .a archives explicitly
+    # ---- Linux portable partial-static build (glibc-based) ----
+    # Build host: Ubuntu 22.04 (glibc 2.35).
+    # Strategy:
+    #   * libstdc++ + libgcc are bundled via -static-libstdc++ -static-libgcc
+    #   * htslib + zlib + bzip2 + lzma + openssl are linked as .a archives
+    #   * glibc remains DYNAMIC (the binary still depends on the host's
+    #     /lib64/ld-linux-x86-64.so.2 + libc.so.6, but those exist on every
+    #     glibc-based Linux distribution).
+    # This produces a binary that runs unmodified on any Linux with
+    # glibc >= 2.31 (Ubuntu 20.04+, Debian 11+, RHEL/CentOS 8+, Fedora 32+).
     find_library(ZLIB_STATIC   NAMES libz.a     REQUIRED)
     find_library(BZ2_STATIC    NAMES libbz2.a   REQUIRED)
     find_library(LZMA_STATIC   NAMES liblzma.a  REQUIRED)
@@ -369,21 +391,18 @@ if(STATIC_BUILD AND NOT APPLE)
     message(STATUS "Linux static libs:")
     message(STATUS "  zlib=${ZLIB_STATIC} bz2=${BZ2_STATIC} lzma=${LZMA_STATIC}")
     message(STATUS "  ssl=${SSL_STATIC} crypto=${CRYPTO_STATIC}")
-    message(STATUS "  curl static flags: ${CURL_STATIC_STATIC_LIBRARIES}")
 
-    # Force static linker flag
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static")
+    # Bundle the C++ runtime statically; glibc stays dynamic.
+    set(CMAKE_EXE_LINKER_FLAGS
+        "${CMAKE_EXE_LINKER_FLAGS} -static-libstdc++ -static-libgcc")
 
     target_link_libraries(basevar
         ${HTSLIB}
-        # pkg-config resolves libcurl.a + all its transitive static deps
-        # (libidn2, libunistring, libnghttp2, libcares, libssl, libcrypto, etc.)
-        -Wl,--start-group
-        ${CURL_STATIC_STATIC_LIBRARIES}
+        ${SSL_STATIC}
+        ${CRYPTO_STATIC}
         ${LZMA_STATIC}
         ${BZ2_STATIC}
         ${ZLIB_STATIC}
-        -Wl,--end-group
         pthread
         m
         dl
@@ -392,24 +411,28 @@ endif()
 ```
 
 **Benefits:**
-- Zero runtime dependencies on Linux systems
-- Compatible with CentOS 7+, Ubuntu 16.04+, Debian 9+, and Alpine 3.20+
-- Can run on minimal Docker containers with musl libc
-- **NEW**: Enhanced dependency resolution prevents manual tracking of transitive dependencies
-- **NEW**: Improved error handling through pkg-config validation
+- **NEW**: Eliminates musl/glibc runtime incompatibility issues through native Ubuntu 22.04 approach
+- **NEW**: Compatible with Ubuntu 22.04+, Debian 12+, Fedora 36+, openSUSE Tumbleweed (glibc ≥ 2.35)
+- **NEW**: Ensures compatibility with modern Linux distributions and enterprise environments
+- **NEW**: Native Ubuntu 22.04 build system ensures consistent library availability
+- **NEW**: Simplified CI/CD workflow with parallel execution of build jobs
+- **NEW**: Reduces runtime dependencies while maintaining broad compatibility
+- **NEW**: Can run on minimal Docker containers with glibc ≥ 2.35
 
 **Requirements:**
-- Alpine Linux Docker container (Alpine 3.20) for reliable static linking
+- **NEW**: Native Ubuntu 22.04 runner (glibc 2.35) for reliable static linking
 - All required libraries must be available as static archives (zlib-static, bzip2-static, etc.)
+- **NEW**: Native Ubuntu 22.04 environment ensures consistent library availability
 - May limit certain features that rely on dynamic loading (DNS via NSS)
-- **NEW**: Alpine 3.20 provides improved package availability and compatibility
+- **NEW**: glibc ≥ 2.35 requirement ensures compatibility with modern Linux distributions
+- **NEW**: Simplified CI/CD workflow eliminates Docker-based complexity
 
 ### macOS Static Linking Strategy
 macOS has stricter limitations on static linking. The implementation uses a best-effort approach:
 
 ```cmake
 if(STATIC_BUILD AND APPLE)
-    # On macOS, Apple does not support fully static executables.
+    # On macOS, Apple does NOT support fully static executables.
     # Strategy: statically link zlib, bz2, lzma via Homebrew .a archives.
     # Homebrew's libcurl.a requires ngtcp2/libicucore (QUIC/HTTP3+IDN) which
     # are complex to resolve as .a on macOS — use system curl dylib instead.
@@ -453,34 +476,29 @@ endif()
 - Requires Homebrew installation of static library dependencies
 
 ### Static Build Verification
-The enhanced GitHub Actions workflow includes improved verification steps for static binaries with Alpine 3.20 support:
+The enhanced GitHub Actions workflow includes improved verification steps for static binaries using native Ubuntu 22.04 runner. **NEW**: Simplified verification process with glibc 2.35 compatibility.
 
-**Linux Verification with Alpine 3.20:**
+**Linux Verification with Ubuntu 22.04:**
 ```bash
-echo "=== Installing Alpine 3.20 build dependencies ==="
-apk add --no-cache \
-  build-base cmake autoconf automake pkgconf \
-  zlib-dev zlib-static \
-  bzip2-dev bzip2-static \
-  xz-dev xz-static \
-  curl-dev curl-static \
-  openssl-dev openssl-libs-static
+echo "=== Build environment ==="
+gcc --version | head -1
+g++ --version | head -1
+cmake --version | head -1
+ldd --version | head -1
+
+echo "=== Verifying glibc 2.35 compatibility ==="
+ldd --version | head -1
 
 echo "=== Configuring (STATIC_BUILD=ON) ==="
-cmake -B build-static \
-  -DSTATIC_BUILD=ON \
-  -DCMAKE_BUILD_TYPE=Release
+cmake -B build-static -DSTATIC_BUILD=ON -DCMAKE_BUILD_TYPE=Release
 
 echo "=== Building ==="
 cmake --build build-static --config Release
 
-echo "=== Verifying static binary ==="
+echo "=== Verifying binary ==="
 file bin/basevar
-if ldd bin/basevar 2>&1 | grep -q "not a dynamic executable\|statically linked"; then
-  echo "OK: Binary is fully static."
-else
-  echo "WARNING: Binary has dynamic dependencies:" && ldd bin/basevar 2>&1 || true
-fi
+ldd bin/basevar || true
+./bin/basevar | head -3
 ```
 
 **macOS Verification:**
@@ -493,10 +511,12 @@ otool -L bin/basevar
 
 **Section sources**
 - [CMakeLists.txt:23](file://CMakeLists.txt#L23)
-- [CMakeLists.txt:46-62](file://CMakeLists.txt#L46-L62)
-- [CMakeLists.txt:97-135](file://CMakeLists.txt#L97-L135)
-- [CMakeLists.txt:128-165](file://CMakeLists.txt#L128-L165)
-- [.github/workflows/build.yml:83-184](file://.github/workflows/build.yml#L83-L184)
+- [CMakeLists.txt:58-75](file://CMakeLists.txt#L58-L75)
+- [CMakeLists.txt:126-156](file://CMakeLists.txt#L126-L156)
+- [CMakeLists.txt:158-192](file://CMakeLists.txt#L158-L192)
+- [.github/workflows/build.yml:82-93](file://.github/workflows/build.yml#L82-L93)
+- [.github/workflows/build.yml:114-141](file://.github/workflows/build.yml#L114-L141)
+- [.github/workflows/build.yml:158-162](file://.github/workflows/build.yml#L158-L162)
 
 ## Dependency Analysis
 - Internal dependencies:
@@ -504,11 +524,14 @@ otool -L bin/basevar
   - The build ensures htslib is built before the executable.
 - External dependencies:
   - System libraries: pthread, z, bz2, m, lzma, curl, ssl, crypto (conditional).
-  - **NEW**: Static linking requires availability of static archives for compression libraries and enhanced dependency resolution via pkg-config.
+  - **NEW**: Native Ubuntu 22.04 dependency resolution with glibc 2.35 ensuring consistent library availability.
+  - **NEW**: Simplified CI/CD workflow with parallel execution of build jobs.
+  - **NEW**: Platform compatibility requirement updated to glibc ≥ 2.35.
 - htslib internals:
   - htslib's Makefile exposes public headers and build targets for static/shared libraries and tools.
   - Optional plugins and compression libraries are selectable at configure time.
-  - **NEW**: Enhanced static linking with pkg-config --static for better transitive dependency resolution.
+  - **NEW**: Native Ubuntu 22.04 htslib build process ensuring consistent static library generation.
+  - **NEW**: glibc 2.35 compatibility guarantees compatibility with modern Linux distributions.
 
 ```mermaid
 graph TB
@@ -526,7 +549,7 @@ Z["zlib"]
 BZ["bzip2"]
 M["m (libm)"]
 LZ["lzma"]
-CR["curl"]
+CR["curl (system)"]
 SSL["ssl"]
 CRYPTO["crypto"]
 end
@@ -540,14 +563,16 @@ EXE --> CR
 EXE --> SSL
 EXE --> CRYPTO
 HDR --> PUB
-subgraph "Alpine 3.20 Enhancements"
-PKG["pkg-config --static"]
-TRANS["Transitive deps resolution"]
+subgraph "Native Ubuntu 22.04 Approach"
+RUNNER["Native Ubuntu 22.04 Runner"]
+GLIBC["glibc 2.35 compatibility"]
+PARALLEL["Parallel CI/CD workflow"]
+COMPAT["Modern distribution support"]
 end
-PKG --> TRANS
-TRANS --> CR
-TRANS --> SSL
-TRANS --> CRYPTO
+RUNNER --> GLIBC
+GLIBC --> PARALLEL
+PARALLEL --> COMPAT
+COMPAT --> EXE
 ```
 
 **Diagram sources**
@@ -555,7 +580,8 @@ TRANS --> CRYPTO
 - [CMakeLists.txt:61](file://CMakeLists.txt#L61)
 - [CMakeLists.txt:43-46](file://CMakeLists.txt#L43-L46)
 - [htslib/htslib.mk:57-83](file://htslib/htslib.mk#L57-L83)
-- [CMakeLists.txt:134-135](file://CMakeLists.txt#L134-L135)
+- [CMakeLists.txt:158-192](file://CMakeLists.txt#L158-L192)
+- [CMakeLists.txt:160-171](file://CMakeLists.txt#L160-L171)
 
 **Section sources**
 - [CMakeLists.txt:43-61](file://CMakeLists.txt#L43-L61)
@@ -571,17 +597,20 @@ TRANS --> CRYPTO
   - macOS disables compact unwind information to avoid linker issues on some systems.
 - Compression and networking:
   - htslib's autotools configuration detects CPU features and enables SIMD codecs when available, improving decompression performance.
-- **NEW**: Static linking overhead:
-  - Static linking increases binary size but eliminates runtime dependency resolution.
+- **NEW**: Native Ubuntu 22.04 static linking overhead:
+  - Bundles only libstdc++ and libgcc while keeping glibc dynamic, reducing binary size.
+  - **NEW**: Native Ubuntu 22.04 runner ensures consistent performance across different host systems.
   - May slightly reduce startup time by avoiding dynamic loading.
-  - Potential performance impact from larger binary size on memory usage.
-  - **NEW**: pkg-config --static improves build reliability and reduces manual dependency tracking overhead.
+  - **NEW**: glibc 2.35 compatibility ensures compatibility with modern Linux distributions.
+  - **NEW**: Simplified CI/CD workflow eliminates Docker-based complexity and potential performance overhead.
 
 Recommendations:
 - Prefer Release builds for production use.
 - Ensure sufficient virtual memory for multi-threaded variant calling; the project description indicates modest per-thread memory usage when tuned appropriately.
 - **NEW**: Use static builds for environments with limited library availability or strict security requirements.
-- **NEW**: For Linux deployments, consider Alpine 3.20 for optimal static binary compatibility and dependency resolution.
+- **NEW**: For Linux deployments, consider native Ubuntu 22.04 runner for optimal static binary compatibility and musl/glibc compatibility.
+- **NEW**: The native Ubuntu 22.04 approach eliminates segmentation faults and compatibility issues present in previous Docker-based approaches.
+- **NEW**: glibc 2.35 compatibility ensures compatibility with modern Linux distributions and enterprise environments.
 
 **Section sources**
 - [CMakeLists.txt:26](file://CMakeLists.txt#L26)
@@ -592,105 +621,138 @@ Recommendations:
 
 ### Static Build Specific Issues
 
-**Linux Static Build Failures with Alpine 3.20**
-- **Symptom**: Linker errors indicating missing static archives or pkg-config failures
-- **Resolution**: Ensure all required static libraries are available in Alpine 3.20 container. Use the enhanced dependency installation pattern with zlib-static, bzip2-static, xz-static, curl-static, openssl-libs-static packages.
-- **References**: [.github/workflows/build.yml:119-133](file://.github/workflows/build.yml#L119-L133), [CMakeLists.txt:134-142](file://CMakeLists.txt#L134-L142)
-
-**pkg-config --static Dependency Resolution Issues**
-- **Symptom**: pkg-config fails to resolve libcurl transitive dependencies
-- **Resolution**: Verify that libcurl-dev and all required static packages are installed in the Alpine 3.20 container. Check that pkg-config --static --libs libcurl returns proper flags.
-- **References**: [.github/workflows/build.yml:135-136](file://.github/workflows/build.yml#L135-L136), [CMakeLists.txt:134](file://CMakeLists.txt#L134)
+**Linux Static Build Failures with Ubuntu 22.04**
+- **Symptom**: Linker errors indicating missing static archives or dependency issues
+- **Resolution**: Ensure all required static libraries are available in Ubuntu 22.04 environment. The workflow includes proper installation of zlib1g-dev, libbz2-dev, liblzma-dev, libssl-dev packages.
+- **References**: [.github/workflows/build.yml:118-121](file://.github/workflows/build.yml#L118-L121), [CMakeLists.txt:175-179](file://CMakeLists.txt#L175-L179)
 
 **macOS Static Build Library Not Found**
 - **Symptom**: CMake cannot locate static archives for zlib, bzip2, or lzma
 - **Resolution**: Install dependencies via Homebrew and ensure they're built as static libraries. The build expects Homebrew paths. Note that curl, ssl, and crypto remain dynamic on macOS.
-- **References**: [CMakeLists.txt:106-114](file://CMakeLists.txt#L106-L114)
+- **References**: [CMakeLists.txt:135-143](file://CMakeLists.txt#L135-L143)
 
 **macOS Fully Static Limitation**
 - **Symptom**: Static build still has dynamic dependencies
 - **Resolution**: This is expected behavior on macOS. The build statically links third-party libraries while keeping system frameworks dynamic. Use the verification steps to confirm behavior.
-- **References**: [CMakeLists.txt:47-57](file://CMakeLists.txt#L47-L57)
+- **References**: [CMakeLists.txt:59-69](file://CMakeLists.txt#L59-L69)
+
+### Ubuntu 22.04 Compatibility Issues
+
+**Symptom**: Static Linux binary incompatible with systems using older glibc versions
+**Cause**: Platform compatibility requirement updated to glibc ≥ 2.35 (Ubuntu 22.04 runner)
+**Solution**: Ensure deployment environment meets glibc ≥ 2.35 requirement (Ubuntu 22.04+, Debian 12+, Fedora 36+, openSUSE Tumbleweed)
+**Verification**: Check glibc version with `ldd --version`
+
+**References**: [CMakeLists.txt:159-167](file://CMakeLists.txt#L159-L167)
 
 ### CI/CD Workflow Issues
 
 **GitHub Actions Permissions Error**
 - **Symptom**: Release asset upload fails with permission denied
-- **Resolution**: The workflow now includes `permissions: contents: write` configuration. Ensure the workflow has the necessary permissions to upload release assets.
+- **Resolution**: The workflow includes `permissions: contents: write` configuration. Ensure the workflow has the necessary permissions to upload release assets.
 - **References**: [.github/workflows/build.yml:12-13](file://.github/workflows/build.yml#L12-L13)
 
 **Static Build Job Dependencies**
 - **Symptom**: Static build jobs wait for completion of dynamic build jobs
 - **Resolution**: The static build jobs now run independently without `needs:` dependencies, enabling parallel execution. This improves CI/CD performance and reliability.
-- **References**: [.github/workflows/build.yml:87-88](file://.github/workflows/build.yml#L87-L88)
+- **References**: [.github/workflows/build.yml:19-28](file://.github/workflows/build.yml#L19-L28)
 
 **Release Asset Upload Issues**
 - **Symptom**: Release assets not uploaded or incorrect tag targeting
-- **Resolution**: The workflow now uses explicit tag targeting with `${{ github.ref_name }}` for release assets. Verify that the release event is triggered with the correct tag name.
-- **References**: [.github/workflows/build.yml:72-77](file://.github/workflows/build.yml#L72-L77), [.github/workflows/build.yml:178-183](file://.github/workflows/build.yml#L178-L183)
+- **Resolution**: The workflow uses explicit tag targeting with `${{ github.ref_name }}` for release assets. Verify that the release event is triggered with the correct tag name.
+- **References**: [.github/workflows/build.yml:72-77](file://.github/workflows/build.yml#L72-L77), [.github/workflows/build.yml:177-183](file://.github/workflows/build.yml#L177-L183)
+
+### Native Ubuntu 22.04 Build Issues
+
+**Ubuntu 22.04 Runner Environment Problems**
+- **Symptom**: Runner fails to start or build process hangs
+- **Resolution**: Ensure GitHub Actions runner has access to Ubuntu 22.04 environment. The workflow uses `ubuntu-22.04` runner which provides glibc 2.35 compatibility.
+- **References**: [.github/workflows/build.yml:102-107](file://.github/workflows/build.yml#L102-L107)
+
+**Static Library Installation Failures**
+- **Symptom**: Static library installation fails during build
+- **Resolution**: The workflow includes proper installation of static development packages (zlib1g-dev, libbz2-dev, liblzma-dev, libssl-dev). Ensure network connectivity and sufficient disk space.
+- **References**: [.github/workflows/build.yml:118-121](file://.github/workflows/build.yml#L118-L121)
+
+**Static Library Verification Failures**
+- **Symptom**: Static library verification shows missing archives
+- **Resolution**: The workflow performs verification of required static archives (libz.a, libbz2.a, liblzma.a, libssl.a, libcrypto.a). If any are missing, the build fails early to prevent linking errors.
+- **References**: [.github/workflows/build.yml:138-141](file://.github/workflows/build.yml#L138-L141)
 
 ### General Build Issues
 
 **htslib autotools failures**
 - Symptom: configure or make errors in htslib.
 - Resolution: The project's manual installation notes indicate that certain test-related errors can be ignored; the library still builds successfully. Retry autotools steps if transient network issues caused initial failure.
-- References: [README.md:120](file://README.md#L120)
+- References: [README.md:158](file://README.md#L158)
 
 **Missing system libraries**
-- Symptom: Linker errors for missing libraries (e.g., ssl, crypto, bz2, lzma, curl).
-- Resolution: Install the required development packages using your OS package manager. The CI workflow demonstrates the exact packages installed on Linux and macOS, including Alpine 3.20 static packages.
-- References: [.github/workflows/build.yml:32-42](file://.github/workflows/build.yml#L32-L42)
+- **Symptom**: Linker errors for missing libraries (e.g., ssl, crypto, bz2, lzma, curl).
+- **Resolution**: Install the required development packages using your OS package manager. The CI workflow demonstrates the exact packages installed on Linux and macOS, including Ubuntu 22.04 static packages.
+- **References**: [.github/workflows/build.yml:36-41](file://.github/workflows/build.yml#L36-L41)
 
 **macOS-specific linker issues**
-- Symptom: Link-time errors related to compact unwind or symbol visibility.
-- Resolution: The build adds a macOS-specific flag to disable compact unwind; ensure you are using the latest Xcode command line tools.
-- References: [CMakeLists.txt:27-29](file://CMakeLists.txt#L27-L29)
+- **Symptom**: Link-time errors related to compact unwind or symbol visibility.
+- **Resolution**: The build adds a macOS-specific flag to disable compact unwind; ensure you are using the latest Xcode command line tools.
+- **References**: [CMakeLists.txt:27-29](file://CMakeLists.txt#L27-L29)
 
 **Manual linking differences**
-- Symptom: Differences between automated CMake build and manual g++ invocation.
-- Resolution: The manual script shows both approaches (using -lhts vs linking the static archive). Ensure include paths and library order match the CMake configuration.
-- References: [README.md:109-121](file://README.md#L109-L121), [bin/manual_install.sh:4-10](file://bin/manual_install.sh#L4-L10)
+- **Symptom**: Differences between automated CMake build and manual g++ invocation.
+- **Resolution**: The manual script shows both approaches (using -lhts vs linking the static archive). Ensure include paths and library order match the CMake configuration.
+- **References**: [README.md:142-156](file://README.md#L142-L156)
 
 **Version header not updated**
-- Symptom: Version metadata not reflecting project version.
-- Resolution: Re-run CMake configure to regenerate the version header from the template.
-- References: [CMakeLists.txt:17-20](file://CMakeLists.txt#L17-L20), [src/version.h.in:1-13](file://src/version.h.in#L1-L13), [src/version.h:1-13](file://src/version.h#L1-L13)
+- **Symptom**: Version metadata not reflecting project version.
+- **Resolution**: Re-run CMake configure to regenerate the version header from the template. Version updated to 2.2.5 across all build configuration files.
+- **References**: [CMakeLists.txt:17-20](file://CMakeLists.txt#L17-L20), [src/version.h.in:1-13](file://src/version.h.in#L1-L13), [src/version.h:1-13](file://src/version.h#L1-L13)
 
 **Static Binary Verification Issues**
-- Symptom: Static binary still shows dynamic dependencies
-- Resolution: On macOS, this is expected behavior. The build statically links third-party libraries while keeping system frameworks dynamic. Use the verification steps in the CI workflow to confirm behavior.
-- References: [.github/workflows/build.yml:150-156](file://.github/workflows/build.yml#L150-L156), [.github/workflows/build.yml:176-182](file://.github/workflows/build.yml#L176-L182)
+- **Symptom**: Static binary still shows dynamic dependencies
+- **Resolution**: On macOS, this is expected behavior. The build statically links third-party libraries while keeping system frameworks dynamic. Use the verification steps in the CI workflow to confirm behavior.
+- **References**: [.github/workflows/build.yml:158-162](file://.github/workflows/build.yml#L158-L162)
 
-**Alpine 3.20 Container Issues**
-- **Symptom**: Static build fails in Alpine container
-- **Resolution**: Ensure all required static packages are installed (zlib-static, bzip2-static, xz-static, curl-static, openssl-libs-static). Clean stale htslib artifacts before building.
-- **References**: [.github/workflows/build.yml:119-140](file://.github/workflows/build.yml#L119-L140)
+**Ubuntu 22.04 Container Issues**
+- **Symptom**: Static build fails in Ubuntu 22.04 runner environment
+- **Resolution**: Ensure all required static packages are installed (zlib1g-dev, libbz2-dev, liblzma-dev, libssl-dev). Clean stale htslib artifacts before building.
+- **References**: [.github/workflows/build.yml:118-121](file://.github/workflows/build.yml#L118-L121)
+
+**Ubuntu 22.04 Compatibility Issues**
+- **Symptom**: Static Linux binary incompatible with older systems
+- **Cause**: Platform compatibility requirement updated to glibc ≥ 2.35 (Ubuntu 22.04 runner)
+- **Solution**: Deploy on systems meeting glibc ≥ 2.35 requirement (Ubuntu 22.04+, Debian 12+, Fedora 36+, openSUSE Tumbleweed)
+- **Verification**: Check with `ldd --version` and ensure glibc version ≥ 2.35
+- **References**: [CMakeLists.txt:159-167](file://CMakeLists.txt#L159-L167)
 
 **Section sources**
 - [.github/workflows/build.yml:12-13](file://.github/workflows/build.yml#L12-L13)
-- [.github/workflows/build.yml:87-88](file://.github/workflows/build.yml#L87-L88)
+- [.github/workflows/build.yml:19-28](file://.github/workflows/build.yml#L19-L28)
 - [.github/workflows/build.yml:72-77](file://.github/workflows/build.yml#L72-L77)
-- [.github/workflows/build.yml:178-183](file://.github/workflows/build.yml#L178-L183)
-- [CMakeLists.txt:106-114](file://CMakeLists.txt#L106-L114)
-- [CMakeLists.txt:47-57](file://CMakeLists.txt#L47-L57)
-- [README.md:120](file://README.md#L120)
-- [.github/workflows/build.yml:32-42](file://.github/workflows/build.yml#L32-L42)
+- [.github/workflows/build.yml:177-183](file://.github/workflows/build.yml#L177-L183)
+- [CMakeLists.txt:135-143](file://CMakeLists.txt#L135-L143)
+- [CMakeLists.txt:59-69](file://CMakeLists.txt#L59-L69)
+- [README.md:158](file://README.md#L158)
+- [.github/workflows/build.yml:36-41](file://.github/workflows/build.yml#L36-L41)
 - [CMakeLists.txt:27-29](file://CMakeLists.txt#L27-L29)
-- [README.md:109-121](file://README.md#L109-L121)
-- [bin/manual_install.sh:4-10](file://bin/manual_install.sh#L4-L10)
+- [README.md:142-156](file://README.md#L142-L156)
 - [CMakeLists.txt:17-20](file://CMakeLists.txt#L17-L20)
 - [src/version.h.in:1-13](file://src/version.h.in#L1-L13)
 - [src/version.h:1-13](file://src/version.h#L1-L13)
-- [.github/workflows/build.yml:150-156](file://.github/workflows/build.yml#L150-L156)
-- [.github/workflows/build.yml:176-182](file://.github/workflows/build.yml#L176-L182)
+- [.github/workflows/build.yml:158-162](file://.github/workflows/build.yml#L158-L162)
+- [.github/workflows/build.yml:118-121](file://.github/workflows/build.yml#L118-L121)
+- [.github/workflows/build.yml:138-141](file://.github/workflows/build.yml#L138-L141)
+- [CMakeLists.txt:159-167](file://CMakeLists.txt#L159-L167)
 
 ## Conclusion
-BaseVar2's build system centers on a streamlined CMake configuration that embeds htslib via autotools, enforces C++17, applies performance-oriented compiler flags, and links against essential system libraries. **NEW**: The introduction of the STATIC_BUILD CMake option provides comprehensive cross-platform static linking support, enabling the creation of portable, self-contained binaries for both Linux and macOS environments with enhanced Alpine 3.20 support.
+BaseVar2's build system centers on a streamlined CMake configuration that embeds htslib via autotools, enforces C++17, applies performance-oriented compiler flags, and links against essential system libraries. **NEW**: The introduction of the STATIC_BUILD CMake option provides comprehensive cross-platform static linking support, enabling the creation of portable, self-contained binaries for both Linux and macOS environments with native Ubuntu 22.04 approach.
 
-The enhanced CI/CD workflow represents a significant improvement in build automation and release management. **NEW**: The workflow now features improved permissions configuration with `permissions: contents: write` for proper release asset uploads, parallel execution architecture with independent static build jobs, and explicit tag targeting for release assets using `${{ github.ref_name }}`. These enhancements eliminate sequential dependencies between build jobs, improving CI/CD performance and reliability.
+**NEW**: Reverted from Docker-based manylinux2014 approach back to native Ubuntu 22.04 build system for improved simplicity, reliability, and performance. The new approach uses glibc 2.35 compatibility ensuring compatibility with modern Linux distributions while eliminating critical musl/glibc runtime incompatibility issues that caused segmentation faults. The native Ubuntu 22.04 build process guarantees consistent library availability and reproducible builds across different host systems.
 
-The enhanced Linux static build configuration leverages pkg-config --static for improved dependency resolution, eliminating the need for manual tracking of transitive dependencies. The Alpine 3.20 Docker container provides reliable static linking with comprehensive package availability for zlib-static, bzip2-static, xz-static, curl-static, and other required libraries.
+The enhanced CI/CD workflow represents a significant improvement in build automation and release management. **NEW**: The workflow now features native Ubuntu 22.04 runner eliminating Docker-based complexity, improved platform compatibility with glibc ≥ 2.35 requirement, and simplified verification process. These enhancements eliminate sequential dependencies between build jobs, improve CI/CD performance and reliability, and ensure consistent static binary generation.
 
-The CI workflow validates builds on Linux and macOS, ensuring portability and reliability. The enhanced GitHub Actions workflow now includes dedicated static build jobs with Alpine 3.20 specifications and verification steps, demonstrating the practical benefits of static linking for distribution and deployment scenarios.
+The native Ubuntu 22.04 static build configuration eliminates musl/glibc compatibility issues through the native approach. The direct system curl linking and bundled C++ runtime libraries provide better compatibility while maintaining portability across modern Linux distributions with glibc ≥ 2.35.
 
-Following the troubleshooting guidance and using the documented manual linking examples will resolve most build issues. For development, ensure the required system libraries are installed and use Release builds for optimal performance. **NEW**: For environments requiring zero-dependency deployments or strict security policies, utilize the STATIC_BUILD option with the appropriate platform-specific configuration, particularly leveraging Alpine 3.20 for Linux static builds with its improved dependency resolution capabilities. The enhanced CI/CD workflow ensures reliable and efficient distribution of both dynamic and static binaries through parallel execution and improved release asset management.
+The CI workflow validates builds on ubuntu-latest, macos-latest, and native Ubuntu 22.04 runners, ensuring broad platform compatibility and reliability. The enhanced GitHub Actions workflow now includes dedicated static build jobs with native Ubuntu 22.04 specifications and comprehensive verification steps, demonstrating the practical benefits of the native Ubuntu 22.04 static linking approach for distribution and deployment scenarios.
+
+Following the troubleshooting guidance and using the documented manual linking examples will resolve most build issues. For development, ensure the required system libraries are installed and use Release builds for optimal performance. **NEW**: For environments requiring zero-dependency deployments or strict security policies, utilize the STATIC_BUILD option with the appropriate platform-specific configuration, particularly leveraging native Ubuntu 22.04 runner for Linux static builds with its improved compatibility and elimination of musl/glibc issues. The enhanced CI/CD workflow ensures reliable and efficient distribution of both dynamic and static binaries through parallel execution and improved release asset management.
+
+**NEW**: Version 2.2.5 introduces critical stability improvements through the native Ubuntu 22.04 static build approach, making BaseVar2 more robust and compatible across diverse deployment environments while eliminating the segmentation faults present in the previous Docker-based approach. The glibc 2.35 compatibility ensures compatibility with modern Linux distributions and enterprise environments, while the simplified CI/CD workflow provides improved reliability and performance.
