@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)  # C++ 17
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Set the project name
-project (BASEVAR VERSION 2.2.2 LANGUAGES CXX)
+project (BASEVAR VERSION 2.2.3 LANGUAGES CXX)
 
 # Add project metadata
 set(PROJECT_AUTHOR "Shujia Huang")
@@ -75,12 +75,19 @@ if(STATIC_BUILD)
 endif()
 
 # Ensure htslib is built before the main executable.
-# For static builds on Linux, disable libcurl in htslib: BaseVar only reads
-# local BAM/CRAM/FASTA files, so remote-URL support is not needed.
-# This removes curl (and its transitive deps) from the link graph and
-# matches what the dynamic glibc build successfully produces.
+# For static builds on Linux:
+#   * --disable-libcurl  : we only read local files, no remote URLs.
+#   * --without-libdeflate: htslib's ./configure auto-detects libdeflate
+#                          when it is present on the build host (e.g.
+#                          GitHub-hosted ubuntu-22.04 runners have it
+#                          preinstalled), and then emits libhts.a with
+#                          libdeflate_* references.  Since we do not
+#                          link -ldeflate (and want to keep the binary
+#                          dependency-light), we explicitly disable it.
+#                          htslib falls back to zlib transparently with
+#                          no functional loss.
 if(STATIC_BUILD AND NOT APPLE)
-    set(HTSLIB_CONFIGURE_FLAGS --disable-libcurl)
+    set(HTSLIB_CONFIGURE_FLAGS --disable-libcurl --without-libdeflate)
 else()
     set(HTSLIB_CONFIGURE_FLAGS "")
 endif()

@@ -3,8 +3,8 @@
 
 #define BASEVAR_VERSION_MAJOR "2"
 #define BASEVAR_VERSION_MINOR "2"
-#define BASEVAR_VERSION_PATCH "2"
-#define BASEVAR_VERSION "2.2.2"
+#define BASEVAR_VERSION_PATCH "3"
+#define BASEVAR_VERSION "2.2.3"
 #define BASEVAR_AUTHOR "Shujia Huang"
 #define BASEVAR_AUTHOR_EMAIL "hshujia@qq.com"
 #define BASEVAR_DESCRIPTION "BaseVar: Call variants and estimate allele frequency from ultra low-pass (<1x) WGS data"

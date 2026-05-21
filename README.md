@@ -22,21 +22,21 @@ Pre-built static binaries are available on the [GitHub Releases page](https://gi
 
 | Platform | Download | Notes |
 | -------- | -------- | ----- |
-| Linux (x86_64) | [basevar-linux-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.2/basevar-linux-static) | Portable, glibc ≥ 2.31 (Ubuntu 20.04+, Debian 11+, RHEL/CentOS 8+, Fedora 32+) |
-| macOS (arm64 / Intel) | [basevar-macos-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.2/basevar-macos-static) | Best-effort static, requires macOS 12+ |
+| Linux (x86_64) | [basevar-linux-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-linux-static) | Portable, glibc ≥ 2.31 (Ubuntu 20.04+, Debian 11+, RHEL/CentOS 8+, Fedora 32+) |
+| macOS (arm64 / Intel) | [basevar-macos-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-macos-static) | Best-effort static, requires macOS 12+ |
 
 The Linux static binary bundles `libstdc++`, `libgcc`, `htslib`, `zlib`, `bzip2`, `xz` and `openssl` statically; only the system C library (glibc) is linked dynamically. It runs unmodified on any modern glibc-based distribution — no extra packages need to be installed.
 
 ```bash
 # Linux
-wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.2/basevar-linux-static
+wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-linux-static
 chmod +x basevar-linux-static
 ./basevar-linux-static --help
 ```
 
 ```bash
 # macOS
-curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.2/basevar-macos-static
+curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-macos-static
 chmod +x basevar-macos-static
 ./basevar-macos-static --help
 ```
