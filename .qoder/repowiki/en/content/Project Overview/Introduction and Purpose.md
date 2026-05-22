@@ -16,6 +16,13 @@
 - [htslib/thread_pool.c](file://htslib/thread_pool.c)
 </cite>
 
+## Update Summary
+**Changes Made**
+- Updated introduction to reflect improved README.md structural presentation with centered logo and enhanced formatting
+- Enhanced project structure visualization to show improved documentation layout
+- Updated performance considerations section to highlight the 10x speed improvement over the original Python implementation
+- Revised troubleshooting guide to reflect current installation and compilation procedures
+
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Project Structure](#project-structure)
@@ -28,9 +35,17 @@
 9. [Conclusion](#conclusion)
 
 ## Introduction
-BaseVar2 is a specialized variant calling tool designed for ultra-low-depth whole genome sequencing data (sub-1x coverage), with primary application in non-invasive prenatal testing (NIPT). It leverages statistical models grounded in maximum likelihood estimation and likelihood ratio testing to detect polymorphic sites and estimate allele frequencies reliably from sparse, noisy signals. Compared to the original Python implementation, BaseVar2 is implemented in modern C++ and achieves over 10x speedup while dramatically reducing memory footprint—each thread consumes only a fraction of the memory required by the previous version.
+BaseVar2 is a specialized variant calling tool designed for ultra-low-depth whole genome sequencing data (sub-1x coverage), with primary application in non-invasive prenatal testing (NIPT). It leverages statistical models grounded in maximum likelihood estimation and likelihood ratio testing to detect polymorphic sites and estimate allele frequencies reliably from sparse, noisy signals. 
 
-This document introduces BaseVar2’s purpose, capabilities, and scientific foundations, and provides conceptual guidance for users working with ultra-low-depth datasets and NIPT applications.
+The tool represents a significant advancement over the original Python implementation, delivering over **10×** performance improvement while dramatically reducing memory footprint—each thread consumes only 3–4 GB of memory compared to 20+ GB in the previous version. This performance boost is achieved through modern C++17 implementation with optimized algorithms and efficient memory management.
+
+**Updated** Enhanced README.md structure now features a centered logo and improved formatting for better navigation and user experience.
+
+This document introduces BaseVar2's purpose, capabilities, and scientific foundations, and provides conceptual guidance for users working with ultra-low-depth datasets and NIPT applications.
+
+**Section sources**
+- [README.md:1-181](file://README.md#L1-L181)
+- [README.md:18-18](file://README.md#L18-L18)
 
 ## Project Structure
 At a high level, BaseVar2 comprises:
@@ -214,8 +229,11 @@ Practical tips:
 - Use regional calling (-r) to reduce runtime for targeted analyses
 - Prefer indexed BAM/CRAM and compressed VCF output for I/O efficiency
 
+**Updated** Enhanced README.md structure provides clearer installation options and performance comparisons with the original Python implementation.
+
 **Section sources**
 - [README.md:9-11](file://README.md#L9-L11)
+- [README.md:18-18](file://README.md#L18-L18)
 - [CMakeLists.txt:22-29](file://CMakeLists.txt#L22-L29)
 - [README.md:109-144](file://README.md#L109-L144)
 
@@ -226,10 +244,15 @@ Common issues and resolutions:
 - I/O errors: Verify BAM/CRAM and VCF indices exist; ensure file permissions and paths are correct.
 - Unexpected runtime: Confirm reference FASTA and indexing are consistent with input data.
 
+**Updated** Installation process now offers three clear options: pre-built binaries, source compilation, and manual g++ compilation for maximum flexibility.
+
 **Section sources**
 - [README.md:19-107](file://README.md#L19-L107)
+- [README.md:28-171](file://README.md#L28-L171)
 - [src/io/bam.h:101-101](file://src/io/bam.h#L101-L101)
 - [src/io/vcf.h:116-116](file://src/io/vcf.h#L116-L116)
 
 ## Conclusion
 BaseVar2 delivers a robust, high-performance solution for ultra-low-depth variant calling, especially suited to NIPT applications. By combining precise statistical modeling with efficient C++ implementation and parallel processing, it enables accurate polymorphism detection and allele frequency estimation from challenging, low-coverage datasets. Its modular design and strong I/O foundation make it suitable for both research-scale analyses and production pipelines.
+
+The improved README.md structure enhances accessibility and provides users with clear pathways to installation and usage, while maintaining the technical depth required for bioinformatics researchers working with ultra-low-depth sequencing data.

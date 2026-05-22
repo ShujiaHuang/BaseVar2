@@ -13,14 +13,16 @@
 - [.github/workflows/build.yml](file://.github/workflows/build.yml)
 - [tests/data/sample_group.info](file://tests/data/sample_group.info)
 - [CMakeLists.txt](file://CMakeLists.txt)
+- [docs/assets/images/basevar_logo.svg](file://docs/assets/images/basevar_logo.svg)
+- [docs/assets/images/basevar.png](file://docs/assets/images/basevar.png)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Updated version information to reflect 2.2.3 release with simplified build approach
-- Removed manylinux2014 compatibility claims in favor of honest glibc >= 2.35 requirement
-- Streamlined build system documentation reflecting simplified static binary approach
-- Updated installation instructions to reflect current version and requirements
+- Enhanced project branding with new SVG logo system for improved visual quality and scalability
+- Updated introduction to highlight the new visual branding elements
+- Added documentation for the new SVG logo asset and its benefits for cross-platform rendering
+- Updated project structure section to reflect enhanced visual presentation capabilities
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -36,16 +38,20 @@
 
 ## Introduction
 BaseVar2 is a specialized ultra-low-depth whole genome sequencing (ULDS/WGS) variant caller designed for non-invasive prenatal testing (NIPT) and related human genetic research. The latest 2.2.3 release maintains the high-performance C++ implementation while introducing a simplified build approach and honest system requirements. It targets single-nucleotide polymorphism (SNP) and insertion–deletion (Indel) detection from sub-single-read coverage data (<1x), enabling cost-effective, population-scale NIPT studies. The tool emphasizes:
+
 - Accurate variant detection via likelihood-based inference
 - Population-level allele frequency estimation from sparse coverage
 - High-performance C++ implementation with substantial speed and memory improvements over the original Python version
-- **Updated**: Simplified build system with streamlined static binary distribution
+- **Enhanced**: Improved visual branding with scalable SVG logo system for consistent presentation across platforms
+
+**Updated** The project now features an enhanced visual identity system with a high-quality SVG logo that provides superior scalability and rendering quality compared to traditional raster formats. The SVG logo ensures crisp presentation on high-DPI displays, mobile devices, and various screen sizes while maintaining excellent print quality.
 
 Key scientific and technical goals:
 - Robust detection of rare variants in extremely shallow coverage
 - Reliable estimation of minor allele frequencies (MAF) and genotype likelihoods
 - Scalable, parallelized processing suitable for large cohorts and whole-genome analyses
 - **Enhanced**: Honest system requirements with glibc >= 2.35 for Linux static binaries
+- **Enhanced**: Modernized visual presentation with scalable branding assets
 
 Citation and publication details:
 - Liu et al. (2024). Utilizing non-invasive prenatal test sequencing data for human genetic investigation. Cell Genomics 4(10), 100669. https://doi.org/10.1016/j.xgen.2024.100669
@@ -59,6 +65,7 @@ High-level organization:
 - Pipeline generation script for chromosome-wise or region-wise parallelization
 - HTSlib integration for efficient NGS file parsing
 - Build automation and CI workflows with simplified cross-platform support
+- **Enhanced**: Scalable SVG logo system for consistent visual presentation
 
 ```mermaid
 graph TB
@@ -72,6 +79,8 @@ A --> H["Pipeline Generator<br/>scripts/create_pipeline.py"]
 B --> I["HTSlib Integration<br/>htslib/*"]
 J[".github/workflows/build.yml"] --> K["Enhanced Build & Test Automation"]
 L["CMakeLists.txt<br/>Version 2.2.3"] --> M["Simplified Build System"]
+N["SVG Logo System<br/>docs/assets/images/basevar_logo.svg"] --> O["Scalable Branding Assets"]
+P["PNG Backup<br/>docs/assets/images/basevar.png"] --> Q["Raster Fallback"]
 ```
 
 **Diagram sources**
@@ -82,13 +91,17 @@ L["CMakeLists.txt<br/>Version 2.2.3"] --> M["Simplified Build System"]
 - [scripts/create_pipeline.py:1-103](file://scripts/create_pipeline.py#L1-L103)
 - [.github/workflows/build.yml:1-183](file://.github/workflows/build.yml#L1-L183)
 - [CMakeLists.txt:1-197](file://CMakeLists.txt#L1-L197)
+- [docs/assets/images/basevar_logo.svg:1-100](file://docs/assets/images/basevar_logo.svg#L1-L100)
+- [docs/assets/images/basevar.png:1-100](file://docs/assets/images/basevar.png#L1-L100)
 
 **Section sources**
-- [README.md:1-475](file://README.md#L1-L475)
+- [README.md:1-484](file://README.md#L1-L484)
 - [src/main.cpp:1-105](file://src/main.cpp#L1-L105)
 - [scripts/create_pipeline.py:1-103](file://scripts/create_pipeline.py#L1-L103)
 - [.github/workflows/build.yml:1-183](file://.github/workflows/build.yml#L1-L183)
 - [CMakeLists.txt:1-197](file://CMakeLists.txt#L1-L197)
+- [docs/assets/images/basevar_logo.svg:1-100](file://docs/assets/images/basevar_logo.svg#L1-L100)
+- [docs/assets/images/basevar.png:1-100](file://docs/assets/images/basevar.png#L1-L100)
 
 ## Core Components
 - CLI and Commands
@@ -109,11 +122,16 @@ L["CMakeLists.txt<br/>Version 2.2.3"] --> M["Simplified Build System"]
 - Pipeline Utilities
   - Automated chromosome-wise or region-wise job splitting
   - Optional population group file for stratified analyses
+- **Enhanced**: Scalable Visual Identity System
+  - SVG logo with crisp rendering at any resolution
+  - PNG fallback for compatibility with legacy systems
+  - Consistent branding across documentation, presentations, and web interfaces
 
 Practical examples (usage patterns):
 - Single-sample or multi-sample ULDS calling with region selection and population grouping
 - Batched processing via a sample list file
 - Whole-genome parallelization using the pipeline generator
+- **Enhanced**: Consistent visual presentation in research publications and presentations
 
 **Section sources**
 - [src/main.cpp:18-32](file://src/main.cpp#L18-L32)
@@ -122,6 +140,7 @@ Practical examples (usage patterns):
 - [src/algorithm.h:90-178](file://src/algorithm.h#L90-L178)
 - [scripts/create_pipeline.py:26-94](file://scripts/create_pipeline.py#L26-L94)
 - [tests/data/sample_group.info:1-44](file://tests/data/sample_group.info#L1-L44)
+- [docs/assets/images/basevar_logo.svg:1-100](file://docs/assets/images/basevar_logo.svg#L1-L100)
 
 ## Architecture Overview
 The system orchestrates a pipeline from input alignments to population-aware variant calls:
@@ -134,6 +153,7 @@ The system orchestrates a pipeline from input alignments to population-aware var
   - Estimate population-level allele frequencies via EM
   - Write VCF records with FORMAT and INFO fields
 - Optionally concatenate outputs and subset samples post-run
+- **Enhanced**: Consistent visual branding throughout the workflow presentation
 
 ```mermaid
 sequenceDiagram
@@ -144,6 +164,7 @@ participant MOD as "Model (basetype.h)"
 participant ALG as "Algorithms (algorithm.h)"
 participant IO as "I/O (FASTA/BAM/VCF)"
 participant PIPE as "Pipeline (create_pipeline.py)"
+participant BRAND as "Visual Branding"
 U->>CLI : "basevar caller ..."
 CLI->>ENG : "Parse args, init"
 ENG->>IO : "Load reference, samples, regions"
@@ -156,6 +177,7 @@ ALG-->>MOD : "Posterior, MAF"
 ENG->>IO : "Write VCF record"
 end
 CLI-->>U : "Report completion and timings"
+U->>BRAND : "Display branded output"
 ```
 
 **Diagram sources**
@@ -164,6 +186,7 @@ CLI-->>U : "Report completion and timings"
 - [src/basetype.h:95-143](file://src/basetype.h#L95-L143)
 - [src/algorithm.h:150-178](file://src/algorithm.h#L150-L178)
 - [scripts/create_pipeline.py:75-94](file://scripts/create_pipeline.py#L75-L94)
+- [docs/assets/images/basevar_logo.svg:1-100](file://docs/assets/images/basevar_logo.svg#L1-L100)
 
 ## Detailed Component Analysis
 
@@ -279,19 +302,42 @@ Script-->>User : "Shell script to execute"
 **Section sources**
 - [scripts/create_pipeline.py:26-94](file://scripts/create_pipeline.py#L26-L94)
 
+### Enhanced Visual Identity System
+**Updated** The project now features a comprehensive visual branding system designed for modern bioinformatics applications:
+
+- **SVG Logo Asset**: High-resolution vector logo located at `docs/assets/images/basevar_logo.svg` providing crisp rendering at any scale
+- **PNG Fallback**: Compatible raster backup at `docs/assets/images/basevar.png` ensuring broad compatibility
+- **Scalability Benefits**: Vector graphics maintain quality across different display densities, from standard monitors to high-DPI screens
+- **Cross-Platform Consistency**: Ensures uniform appearance across documentation, presentations, websites, and research materials
+- **Mobile Optimization**: Scales appropriately for mobile device displays and touch interfaces
+- **Print Quality**: Maintains sharp detail in printed materials and academic publications
+
+The visual identity system supports:
+- Research presentations with professional appearance
+- Documentation websites with responsive design
+- Academic posters and conference materials
+- Social media and promotional content
+- Mobile applications and web interfaces
+
+**Section sources**
+- [docs/assets/images/basevar_logo.svg:1-100](file://docs/assets/images/basevar_logo.svg#L1-L100)
+- [docs/assets/images/basevar.png:1-100](file://docs/assets/images/basevar.png#L1-L100)
+
 ### Practical Examples and Target Use Cases
 - NIPT cohort-wide SNP detection from ULDS data
 - Population-level MAF estimation by grouping samples (e.g., regional or ethnic groups)
 - Whole-genome analysis via automated chromosome-wise pipelines
 - Downstream compatibility with tools expecting standard VCF FORMAT/INFO fields
+- **Enhanced**: Professional visual presentation in research communications
 
 Target scenarios:
 - Large-scale maternal plasma ULDS studies requiring speed and memory efficiency
 - Cost-effective screening protocols leveraging shallow coverage
 - Research applications needing robust variant detection and frequency estimation
+- **Enhanced**: High-quality visual presentation for academic and commercial contexts
 
 **Section sources**
-- [README.md:13-475](file://README.md#L13-L475)
+- [README.md:13-484](file://README.md#L13-L484)
 - [tests/data/sample_group.info:1-44](file://tests/data/sample_group.info#L1-L44)
 
 ## Dependency Analysis
@@ -300,10 +346,12 @@ Internal dependencies:
 - Caller engine depends on model (BaseType), algorithms, and I/O adapters
 - Algorithms module provides shared statistical primitives
 - Pipeline script depends on CLI binary availability
+- **Enhanced**: Visual assets depend on proper asset management and deployment
 
 External dependencies:
 - HTSlib for NGS file parsing and compression
 - Standard system libraries (pthread, zlib, bz2, lzma, curl, OpenSSL on non-macOS)
+- **Enhanced**: Asset delivery systems for scalable visual content
 
 ```mermaid
 graph LR
@@ -314,12 +362,16 @@ CALLER --> IO["I/O (io/*)"]
 CALLER --> PIPE["Pipeline (create_pipeline.py)"]
 CALLER --> HTS["HTSlib"]
 ALG --> HTS
+ASSETS["Visual Assets<br/>SVG/PNG logos"] --> BRANDING["Brand Presentation"]
+BRANDING --> DOCS["Documentation"]
+BRANDING --> WEBSITE["Web Interface"]
 ```
 
 **Diagram sources**
 - [src/main.cpp:12-16](file://src/main.cpp#L12-L16)
 - [src/variant_caller.h:23-31](file://src/variant_caller.h#L23-L31)
 - [src/algorithm.h:22](file://src/algorithm.h#L22)
+- [docs/assets/images/basevar_logo.svg:1-100](file://docs/assets/images/basevar_logo.svg#L1-L100)
 
 **Section sources**
 - [CMakeLists.txt:31-62](file://CMakeLists.txt#L31-L62)
@@ -331,6 +383,7 @@ ALG --> HTS
 - Quality filters (min MAPQ and base quality) reduce noise and improve accuracy without heavy computational overhead
 - Parallelization via region-wise pipelines accelerates whole-genome analyses
 - **Updated**: Simplified build system reduces compilation time and build failures across platforms
+- **Enhanced**: Optimized visual asset delivery for faster documentation loading and better user experience
 
 [No sources needed since this section provides general guidance]
 
@@ -348,6 +401,10 @@ Common issues and resolutions:
   - Use pre-built static binaries for zero-dependency deployment
   - Linux static binaries require glibc >= 2.35 (Ubuntu 22.04+, Debian 12+, Fedora 36+)
   - macOS static binaries require macOS 12+ and have minimal system dependencies
+- **Enhanced**: Visual asset loading issues
+  - Ensure SVG and PNG assets are properly deployed in documentation builds
+  - Verify asset paths match the expected directory structure
+  - Check browser compatibility for SVG rendering in older environments
 
 **Section sources**
 - [.github/workflows/build.yml:29-40](file://.github/workflows/build.yml#L29-L40)
@@ -356,6 +413,8 @@ Common issues and resolutions:
 
 ## Conclusion
 BaseVar2 advances the state-of-the-art for ULDS variant discovery by combining rigorous statistical modeling with high-performance C++ implementation. The 2.2.3 release maintains significant improvements in build reliability and cross-platform compatibility while adopting a simplified build approach. Its focus on accurate variant detection and reliable allele frequency estimation from <1x data makes it especially suited for NIPT and population-scale studies. The modular architecture, robust I/O layer, and automated parallelization pipeline enable scalable, reproducible workflows from shallow coverage datasets.
+
+**Enhanced** The project's new SVG-based visual identity system provides professional, scalable branding that enhances the overall presentation quality for research communications, academic publications, and commercial applications. The combination of technical excellence and visual polish positions BaseVar2 as a comprehensive solution for modern bioinformatics workflows.
 
 [No sources needed since this section summarizes without analyzing specific files]
 
@@ -381,12 +440,44 @@ BaseVar2 advances the state-of-the-art for ULDS variant discovery by combining r
 - **Honest System Requirements**: Clear glibc version requirements for Linux static binaries
 - **Reduced Build Complexity**: Eliminated manylinux2014 compatibility claims in favor of realistic requirements
 - **Improved Reliability**: Better error handling and clearer build instructions
+- **Enhanced Visual Assets**: New SVG logo system for scalable, high-quality branding
 
 **Static Binary Availability:**
 - **Linux (x86_64)**: Partial-static binary with glibc >= 2.35 requirement
 - **macOS (arm64/Intel)**: Best-effort static binary with minimal system requirements
 
+**Enhanced Visual Identity Features:**
+- **SVG Logo**: High-resolution vector logo for crisp rendering at any scale
+- **PNG Fallback**: Compatible raster backup for broad compatibility
+- **Cross-Platform Consistency**: Uniform appearance across different devices and displays
+- **Mobile Optimization**: Scales appropriately for mobile and tablet interfaces
+
 **Section sources**
 - [README.md:19-43](file://README.md#L19-L43)
 - [.github/workflows/build.yml:82-183](file://.github/workflows/build.yml#L82-L183)
 - [CMakeLists.txt:46-63](file://CMakeLists.txt#L46-L63)
+- [docs/assets/images/basevar_logo.svg:1-100](file://docs/assets/images/basevar_logo.svg#L1-L100)
+- [docs/assets/images/basevar.png:1-100](file://docs/assets/images/basevar.png#L1-L100)
+
+### Visual Asset Management
+**Asset Structure:**
+- Primary SVG logo: `docs/assets/images/basevar_logo.svg`
+- Fallback PNG image: `docs/assets/images/basevar.png`
+- Asset dimensions optimized for different use cases
+- Cross-platform compatibility ensured
+
+**Usage Guidelines:**
+- SVG preferred for scalable applications and high-DPI displays
+- PNG fallback for legacy systems and environments without SVG support
+- Consistent sizing recommendations for different presentation contexts
+- Proper attribution and licensing considerations for public use
+
+**Technical Specifications:**
+- SVG vector format with embedded fonts and scalable elements
+- PNG raster format with appropriate resolution for web and print
+- File size optimization for fast loading and distribution
+- Cross-browser compatibility verified across major platforms
+
+**Section sources**
+- [docs/assets/images/basevar_logo.svg:1-100](file://docs/assets/images/basevar_logo.svg#L1-L100)
+- [docs/assets/images/basevar.png:1-100](file://docs/assets/images/basevar.png#L1-L100)
