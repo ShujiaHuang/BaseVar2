@@ -31,12 +31,14 @@ If you use `BaseVar` in your research work, please cite the following paper:
 
 ### Option 1 — Download pre-built binary (Recommended, no compilation needed)
 
+https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static
+
 Pre-built static binaries are available on the [GitHub Releases page](https://github.com/ShujiaHuang/BaseVar2/releases).
 
 | Platform | Download | Notes |
 | -------- | -------- | ----- |
-| Linux (x86_64) | [basevar-linux-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-linux-static) | Requires **glibc ≥ 2.35** (see below) |
-| macOS (arm64 / Intel) | [basevar-macos-static](https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-macos-static) | Requires **macOS 12+** |
+| Linux (x86_64) | [basevar-linux-static](https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static) | Requires **glibc ≥ 2.35** (see below) |
+| macOS (arm64 / Intel) | [basevar-macos-static](https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-macos-static) | Requires **macOS 12+** |
 
 #### System requirements for `basevar-linux-static`
 

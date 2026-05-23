@@ -3,21 +3,29 @@
 <cite>
 **Referenced Files in This Document**
 - [README.md](file://README.md)
+- [.gitmodules](file://.gitmodules)
 - [CMakeLists.txt](file://CMakeLists.txt)
+- [.github/workflows/build.yml](file://.github/workflows/build.yml)
 - [src/main.cpp](file://src/main.cpp)
 - [src/variant_caller.h](file://src/variant_caller.h)
 - [src/basetype.h](file://src/basetype.h)
 - [src/algorithm.h](file://src/algorithm.h)
 - [src/version.h.in](file://src/version.h.in)
 - [src/io/bam.h](file://src/io/bam.h)
-- [.github/workflows/build.yml](file://.github/workflows/build.yml)
 - [scripts/create_pipeline.py](file://scripts/create_pipeline.py)
-- [bin/manual_install.sh](file://bin/manual_install.sh)
 - [note.md](file://note.md)
 - [update_note.md](file://update_note.md)
 - [tests/io/test_bam.cpp](file://tests/io/test_bam.cpp)
 - [tests/io/test_algorithm.cpp](file://tests/io/test_algorithm.cpp)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Updated dependency management section to reflect git submodule integration with external htslib
+- Revised development environment setup to emphasize submodule initialization
+- Updated build system documentation to show custom htslib build target
+- Added submodule workflow documentation for development and CI processes
+- Enhanced troubleshooting section with submodule-related guidance
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -42,15 +50,17 @@
 ## Introduction
 BaseVar2 is a C++-based tool designed for variant calling from ultra-low-coverage whole-genome sequencing data, particularly suited for non-invasive prenatal testing applications. It leverages maximum likelihood and likelihood ratio models to detect polymorphisms and estimate allele frequencies efficiently. The project emphasizes high performance and memory efficiency, with a modern C++17 codebase and integrated htslib for NGS file I/O.
 
+**Updated** The project now uses an external git submodule for htslib integration, replacing the previous embedded implementation approach. This change improves maintainability and allows for easier updates to the underlying htslib library.
+
 ## Project Structure
 The repository is organized into core source modules, I/O wrappers for NGS formats, tests, scripts, and build configuration. Key areas include:
 - src/: Core C++ implementation, including the main entry point, variant caller engine, algorithm utilities, and I/O abstractions.
 - src/io/: Thin wrappers around htslib for BAM/CRAM/SAM and FASTA/VCF parsing and writing.
-- htslib/: Bundled submodule for NGS file format support.
+- htslib/: Git submodule containing the external htslib dependency.
 - tests/: Unit tests for I/O and algorithmic components.
 - scripts/: Pipeline generation utilities for distributed execution.
 - .github/workflows/: CI configuration for cross-platform builds and testing.
-- Root build and documentation files (CMakeLists.txt, README.md, etc.).
+- Root build and documentation files (CMakeLists.txt, README.md, .gitmodules, etc.).
 
 ```mermaid
 graph TB
@@ -64,22 +74,27 @@ H["CMakeLists.txt"] --> A
 H --> I["src/version.h.in"]
 J[".github/workflows/build.yml"] --> H
 K["scripts/create_pipeline.py"] --> A
+L[".gitmodules"] --> M["htslib/ (submodule)"]
+N["htslib/htslib/"] --> O["htslib headers"]
+N --> P["htslib sources"]
 ```
 
 **Diagram sources**
-- [src/main.cpp:1-93](file://src/main.cpp#L1-L93)
+- [src/main.cpp:1-105](file://src/main.cpp#L1-L105)
 - [src/variant_caller.h:1-180](file://src/variant_caller.h#L1-L180)
 - [src/basetype.h:1-146](file://src/basetype.h#L1-L146)
 - [src/algorithm.h:1-180](file://src/algorithm.h#L1-L180)
 - [src/io/bam.h:1-149](file://src/io/bam.h#L1-L149)
-- [CMakeLists.txt:1-62](file://CMakeLists.txt#L1-L62)
+- [CMakeLists.txt:1-197](file://CMakeLists.txt#L1-L197)
 - [src/version.h.in:1-13](file://src/version.h.in#L1-L13)
-- [.github/workflows/build.yml:1-78](file://.github/workflows/build.yml#L1-L78)
-- [scripts/create_pipeline.py:1-103](file://scripts/create_pipeline.py#L1-L103)
+- [.github/workflows/build.yml:1-183](file://.github/workflows/build.yml#L1-L183)
+- [scripts/create_pipeline.py:1-247](file://scripts/create_pipeline.py#L1-L247)
+- [.gitmodules:1-4](file://.gitmodules#L1-L4)
 
 **Section sources**
-- [README.md:1-181](file://README.md#L1-L181)
-- [CMakeLists.txt:1-62](file://CMakeLists.txt#L1-L62)
+- [README.md:1-488](file://README.md#L1-L488)
+- [CMakeLists.txt:1-197](file://CMakeLists.txt#L1-L197)
+- [.gitmodules:1-4](file://.gitmodules#L1-L4)
 
 ## Core Components
 - Main entry point and CLI dispatcher: routes subcommands to specific runners.
@@ -96,7 +111,7 @@ Key responsibilities:
 - src/io/bam.h: Wraps htslib for reading indexed NGS alignments.
 
 **Section sources**
-- [src/main.cpp:1-93](file://src/main.cpp#L1-L93)
+- [src/main.cpp:1-105](file://src/main.cpp#L1-L105)
 - [src/variant_caller.h:1-180](file://src/variant_caller.h#L1-L180)
 - [src/basetype.h:1-146](file://src/basetype.h#L1-L146)
 - [src/algorithm.h:1-180](file://src/algorithm.h#L1-L180)
@@ -129,7 +144,7 @@ Runner-->>CLI : Exit status and timing
 ```
 
 **Diagram sources**
-- [src/main.cpp:43-92](file://src/main.cpp#L43-L92)
+- [src/main.cpp:45-104](file://src/main.cpp#L45-L104)
 - [src/variant_caller.h:160-174](file://src/variant_caller.h#L160-L174)
 - [src/basetype.h:95-143](file://src/basetype.h#L95-L143)
 - [src/io/bam.h:106-143](file://src/io/bam.h#L106-L143)
@@ -159,12 +174,12 @@ RunSubsam --> End
 ```
 
 **Diagram sources**
-- [src/main.cpp:43-92](file://src/main.cpp#L43-L92)
+- [src/main.cpp:45-104](file://src/main.cpp#L45-L104)
 
 **Section sources**
-- [src/main.cpp:17-30](file://src/main.cpp#L17-L30)
-- [src/main.cpp:32-41](file://src/main.cpp#L32-L41)
-- [src/main.cpp:43-92](file://src/main.cpp#L43-L92)
+- [src/main.cpp:18-32](file://src/main.cpp#L18-L32)
+- [src/main.cpp:34-41](file://src/main.cpp#L34-L41)
+- [src/main.cpp:45-104](file://src/main.cpp#L45-L104)
 
 ### Variant Caller Engine
 - Manages command-line arguments, sample IDs, population groups, and calling intervals.
@@ -242,7 +257,7 @@ class BaseType {
 - [src/basetype.h:29-143](file://src/basetype.h#L29-L143)
 
 ### Algorithm Utilities
-- Provides statistical tests (Chi-square, Fisher’s exact, Wilcoxon rank-sum), summary statistics, and EM routines.
+- Provides statistical tests (Chi-square, Fisher's exact, Wilcoxon rank-sum), summary statistics, and EM routines.
 
 ```mermaid
 flowchart TD
@@ -309,13 +324,17 @@ Emit --> End(["Done"])
 - [scripts/create_pipeline.py:26-94](file://scripts/create_pipeline.py#L26-L94)
 
 ## Dependency Analysis
-- Build system: CMake enforces C++17, configures version header, builds htslib as a prerequisite, and links system libraries.
-- Runtime dependencies: htslib (static or shared), zlib, bz2, lzma, pthread, curl, ssl/crypto (Linux).
+- Build system: CMake enforces C++17, configures version header, builds htslib as a custom target, and links system libraries.
+- Runtime dependencies: External htslib submodule (statically linked), zlib, bz2, lzma, pthread, curl, ssl/crypto (Linux).
 - Version metadata: Generated from version.h.in via CMake configure_file.
+
+**Updated** The dependency management now uses a git submodule for htslib, which is built as part of the main build process. The CMake configuration includes a custom target that runs autoreconf, configure, and make to build htslib within the project.
 
 ```mermaid
 graph TB
-CMake["CMakeLists.txt"] --> Htslib["htslib (built)"]
+CMake["CMakeLists.txt"] --> Submodule["Git Submodule: htslib/"]
+Submodule --> BuildTarget["Custom Target: Buildhts"]
+BuildTarget --> Htslib["htslib/libhts.a"]
 CMake --> Src["src/*.cpp + src/io/*.cpp"]
 Src --> Bin["bin/basevar"]
 CMake --> Ver["src/version.h.in -> src/version.h"]
@@ -323,12 +342,14 @@ Bin --> SysLibs["System libs: pthread, z, bz2, m, lzma, curl, ssl, crypto"]
 ```
 
 **Diagram sources**
-- [CMakeLists.txt:32-61](file://CMakeLists.txt#L32-L61)
-- [src/version.h.in:1-13](file://src/version.h.in#L1-L13)
+- [CMakeLists.txt:95-113](file://CMakeLists.txt#L95-L113)
+- [CMakeLists.txt:112](file://CMakeLists.txt#L112)
+- [CMakeLists.txt:196](file://CMakeLists.txt#L196)
+- [src/version.h.in:1-13](file://src/version.h.in#L1-13)
 
 **Section sources**
-- [CMakeLists.txt:1-62](file://CMakeLists.txt#L1-L62)
-- [bin/manual_install.sh:1-13](file://bin/manual_install.sh#L1-L13)
+- [CMakeLists.txt:1-197](file://CMakeLists.txt#L1-L197)
+- [.gitmodules:1-4](file://.gitmodules#L1-L4)
 
 ## Performance Considerations
 - Compilation flags: Optimized builds with aggressive optimization and position-independent code.
@@ -336,8 +357,6 @@ Bin --> SysLibs["System libs: pthread, z, bz2, m, lzma, curl, ssl, crypto"]
 - Parallelism: Multi-threaded processing of genomic regions; consider tuning thread counts and batch sizes for throughput vs. memory trade-offs.
 - I/O efficiency: Index-aware fetching and streaming reads to minimize disk access.
 - Statistical computations: Efficient matrix operations and iterative algorithms (EM) with early stopping criteria.
-
-[No sources needed since this section provides general guidance]
 
 ## Testing Procedures
 - Unit tests: Located under tests/, covering I/O and algorithmic components.
@@ -351,24 +370,28 @@ Recommended steps:
 - Verify algorithmic tests for statistical functions.
 
 **Section sources**
-- [.github/workflows/build.yml:50-53](file://.github/workflows/build.yml#L50-L53)
+- [.github/workflows/build.yml:57-59](file://.github/workflows/build.yml#L57-L59)
 - [tests/io/test_bam.cpp:1-112](file://tests/io/test_bam.cpp#L1-L112)
 - [tests/io/test_algorithm.cpp:1-43](file://tests/io/test_algorithm.cpp#L1-L43)
 
 ## Development Environment Setup
 - Prerequisites: C++17-capable compiler, CMake, Git, and system libraries (zlib, bz2, lzma, pthread, curl, ssl/crypto on Linux).
-- Recommended build method: CMake-based build with htslib built as part of the project.
+- Recommended build method: CMake-based build with htslib built as part of the project via git submodule.
 - Alternative manual build: Provided script demonstrates linking against system or bundled htslib.
 
+**Updated** Development environment setup now requires proper git submodule initialization. The project uses a git submodule for htslib, so developers must ensure the submodule is properly initialized and updated.
+
 Steps:
-- Clone repository and initialize submodules.
+- Clone repository with submodules: `git clone --recursive https://github.com/ShujiaHuang/basevar2.git`
+- Or if you forgot `--recursive`: `git submodule update --init --recursive`
 - Configure with CMake and build.
 - Optionally enable tests and run ctest.
 
 **Section sources**
-- [README.md:19-107](file://README.md#L19-L107)
+- [README.md:100-107](file://README.md#L100-L107)
+- [README.md:107](file://README.md#L107)
 - [CMakeLists.txt:22-46](file://CMakeLists.txt#L22-L46)
-- [bin/manual_install.sh:1-13](file://bin/manual_install.sh#L1-L13)
+- [.gitmodules:1-4](file://.gitmodules#L1-4)
 
 ## Contribution Guidelines
 - Coding standards: Use C++17 features, RAII, STL containers, and avoid global mutable state. Keep functions and classes cohesive and focused.
@@ -377,15 +400,17 @@ Steps:
 - Documentation: Add comments for complex logic and maintain inline documentation for public APIs.
 - Commit hygiene: Keep commits atomic and well-described; reference issues in commit messages.
 
-[No sources needed since this section provides general guidance]
-
 ## Version Control Practices
 - Branching: Develop features on topic branches; merge to main via pull requests.
 - Tags: Use semantic versioning for releases; update version.h.in accordingly.
 - Changelog: Maintain update notes for major changes and breaking updates.
+- Submodules: When updating htslib submodule, ensure proper submodule commit updates and rebuild.
+
+**Updated** Version control practices now include submodule management. When updating the htslib dependency, developers should update the submodule reference and rebuild the project.
 
 **Section sources**
 - [update_note.md:1-36](file://update_note.md#L1-L36)
+- [.gitmodules:1-4](file://.gitmodules#L1-L4)
 
 ## Pull Request Guidelines
 - Scope: Limit PRs to a single concern; reference related issues.
@@ -393,10 +418,8 @@ Steps:
 - Reviews: Request reviews from maintainers; address feedback promptly.
 - Description: Summarize changes, rationale, and migration notes for breaking changes.
 
-[No sources needed since this section provides general guidance]
-
 ## Code Review Process
-- Automated checks: CI validates builds on multiple platforms.
+- Automated checks: CI validates builds on multiple platforms with submodule support.
 - Human review: Ensure adherence to style, correctness, and performance expectations.
 - Approval: Require at least one maintainer approval before merging.
 
@@ -417,7 +440,7 @@ Guidance:
 **Section sources**
 - [src/io/bam.h:23-145](file://src/io/bam.h#L23-L145)
 - [src/algorithm.h:90-178](file://src/algorithm.h#L90-L178)
-- [src/main.cpp:17-30](file://src/main.cpp#L17-L30)
+- [src/main.cpp:18-32](file://src/main.cpp#L18-L32)
 
 ## Maintaining Backward Compatibility
 - API stability: Avoid removing or renaming public methods and classes.
@@ -441,13 +464,17 @@ Guidance:
 ## Troubleshooting Guide
 Common issues and resolutions:
 - Build failures due to missing dependencies: Install required system packages (zlib, bz2, lzma, curl, ssl/crypto).
-- htslib build errors: Ignore non-critical test warnings during htslib configure/make; the library should still compile.
+- htslib build errors: The project now uses a git submodule approach; ensure proper submodule initialization with `git submodule update --init --recursive`.
 - Linker errors: Ensure correct linking order and inclusion of all required system libraries.
 - Runtime crashes: Validate input files and indices; check region specifications.
+- Submodule issues: If htslib fails to build, verify the submodule is properly initialized and the htslib directory contains the expected structure.
+
+**Updated** Troubleshooting now includes specific guidance for git submodule issues. The project uses a git submodule for htslib, so developers encountering build issues should first verify proper submodule initialization.
 
 **Section sources**
 - [README.md:70-84](file://README.md#L70-L84)
 - [CMakeLists.txt:42-46](file://CMakeLists.txt#L42-L46)
+- [.gitmodules:1-4](file://.gitmodules#L1-L4)
 
 ## Conclusion
-BaseVar2 offers a robust, high-performance framework for ultra-low-coverage variant calling. Contributors should focus on modular design, rigorous testing, and careful attention to performance and compatibility. The documented architecture and CI practices provide a solid foundation for extending functionality while maintaining reliability.
+BaseVar2 offers a robust, high-performance framework for ultra-low-coverage variant calling. The recent transition to git submodule integration for htslib improves maintainability while preserving the project's performance characteristics. Contributors should focus on modular design, rigorous testing, and careful attention to performance and compatibility. The documented architecture, CI practices, and submodule management provide a solid foundation for extending functionality while maintaining reliability.

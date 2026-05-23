@@ -5,23 +5,22 @@
 - [README.md](file://README.md)
 - [CMakeLists.txt](file://CMakeLists.txt)
 - [src/main.cpp](file://src/main.cpp)
-- [src/variant_caller.h](file://src/variant_caller.h)
+- [src/version.h.in](file://src/version.h.in)
+- [build/CMakeCache.txt](file://build/CMakeCache.txt)
+- [htslib/INSTALL](file://htslib/INSTALL)
 - [scripts/create_pipeline.py](file://scripts/create_pipeline.py)
 - [tests/data/sample_group.info](file://tests/data/sample_group.info)
 - [tests/io/make.sh](file://tests/io/make.sh)
-- [htslib/INSTALL](file://htslib/INSTALL)
-- [src/version.h.in](file://src/version.h.in)
-- [build/CMakeCache.txt](file://build/CMakeCache.txt)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Updated version references from 2.2.5 to 2.2.3 throughout the Getting Started documentation
-- Corrected download links in installation examples to point to v2.2.3 releases
-- Updated system requirements to reflect glibc >= 2.35 requirement for basevar-linux-static
-- Added comprehensive system requirements section with compatibility matrix and troubleshooting guidance
+- Enhanced installation documentation with three installation approaches: pre-built binaries, source compilation, and manual compilation
+- Updated system requirements to include C++17 compiler and CMake ≥ 3.12
+- Added comprehensive platform-specific compatibility matrix with glibc version requirements
+- Updated version references to reflect 2.2.3 throughout the documentation
 - Enhanced static binary compatibility notes for Linux glibc environments
-- Updated troubleshooting guidance to reflect improved static binary compatibility fixes
+- Added detailed troubleshooting guidance for all installation methods
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -36,14 +35,14 @@
 10. [Appendices](#appendices)
 
 ## Introduction
-BaseVar2 is a C++ tool designed for variant calling from ultra-low-coverage whole-genome sequencing data (typically below 1x), with a focus on non-invasive prenatal testing (NIPT) applications. It efficiently estimates allele frequencies and produces VCF output using maximum likelihood and likelihood ratio models. This guide helps you install BaseVar2 via two methods, verify your installation, and run your first variant calling analyses from BAM files.
+BaseVar2 is a C++ tool designed for variant calling from ultra-low-coverage whole-genome sequencing data (typically below 1x), with a focus on non-invasive prenatal testing (NIPT) applications. It efficiently estimates allele frequencies and produces VCF output using maximum likelihood and likelihood ratio models. This guide helps you install BaseVar2 via three methods, verify your installation, and run your first variant calling analyses from BAM files.
 
 **Section sources**
-- [README.md:1-17](file://README.md#L1-L17)
+- [README.md:11-20](file://README.md#L11-L20)
 
 ## Installation Options
 
-BaseVar2 provides two installation methods, each suited for different use cases and environments:
+BaseVar2 provides three installation methods, each suited for different use cases and environments:
 
 ### Option 1: Pre-built Static Binary (Recommended - No Compilation)
 Download pre-built static binaries that require zero runtime dependencies and run on any modern Linux distribution or macOS.
@@ -72,7 +71,7 @@ chmod +x basevar-macos-static
 **Updated** Download links now point to version 2.2.3 releases with improved static binary compatibility.
 
 **Section sources**
-- [README.md:19-42](file://README.md#L19-L42)
+- [README.md:32-92](file://README.md#L32-L92)
 
 ### Option 2: Compile from Source (CMake Method)
 **Prerequisites**: C++17 compiler (GCC 7+ or Apple Clang 10+), CMake ≥ 3.12, and system libraries: zlib, bzip2, xz-utils, libcurl.
@@ -114,8 +113,36 @@ cmake --build build-static
 **Updated** Static binary compatibility has been improved with better glibc environment support and enhanced linker flags.
 
 **Section sources**
-- [README.md:46-94](file://README.md#L46-L94)
+- [README.md:96-142](file://README.md#L96-L142)
 - [CMakeLists.txt:22-62](file://CMakeLists.txt#L22-L62)
+
+### Option 3: Manual g++ Compilation (Fallback)
+**Prerequisites**: C++17 compiler, autotools, and system libraries.
+
+**Step 1**: Build htslib
+```bash
+cd htslib && autoreconf -i && ./configure && make && cd ..
+```
+
+**Step 2**: Compile manually
+**Linux:**
+```bash
+cd bin/
+g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a \
+    -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -lssl -lcrypto -o basevar
+```
+
+**macOS:**
+```bash
+cd bin/
+g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a \
+    -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -o basevar
+```
+
+**Note**: If you encounter a `test/test_khash.c` compilation error during `make` in htslib, you can safely ignore it — the required `libhts.a` archive is still produced correctly.
+
+**Section sources**
+- [README.md:145-172](file://README.md#L145-L172)
 
 ## Quick Start Examples
 
@@ -187,7 +214,7 @@ basevar caller \
 ```
 
 **Section sources**
-- [README.md:171-247](file://README.md#L171-L247)
+- [README.md:222-303](file://README.md#L222-L303)
 
 ## Command Reference
 
@@ -203,7 +230,7 @@ Commands:
 ```
 
 **Section sources**
-- [README.md:124-136](file://README.md#L124-L136)
+- [README.md:175-185](file://README.md#L175-L185)
 
 ### BaseVar Caller Parameters
 
@@ -238,7 +265,7 @@ Optional options:
 ```
 
 **Section sources**
-- [README.md:138-169](file://README.md#L138-L169)
+- [README.md:189-221](file://README.md#L189-L221)
 
 ### BaseVar Pipeline Parameters
 
@@ -258,7 +285,7 @@ Optional:
 **Updated** Pipeline functionality is now built directly into the basevar binary as a native C++ subcommand, with the legacy Python script remaining for backward compatibility.
 
 **Section sources**
-- [README.md:249-267](file://README.md#L249-L267)
+- [README.md:307-325](file://README.md#L307-L325)
 
 ### BaseVar Concat Parameters
 
@@ -274,7 +301,7 @@ Optional:
 ```
 
 **Section sources**
-- [README.md:334-347](file://README.md#L334-L347)
+- [README.md:396-408](file://README.md#L396-L408)
 
 ### BaseVar Subsam Parameters
 
@@ -293,7 +320,7 @@ Options:
 ```
 
 **Section sources**
-- [README.md:362-377](file://README.md#L362-L377)
+- [README.md:425-441](file://README.md#L425-L441)
 
 ## Whole-Genome Pipeline
 
@@ -311,7 +338,7 @@ For whole-genome variant calling, the pipeline generator creates sub-region comm
 **Updated** The pipeline functionality is now integrated into the main basevar binary, providing better performance and reliability compared to the legacy Python implementation.
 
 **Section sources**
-- [README.md:255-264](file://README.md#L255-L264)
+- [README.md:313-321](file://README.md#L313-L321)
 
 ### Pipeline Examples
 
@@ -375,7 +402,7 @@ basevar concat -L vcf.list -o final_output.vcf.gz
 ```
 
 **Section sources**
-- [README.md:268-328](file://README.md#L268-L328)
+- [README.md:326-391](file://README.md#L326-L391)
 - [scripts/create_pipeline.py:138-200](file://scripts/create_pipeline.py#L138-L200)
 
 ## System Requirements
@@ -437,7 +464,7 @@ ldd --version | head -1
 **Resolution**: If you see this error or are on an incompatible distribution, use Option 2 (compile from source) instead.
 
 **Section sources**
-- [README.md:48](file://README.md#L48)
+- [README.md:41-79](file://README.md#L41-L79)
 - [CMakeLists.txt:4-6](file://CMakeLists.txt#L4-L6)
 - [CMakeLists.txt:75-79](file://CMakeLists.txt#L75-L79)
 - [htslib/INSTALL:31-42](file://htslib/INSTALL#L31-L42)
@@ -454,6 +481,12 @@ ldd --version | head -1
 ```bash
 ./bin/basevar --help
 # Should display the same usage information as pre-built binary
+```
+
+### Verify Manual Compilation
+```bash
+cd bin && ./basevar --help
+# Should display usage information and confirm successful compilation
 ```
 
 ### Quick Smoke Test
@@ -474,7 +507,7 @@ basevar caller \
 - Memory usage should be reasonable for the test size
 
 **Section sources**
-- [README.md:171-179](file://README.md#L171-L179)
+- [README.md:222-231](file://README.md#L222-L231)
 - [src/main.cpp:18-32](file://src/main.cpp#L18-L32)
 
 ## Best Practices
@@ -498,7 +531,7 @@ basevar caller \
 - **Sample naming**: Ensure consistent naming conventions for optimal performance
 
 **Section sources**
-- [README.md:404-411](file://README.md#L404-L411)
+- [README.md:468-475](file://README.md#L468-L475)
 
 ## Troubleshooting Guide
 
@@ -517,6 +550,11 @@ basevar caller \
 **Linker errors on macOS**
 - Adjust flags as needed; the build system adds a macOS-specific flag to accommodate platform differences
 - For static builds, ensure all required libraries are available via Homebrew
+
+**Manual compilation issues**
+- Ensure all required system libraries are installed
+- Check that the C++17 standard is supported by your compiler
+- Verify that autotools are properly installed for htslib compilation
 
 **Network/cloud storage access**
 - Enable libcurl and, on non-macOS systems, OpenSSL for S3/GCS support if required
@@ -564,11 +602,11 @@ basevar caller \
 **Updated** Version is now 2.2.3 with improved static binary compatibility and better environment detection.
 
 **Section sources**
-- [README.md:48](file://README.md#L48)
+- [README.md:41-79](file://README.md#L41-L79)
 - [CMakeLists.txt:46-62](file://CMakeLists.txt#L46-L62)
 - [CMakeLists.txt:75-79](file://CMakeLists.txt#L75-L79)
 - [htslib/INSTALL:252-278](file://htslib/INSTALL#L252-L278)
-- [README.md:404-411](file://README.md#L404-L411)
+- [README.md:468-475](file://README.md#L468-L475)
 
 ## Appendices
 
@@ -581,19 +619,18 @@ basevar caller \
 
 **Section sources**
 - [src/main.cpp:18-32](file://src/main.cpp#L18-L32)
-- [src/variant_caller.h:169-173](file://src/variant_caller.h#L169-L173)
 
 ### B. Version Metadata
 - Version and author metadata are configured via CMake and templated into the version header
 - Current version: 2.2.3
 - Author: Shujia Huang
 
-**Updated** Version has been reverted to 2.2.3 with improved static binary compatibility and bug fixes.
+**Updated** Version has been updated to 2.2.3 with improved static binary compatibility and bug fixes.
 
 **Section sources**
 - [src/version.h.in:1-13](file://src/version.h.in#L1-L13)
 - [CMakeLists.txt:8-20](file://CMakeLists.txt#L8-L20)
-- [build/CMakeCache.txt:150](file://build/CMakeCache.txt#L150)
+- [build/CMakeCache.txt:149](file://build/CMakeCache.txt#L149)
 
 ### C. Test Utilities
 - The tests/io/make.sh script demonstrates linking and running unit tests for IO components, which can serve as a reference for verifying your own linking
@@ -614,4 +651,4 @@ basevar caller \
   ```
 
 **Section sources**
-- [README.md:414-424](file://README.md#L414-L424)
+- [README.md:478-487](file://README.md#L478-L487)

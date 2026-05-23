@@ -14,17 +14,15 @@
 - [README.md](file://README.md)
 - [sample_group.info](file://tests/data/sample_group.info)
 - [bam90.list](file://tests/data/bam90.list)
-- [create_pipeline.py](file://scripts/create_pipeline.py)
-- [test_pipeline.cpp](file://tests/io/test_pipeline.cpp)
 </cite>
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive documentation for the new `basevar pipeline` subcommand
-- Updated architecture overview to include the pipeline subcommand
-- Enhanced performance considerations section with pipeline-specific guidance
-- Added detailed examples for whole-genome pipeline generation
-- Updated troubleshooting guide with pipeline-specific error handling
+- Comprehensive documentation for all three main commands: caller, pipeline, and concat
+- Detailed parameter references with defaults and validation rules
+- Practical usage examples for single-sample, multi-sample, and whole-genome workflows
+- Parameter interaction guidance and performance optimization tips
+- Output format specifications and file handling details
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -38,7 +36,7 @@
 9. [Conclusion](#conclusion)
 
 ## Introduction
-This document provides a comprehensive command-line interface (CLI) reference for BaseVar2, focusing on the four primary commands: caller, pipeline, concat, and subsam. It explains syntax, parameters, defaults, output formats, and practical usage scenarios. Special emphasis is placed on the caller command's extensive parameter set, including quality thresholds, batch processing, threading, and population analysis options. The new pipeline subcommand provides superior performance and maintainability through native C++ implementation while preserving full backward compatibility with existing workflows.
+This document provides a comprehensive command-line interface (CLI) reference for BaseVar2, covering all four primary commands: caller, pipeline, concat, and subsam. It explains syntax, parameters, defaults, output formats, and practical usage scenarios. The caller command focuses on ultra-low-pass WGS variant calling with population-aware allele frequency estimation. The pipeline subcommand generates per-region caller commands for whole-genome analysis. The concat command merges BaseVar-produced VCF files, while subsam extracts specified samples with optional INFO recalculation.
 
 ## Project Structure
 BaseVar2 exposes a unified CLI via a single executable with subcommands routed from the main entry point. Each subcommand is implemented in dedicated modules:
@@ -61,15 +59,15 @@ D --> E
 ```
 
 **Diagram sources**
-- [main.cpp:43-92](file://src/main.cpp#L43-L92)
-- [variant_caller.cpp:1-120](file://src/variant_caller.cpp#L1-L120)
+- [main.cpp:45-104](file://src/main.cpp#L45-L104)
+- [variant_caller.cpp:11-48](file://src/variant_caller.cpp#L11-L48)
 - [pipeline.cpp:1-476](file://src/pipeline.cpp#L1-L476)
 - [concat.cpp:27-90](file://src/concat.cpp#L27-L90)
 - [vcf_subset_samples.cpp:117-119](file://src/vcf_subset_samples.cpp#L117-L119)
 
 **Section sources**
-- [main.cpp:17-30](file://src/main.cpp#L17-L30)
-- [README.md:124-134](file://README.md#L124-L134)
+- [main.cpp:18-32](file://src/main.cpp#L18-L32)
+- [README.md:175-185](file://README.md#L175-L185)
 
 ## Core Components
 - Caller command: Reads indexed alignment files (BAM/CRAM/SAM), builds batch files per genomic region, performs parallel variant discovery, and outputs a merged VCF with population-specific INFO fields.
@@ -78,14 +76,14 @@ D --> E
 - Subsam command: Extracts specified samples from a VCF, optionally recalculates INFO fields (AC/AN/AF/CAF), and writes a subset VCF/BCF.
 
 Key defaults and behaviors:
-- Caller defaults: min-af, min-mapq, min-baseq, batch-count, thread count, and optional population grouping.
+- Caller defaults: min-af (auto-calculated as min(0.001, 100/N)), min-mapq (5), min-baseq (10), batch-count (500), thread count (hardware concurrency), and optional population grouping.
 - Pipeline defaults: outdir (required), ref_fai (required), delta (2,000,000 bp), chrom filter (all chromosomes).
 - Concat defaults: requires an output file; accepts a file list and positional inputs.
 - Subsam defaults: determines output mode by extension; can preserve all sites or filter monomorphic sites.
 
 **Section sources**
-- [variant_caller.h:44-71](file://src/variant_caller.h#L44-L71)
-- [variant_caller.cpp:11-48](file://src/variant_caller.cpp#L11-L48)
+- [variant_caller.h:63-71](file://src/variant_caller.h#L63-L71)
+- [variant_caller.cpp:130-149](file://src/variant_caller.cpp#L130-L149)
 - [pipeline.h:97-102](file://src/pipeline.h#L97-L102)
 - [concat.cpp:28-38](file://src/concat.cpp#L28-L38)
 - [vcf_subset_samples.cpp:7-22](file://src/vcf_subset_samples.cpp#L7-L22)
@@ -111,7 +109,7 @@ M-->>U : completion summary
 ```
 
 **Diagram sources**
-- [main.cpp:55-61](file://src/main.cpp#L55-L61)
+- [main.cpp:56-61](file://src/main.cpp#L56-L61)
 - [pipeline.cpp:367-392](file://src/pipeline.cpp#L367-L392)
 - [pipeline.cpp:416-432](file://src/pipeline.cpp#L416-L432)
 - [pipeline.cpp:459-469](file://src/pipeline.cpp#L459-L469)
@@ -119,51 +117,45 @@ M-->>U : completion summary
 ## Detailed Component Analysis
 
 ### Pipeline Command
-**Updated** Enhanced with native C++ implementation providing superior performance and maintainability while preserving full backward compatibility.
+The pipeline subcommand generates per-region `basevar caller` commands for whole-genome calling. It provides native C++ implementation with superior performance characteristics while maintaining full backward compatibility with existing workflows.
 
-- Purpose: Generate per-region `basevar caller` commands for whole-genome calling. Native C++ implementation replaces the legacy Python script with improved performance characteristics.
-- Required arguments:
-  - -o, --outdir: Output directory for per-region VCF files and logs (required)
-  - --ref_fai: Reference FASTA index file (.fai) used to determine chromosome lengths (required)
-- Optional arguments:
-  - -d, --delta: Size of each sub-region in bp (default: 2,000,000)
-  - -c, --chrom: Only process these comma-delimited chromosomes (e.g., chr1,chr2)
-  - -h, --help: Print usage
+**Purpose**: Generate per-region `basevar caller` commands for whole-genome calling. Native C++ implementation replaces the legacy Python script with improved performance characteristics.
 
-**Enhanced Performance Features:**
-- Native C++ implementation with superior runtime performance
-- Optimized memory management and string handling
-- Direct filesystem operations without Python overhead
-- Improved error handling and validation
-- Maintains byte-perfect compatibility with legacy Python script output
+**Required arguments**:
+- -o, --outdir: Output directory for per-region VCF files and logs (required)
+- --ref_fai: Reference FASTA index file (.fai) used to determine chromosome lengths (required)
 
-**Pass-through Options:**
-All other options (`-f`, `-L`, `-r`, `-Q`, `-q`, `-B`, `-t`, `--filename-has-samplename`, `--pop-group`, ...) are passed through verbatim to `basevar caller` without modification.
+**Optional arguments**:
+- -d, --delta: Size of each sub-region in bp (default: 2,000,000)
+- -c, --chrom: Only process these comma-delimited chromosomes (e.g., chr1,chr2)
+- -h, --help: Print usage
 
-**Behavior:**
+**Pass-through Options**: All other options (`-f`, `-L`, `-r`, `-Q`, `-q`, `-B`, `-t`, `--filename-has-samplename`, `--pop-group`, ...) are passed through verbatim to `basevar caller` without modification.
+
+**Behavior**:
 - Loads chromosome lengths from .fai file and splits genome into sub-regions
 - Generates one `basevar caller` command per sub-region with proper logging
 - Supports both whole-genome and targeted region processing
 - Produces shell script output suitable for sequential, parallel, or cluster execution
 
-**Output formats and file handling:**
+**Output formats and file handling**:
 - Writes generated shell commands to stdout (redirect to file for execution)
 - Each sub-job creates individual VCF files with log files in the specified output directory
 - Uses `time` command wrapper and completion markers for progress tracking
 
-**Practical usage scenarios:**
+**Practical usage scenarios**:
 - Whole-genome analysis: Generate pipeline for all chromosomes with default 2 Mb window size
 - Targeted analysis: Process specific chromosomes or regions with custom window sizes
 - High-performance computing: Execute generated pipeline with GNU parallel or job schedulers
 - Legacy compatibility: Byte-perfect output matches original Python script for seamless migration
 
-**Parameter interactions and best practices:**
+**Parameter interactions and best practices**:
 - delta parameter controls sub-region size; smaller values increase parallelization but also job overhead
 - chrom filter reduces processing to specific chromosomes for faster targeted analysis
 - Pass-through options are forwarded unchanged to basevar caller for automatic support of new features
 - Output directory structure maintains compatibility with downstream processing workflows
 
-**Examples (syntax only):**
+**Examples (syntax only)**:
 - Generate whole-genome pipeline with default settings
   - basevar pipeline -o /path/to/outdir --ref_fai reference.fasta.fai -f reference.fasta -L bam.list -Q 20 -q 30 -B 500 -t 4 > basevar_wgs.sh
 - Process single chromosome with larger window size
@@ -171,63 +163,57 @@ All other options (`-f`, `-L`, `-r`, `-Q`, `-q`, `-B`, `-t`, `--filename-has-sam
 - Targeted regions with custom window size
   - basevar pipeline -o /path/to/outdir --ref_fai reference.fasta.fai -d 1000000 -r chr11:5000000-7000000,chr17 -f reference.fasta -L bam.list -Q 20 -q 30 -B 500 -t 4 > basevar.targets.sh
 
-**Legacy Compatibility:**
-- Full backward compatibility with `scripts/create_pipeline.py` output
-- Replace `basevar pipeline` with `basevar=./bin/basevar python scripts/create_pipeline.py` for legacy workflows
-- Identical command structure and output format maintained
+**Legacy Compatibility**: Full backward compatibility with `scripts/create_pipeline.py` output. Replace `basevar pipeline` with `basevar=./bin/basevar python scripts/create_pipeline.py` for legacy workflows.
 
 **Section sources**
 - [pipeline.h:1-125](file://src/pipeline.h#L1-L125)
-- [pipeline.cpp:1-476](file://src/pipeline.cpp#L1-L476)
-- [README.md:249-331](file://README.md#L249-L331)
-- [create_pipeline.py:1-247](file://scripts/create_pipeline.py#L1-L247)
-- [test_pipeline.cpp:1-248](file://tests/io/test_pipeline.cpp#L1-L248)
+- [pipeline.cpp:218-251](file://src/pipeline.cpp#L218-L251)
+- [pipeline.cpp:262-472](file://src/pipeline.cpp#L262-L472)
+- [README.md:307-393](file://README.md#L307-L393)
 
 ### Caller Command
-- Purpose: Ultra-low-pass WGS variant calling with allele frequency estimation and optional population grouping.
-- Required arguments:
-  - -f, --reference: Reference FASTA file
-  - -o, --output: Output VCF file (supports .gz and .bcf via extension)
-- Optional arguments:
-  - -L, --align-file-list: File containing one alignment path per line
-  - -r, --regions: Comma-delimited list of regions (e.g., chr:start-end)
-  - -G, --pop-group: Population group file mapping sample to group
-  - -m, --min-af: Minimum alternate frequency threshold (default derived)
-  - -Q, --min-BQ: Minimum base quality (default 10)
-  - -q, --mapq: Minimum mapping quality (default 5)
-  - -B, --batch-count: Samples per batch file (default 500)
-  - -t, --thread: Number of threads (default hardware concurrency)
-  - --filename-has-samplename: Infer sample IDs from filenames
-  - --smart-rerun: Reuse existing batchfiles and indexes
-  - -h, --help: Print usage
+The caller command performs ultra-low-pass WGS variant calling with allele frequency estimation and optional population grouping.
 
-**Enhanced Performance Features:**
-- Optimized memory management for large-scale batch processing
-- Improved threading model with better resource utilization
-- Enhanced quality filtering algorithms
-- Better error handling and validation
+**Purpose**: Ultra-low-pass WGS variant calling with allele frequency estimation and optional population grouping.
 
-Parameter defaults and behavior:
+**Required arguments**:
+- -f, --reference: Reference FASTA file
+- -o, --output: Output VCF file (supports .gz and .bcf via extension)
+
+**Optional arguments**:
+- -L, --align-file-list: File containing one alignment path per line
+- -r, --regions: Comma-delimited list of regions (e.g., chr:start-end)
+- -G, --pop-group: Population group file mapping sample to group
+- -m, --min-af: Minimum alternate frequency threshold (default derived)
+- -Q, --min-BQ: Minimum base quality (default 10)
+- -q, --mapq: Minimum mapping quality (default 5)
+- -B, --batch-count: Samples per batch file (default 500)
+- -t, --thread: Number of threads (default hardware concurrency)
+- --filename-has-samplename: Infer sample IDs from filenames
+- --smart-rerun: Reuse existing batchfiles and indexes
+- -h, --help: Print usage
+
+**Parameter defaults and behavior**:
 - Defaults are defined in the argument struct and adjusted based on input count and hardware capabilities.
 - Regions can be specified as a list; if omitted, the whole genome is processed.
 - Population grouping enables INFO fields like DP_group and AF_group in the output VCF.
 
-Output formats and file handling:
+**Output formats and file handling**:
 - Output VCF is bgzip-compressed when suffixed with .gz and indexed with tbi.
 - Temporary batch files are created per interval and removed after merging unless smart rerun is enabled.
 
-Practical usage scenarios:
+**Practical usage scenarios**:
 - Single sample: Provide one alignment file and a reference FASTA.
 - Multi-sample: Supply multiple alignment files or a list file.
 - Large-scale batch: Use regions to split workload and increase thread count; adjust batch-count to balance memory and throughput.
 
-Parameter interactions and best practices:
+**Parameter interactions and best practices**:
 - min-af is internally reduced to min(default, 100/N) where N is the number of input files.
 - Higher thread counts improve throughput but increase memory usage; tune -B accordingly.
 - Using --filename-has-samplename avoids parsing RG tags and speeds up sample ID inference.
 - --smart-rerun accelerates reprocessing by skipping existing batchfiles and indexes.
 
-Examples (syntax only):
+**Examples (syntax only)**:
 - Single sample with region and population grouping
   - basevar caller -f ref.fa -o out.vcf.gz -Q 20 -q 30 -B 500 -t 12 -r chr1:1000000-2000000 -G group.tsv --filename-has-samplename in.bam
 - Multi-sample with list and regions
@@ -243,26 +229,30 @@ Examples (syntax only):
 - [variant_caller.cpp:440-495](file://src/variant_caller.cpp#L440-L495)
 - [variant_caller.cpp:842-894](file://src/variant_caller.cpp#L842-L894)
 - [variant_caller.cpp:1219-1302](file://src/variant_caller.cpp#L1219-L1302)
-- [README.md:109-147](file://README.md#L109-L147)
+- [README.md:189-304](file://README.md#L189-L304)
 - [sample_group.info:1-44](file://tests/data/sample_group.info#L1-L44)
 - [bam90.list:1-91](file://tests/data/bam90.list#L1-L91)
 
 ### Concat Command
-- Purpose: Concatenate BaseVar-produced VCF files into a single output.
-- Required arguments:
-  - -o, --output: Output VCF file
-- Optional arguments:
-  - -L, --file-list: File containing one VCF path per line
-  - -h, --help: Print usage
+The concat command concatenates BaseVar-produced VCF files into a single output.
 
-Behavior:
+**Purpose**: Concatenate BaseVar-produced VCF files into a single output.
+
+**Required arguments**:
+- -o, --output: Output VCF file
+
+**Optional arguments**:
+- -L, --file-list: File containing one VCF path per line
+- -h, --help: Print usage
+
+**Behavior**:
 - Reads header from the first input file and appends subsequent files in order.
 - Does not sort positions; users must ensure concat order is appropriate.
 
-Output formats and file handling:
+**Output formats and file handling**:
 - Output format inferred from extension (.gz implies bgzip-compressed VCF).
 
-Examples (syntax only):
+**Examples (syntax only)**:
 - Concatenate multiple VCFs from a list
   - basevar concat -o merged.vcf.gz -L vcf.list in1.vcf.gz in2.vcf.gz
 - Concatenate from positional arguments
@@ -271,28 +261,33 @@ Examples (syntax only):
 **Section sources**
 - [concat.cpp:28-38](file://src/concat.cpp#L28-L38)
 - [concat.cpp:27-90](file://src/concat.cpp#L27-L90)
+- [README.md:396-422](file://README.md#L396-L422)
 
 ### Subsam Command
-- Purpose: Extract specified samples from a VCF and optionally recalculate INFO fields (AC/AN/AF/CAF).
-- Required arguments:
-  - -i, --input: Input VCF/BCF file
-  - -o, --output: Output VCF/BCF file
-- Optional arguments:
-  - -s, --sample-list: File containing sample names (one per line)
-  - -O, --output-type: Output type v|z|b|u (v: VCF, z: bgzip-compressed VCF, b: BCF, u: uncompressed BCF)
-  - --no-update-info: Do not recalculate INFO fields
-  - --keep-all-site: Keep sites with only reference alleles among extracted samples
-  - -h, --help: Print usage
+The subsam command extracts specified samples from a VCF and optionally recalculates INFO fields.
 
-Behavior:
+**Purpose**: Extract specified samples from a VCF and optionally recalculate INFO fields (AC/AN/AF/CAF).
+
+**Required arguments**:
+- -i, --input: Input VCF/BCF file
+- -o, --output: Output VCF/BCF file
+
+**Optional arguments**:
+- -s, --sample-list: File containing sample names (one per line)
+- -O, --output-type: Output type v|z|b|u (v: VCF, z: bgzip-compressed VCF, b: BCF, u: uncompressed BCF)
+- --no-update-info: Do not recalculate INFO fields
+- --keep-all-site: Keep sites with only reference alleles among extracted samples
+- -h, --help: Print usage
+
+**Behavior**:
 - Validates presence of requested samples in the header.
 - Creates a subset header and writes records with cleaned genotypes.
 - Optionally recalculates AC/AN/AF/CAF and filters monomorphic sites depending on flags.
 
-Output formats and file handling:
+**Output formats and file handling**:
 - Output mode determined by -O or guessed from extension.
 
-Examples (syntax only):
+**Examples (syntax only)**:
 - Extract two samples and compress output
   - basevar subsam -i in.vcf.gz -o out.vcf.gz -s samples.txt -O z sampleA sampleB
 - Keep all sites and avoid INFO recalculation
@@ -302,6 +297,7 @@ Examples (syntax only):
 - [vcf_subset_samples.cpp:7-22](file://src/vcf_subset_samples.cpp#L7-L22)
 - [vcf_subset_samples.cpp:25-114](file://src/vcf_subset_samples.cpp#L25-L114)
 - [vcf_subset_samples.cpp:224-316](file://src/vcf_subset_samples.cpp#L224-L316)
+- [README.md:425-465](file://README.md#L425-L465)
 
 ## Dependency Analysis
 The CLI relies on a small set of internal modules and htslib for IO. The caller command composes several stages with explicit dependencies:
@@ -337,20 +333,16 @@ D --> E
 - [vcf_subset_samples.cpp:16-18](file://src/vcf_subset_samples.cpp#L16-L18)
 
 ## Performance Considerations
-**Enhanced** Updated with pipeline-specific performance guidance and native C++ implementation benefits.
-
 - Threading: Increase -t for throughput; monitor memory usage. Typical per-thread memory footprint scales with -B and region size.
 - Batch sizing: Reduce -B to decrease memory consumption per batch; increase -B to reduce overhead when many small batches are created.
 - Smart rerun: Use --smart-rerun to reuse existing batchfiles and indexes, reducing repeated IO.
 - Regions: Limit analysis to targeted regions to reduce runtime and memory.
 - Output compression: Prefer .gz output for large files to reduce disk IO overhead.
-- **Pipeline Performance**: The native C++ implementation provides superior performance compared to the legacy Python script while maintaining full backward compatibility. Use `basevar pipeline` for optimal performance in whole-genome workflows.
-- **Delta sizing**: Choose appropriate sub-region size (-d/--delta) based on computational resources and desired parallelization level.
-- **Memory estimation**: Pipeline memory usage scales with number of sub-jobs and per-job memory requirements.
+- Pipeline Performance: The native C++ implementation provides superior performance compared to the legacy Python script while maintaining full backward compatibility. Use `basevar pipeline` for optimal performance in whole-genome workflows.
+- Delta sizing: Choose appropriate sub-region size (-d/--delta) based on computational resources and desired parallelization level.
+- Memory estimation: Pipeline memory usage scales with number of sub-jobs and per-job memory requirements.
 
 ## Troubleshooting Guide
-**Enhanced** Updated with pipeline-specific error handling and compatibility guidance.
-
 Common issues and resolutions:
 - Missing required arguments: Ensure -f/--reference, -o/--output, and input alignment files are provided for caller; -i/-o for subsam; -o for concat; -o/--outdir and --ref_fai for pipeline.
 - Invalid parameter ranges: min-af, min-BQ, min-mapq, batch-count, thread, and delta must be positive; min-BQ is constrained to a valid range.
@@ -358,8 +350,8 @@ Common issues and resolutions:
 - Index building failures: concat requires bgzip-compressed input for index creation; ensure .gz suffix is used.
 - Sample not found: subsam reports missing samples in the header; confirm names match exactly.
 - No variants in region: Caller warns when no variants are discovered in a given interval; adjust quality thresholds or regions.
-- **Pipeline errors**: Verify .fai file readability and chromosome names match reference; check output directory permissions; ensure pass-through options are valid for basevar caller.
-- **Legacy compatibility**: Use `scripts/create_pipeline.py` for exact byte-perfect compatibility with legacy workflows; `basevar pipeline` provides enhanced performance with identical output format.
+- Pipeline errors: Verify .fai file readability and chromosome names match reference; check output directory permissions; ensure pass-through options are valid for basevar caller.
+- Legacy compatibility: Use `scripts/create_pipeline.py` for exact byte-perfect compatibility with legacy workflows; `basevar pipeline` provides enhanced performance with identical output format.
 
 **Section sources**
 - [variant_caller.cpp:130-149](file://src/variant_caller.cpp#L130-L149)

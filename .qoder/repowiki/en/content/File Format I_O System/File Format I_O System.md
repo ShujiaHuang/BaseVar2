@@ -19,7 +19,18 @@
 - [hts_utils.h](file://src/io/hts_utils.h)
 - [utils.h](file://src/io/utils.h)
 - [utils.cpp](file://src/io/utils.cpp)
+- [CMakeLists.txt](file://CMakeLists.txt)
+- [.gitmodules](file://.gitmodules)
+- [README.md](file://README.md)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Enhanced documentation for htslib submodule integration and dependency management
+- Updated file format handling documentation to reflect new external htslib submodule approach
+- Added comprehensive coverage of static vs dynamic linking strategies
+- Expanded troubleshooting guidance for htslib integration issues
+- Updated installation and build instructions reflecting submodule management
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -27,18 +38,21 @@
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
+6. [htslib Submodule Integration](#htslib-submodule-integration)
+7. [Dependency Analysis](#dependency-analysis)
+8. [Performance Considerations](#performance-considerations)
+9. [Troubleshooting Guide](#troubleshooting-guide)
+10. [Conclusion](#conclusion)
 
 ## Introduction
-This document describes BaseVar2’s file format I/O system with emphasis on:
+This document describes BaseVar2's file format I/O system with emphasis on:
 - BAM/CRAM alignment file processing
 - FASTA reference genome handling
 - VCF output generation
 
 It explains how the system integrates with htslib for maximum compatibility and performance, details stream processing and compression support, and documents the internal data structures used for file representation and conversion between formats. Error handling, validation procedures, and performance optimization techniques for large file processing are covered.
+
+**Updated** Enhanced documentation reflects improved integration of external htslib submodule with comprehensive dependency management approach, including both static and dynamic linking strategies for optimal deployment flexibility.
 
 ## Project Structure
 The I/O system is organized into focused modules under src/io:
@@ -338,6 +352,71 @@ VCFFile --> VCFRecord : "reads/writes"
 - [vcf_record.h:31-525](file://src/io/vcf_record.h#L31-L525)
 - [vcf_record.cpp:1-800](file://src/io/vcf_record.cpp#L1-L800)
 
+## htslib Submodule Integration
+
+### External Submodule Management
+BaseVar2 utilizes htslib as an external Git submodule for enhanced dependency management and build flexibility. The integration follows these key approaches:
+
+- **Submodule Declaration**: The htslib repository is declared as a submodule in [.gitmodules:1-4](file://.gitmodules#L1-L4) with the URL pointing to the official samtools/htslib repository.
+- **Build Automation**: CMake handles htslib compilation through a custom target that executes autoreconf, configure, and make steps within the htslib directory.
+- **Flexible Linking**: The build system supports both static and dynamic linking strategies depending on deployment requirements.
+
+### Static vs Dynamic Linking Strategies
+
+#### Static Build (Recommended for Portability)
+The static build strategy bundles all dependencies including htslib and compression libraries into a single executable:
+
+```mermaid
+flowchart TD
+A["Static Build Request"] --> B["Configure htslib with --disable-libcurl --without-libdeflate"]
+B --> C["Compile htslib to libhts.a"]
+C --> D["Link libhts.a statically"]
+D --> E["Bundle zlib, bzip2, lzma, openssl statically"]
+E --> F["Produce portable executable"]
+```
+
+**Diagram sources**
+- [CMakeLists.txt:77-99](file://CMakeLists.txt#L77-L99)
+- [CMakeLists.txt:111-113](file://CMakeLists.txt#L111-L113)
+
+Key characteristics of static builds:
+- **Linux**: Partial-static approach bundling libstdc++, libgcc, htslib, and compression libs; glibc remains dynamic for broad compatibility.
+- **macOS**: Best-effort static linking with system frameworks remaining dynamic due to platform limitations.
+- **Portability**: Executables run on various Linux distributions without external dependencies.
+
+#### Dynamic Build (Development Flexibility)
+The dynamic build links against system-installed htslib libraries:
+
+```mermaid
+flowchart LR
+A["Dynamic Build"] --> B["Link against system libhts.so"]
+B --> C["Runtime dependency resolution"]
+C --> D["Requires htslib installation"]
+D --> E["Development and testing flexibility"]
+```
+
+### Build Configuration and Dependencies
+
+#### System Requirements
+- **C++17 Compiler**: GCC 7+ or Apple Clang 10+
+- **CMake**: Version 3.12 or higher
+- **System Libraries**: zlib, bzip2, xz-utils, libcurl
+- **Optional**: OpenSSL for certain features
+
+#### Installation Methods
+The project supports multiple installation approaches:
+
+1. **Pre-built Binaries**: Download static binaries from GitHub Releases for immediate use
+2. **Source Compilation**: Clone with submodules and build using CMake
+3. **Manual Compilation**: Build htslib separately, then compile BaseVar2
+
+**Section sources**
+- [.gitmodules:1-4](file://.gitmodules#L1-L4)
+- [CMakeLists.txt:77-99](file://CMakeLists.txt#L77-L99)
+- [CMakeLists.txt:111-113](file://CMakeLists.txt#L111-L113)
+- [CMakeLists.txt:194-196](file://CMakeLists.txt#L194-L196)
+- [README.md:96-142](file://README.md#L96-L142)
+
 ## Dependency Analysis
 - Internal dependencies:
   - BAM depends on BamHeader and BamRecord; both rely on htslib structs.
@@ -346,6 +425,7 @@ VCFFile --> VCFRecord : "reads/writes"
 - External dependencies:
   - htslib for SAM/BAM/CRAM, VCF/BCF, FAI indexing, and compression.
   - Standard C++ filesystem and iostream facilities for path and I/O utilities.
+- **Updated** Enhanced dependency management through external htslib submodule with flexible linking strategies.
 
 ```mermaid
 graph LR
@@ -359,6 +439,12 @@ BAM --> BH["BamHeader"]
 BAM --> BR["BamRecord"]
 VCF --> VH["VCFHeader"]
 VCF --> VR["VCFRecord"]
+subgraph "htslib Integration"
+HTS["libhts.a/.so"] --> HU
+HTS --> BAM
+HTS --> VCF
+HTS --> FASTA
+end
 ```
 
 **Diagram sources**
@@ -387,9 +473,8 @@ VCF --> VR["VCFRecord"]
 - Compression:
   - Transparent BGZF/GZIP support via htslib; choose appropriate compression levels for output writers.
 - Parallelization:
-  - The BAM module comments indicate care for thread-safety with iterators; avoid sharing a single file’s iterator across threads. Instead, process separate files concurrently.
-
-[No sources needed since this section provides general guidance]
+  - The BAM module comments indicate care for thread-safety with iterators; avoid sharing a single file's iterator across threads. Instead, process separate files concurrently.
+- **Updated** Enhanced performance through optimized htslib integration with static linking for reduced overhead and improved portability.
 
 ## Troubleshooting Guide
 - File opening failures:
@@ -403,6 +488,11 @@ VCF --> VR["VCFRecord"]
   - Ensure the FASTA file is indexed; fetching by region throws on invalid inputs or empty results.
 - Header validation:
   - For VCF writers, ensure the header is valid before opening; invalid headers lead to write failures.
+- **Updated** htslib integration issues:
+  - Verify htslib submodule initialization: `git submodule update --init --recursive`
+  - Check build configuration for static vs dynamic linking requirements
+  - Ensure proper linking of compression libraries (zlib, bzip2, lzma, openssl)
+  - Validate system library availability for dynamic builds
 
 **Section sources**
 - [bam.cpp:6-46](file://src/io/bam.cpp#L6-L46)
@@ -413,6 +503,10 @@ VCF --> VR["VCFRecord"]
 - [vcf.cpp:8-57](file://src/io/vcf.cpp#L8-L57)
 - [vcf.cpp:87-107](file://src/io/vcf.cpp#L87-L107)
 - [vcf.cpp:109-161](file://src/io/vcf.cpp#L109-L161)
+- [CMakeLists.txt:77-99](file://CMakeLists.txt#L77-L99)
+- [README.md:100-108](file://README.md#L100-L108)
 
 ## Conclusion
-BaseVar2’s I/O system leverages htslib to deliver robust, high-performance processing of alignment and variant data. The modular design with RAII-managed header and record objects, region-based streaming, and transparent compression support enables scalable workflows for large-scale genomics data. The FASTA interface simplifies reference access, while the VCF/BCF stack provides flexible reading and writing with strong validation and error reporting.
+BaseVar2's I/O system leverages htslib to deliver robust, high-performance processing of alignment and variant data. The modular design with RAII-managed header and record objects, region-based streaming, and transparent compression support enables scalable workflows for large-scale genomics data. The FASTA interface simplifies reference access, while the VCF/BCF stack provides flexible reading and writing with strong validation and error reporting.
+
+**Updated** The enhanced integration with external htslib submodule provides improved dependency management, flexible linking strategies, and better deployment options. The static linking approach ensures portability across diverse environments, while dynamic linking offers development flexibility. This dual-strategy approach addresses both production deployment needs and development workflow requirements, making BaseVar2 more adaptable to various use cases and environments.
