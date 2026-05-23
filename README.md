@@ -1,8 +1,10 @@
 <p align="center">
   <a href="https://github.com/ShujiaHuang/BaseVar2">
-    <img height="200" src="docs/assets/images/basevar_logo.svg">
+    <img height="300" src="docs/assets/images/basevar_logo.svg">
   </a>
-  <!-- <h2 align="center">BaseVar: Call variants from ultra low-pass WGS data</h2> -->
+  <!-- 
+  <h2 align="center">BaseVar: Call variants from ultra low-pass WGS data</h2> 
+  -->
 </p>
 <!-- [![BaseVar](https://github.com/ShujiaHuang/basevar/blob/main/docs/assets/images/basevar.png)](https://github.com/ShujiaHuang/basevar2) -->
 
