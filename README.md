@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/ShujiaHuang/BaseVar2">
-    <img height="300" src="docs/assets/images/basevar_logo.svg">
+    <img height="230" src="docs/assets/images/basevar_logo.svg">
   </a>
   <!-- 
   <h2 align="center">BaseVar: Call variants from ultra low-pass WGS data</h2> 

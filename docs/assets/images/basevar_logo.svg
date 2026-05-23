@@ -18,7 +18,7 @@
   <!--
   <text x="152" y="145" font-family="system-ui, -apple-system, sans-serif" font-weight="400" font-size="95" letter-spacing="-2">
   -->
-  <text x="152" y="150" font-family="'Varela Round', 'Arial Rounded MT', 'Nunito', system-ui, sans-serif" font-weight="400" font-size="100" letter-spacing="-2">
+  <text x="152" y="150" font-family="'Varela Round', 'Arial Rounded MT', 'Nunito', system-ui, sans-serif" font-weight="400" font-size="100" letter-spacing="0">
     <tspan fill="#1E3A8A">ase</tspan>
     <tspan fill="#F97316">Var</tspan>
     <tspan fill="#06B6D4">2</tspan>

@@ -6,11 +6,21 @@
 - [basetype.cpp](file://src/basetype.cpp)
 - [algorithm.h](file://src/algorithm.h)
 - [algorithm.cpp](file://src/algorithm.cpp)
+- [caller_utils.h](file://src/caller_utils.h)
+- [caller_utils.cpp](file://src/caller_utils.cpp)
 - [combinations.h](file://src/external/combinations.h)
 - [variant_caller.h](file://src/variant_caller.h)
 - [variant_caller.cpp](file://src/variant_caller.cpp)
 - [README.md](file://README.md)
 </cite>
+
+## Update Summary
+**Changes Made**
+- Enhanced documentation of the calculatePL function with comprehensive Bayesian inference implementation
+- Added detailed explanation of genotype likelihood calculations with base quality probability modeling
+- Documented error rate estimation and log-likelihood computation with proper error handling
+- Updated LRT framework to include both population-level variant detection and individual sample genotype calling
+- Expanded mathematical formulations to cover Bayesian inference for genotype likelihoods
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -18,18 +28,20 @@
 3. [Core Components](#core-components)
 4. [Architecture Overview](#architecture-overview)
 5. [Detailed Component Analysis](#detailed-component-analysis)
-6. [Dependency Analysis](#dependency-analysis)
-7. [Performance Considerations](#performance-considerations)
-8. [Troubleshooting Guide](#troubleshooting-guide)
-9. [Conclusion](#conclusion)
+6. [Enhanced Bayesian Inference Framework](#enhanced-bayesian-inference-framework)
+7. [Dependency Analysis](#dependency-analysis)
+8. [Performance Considerations](#performance-considerations)
+9. [Troubleshooting Guide](#troubleshooting-guide)
+10. [Conclusion](#conclusion)
 
 ## Introduction
-This document explains BaseVar2’s likelihood ratio testing (LRT) framework for variant calling. It covers the theoretical foundation of LRT in the context of population-level variant detection, the implementation of the LRT algorithm in the BaseType class, and the mathematical formulations used for likelihood calculations, log-likelihood ratios, and significance thresholds. It also documents the LRT_THRESHOLD constant (24, corresponding to a chi-square p-value of approximately 10^-6), practical examples of how LRT distinguishes between reference and variant alleles, and numerical stability and efficiency considerations.
+This document explains BaseVar2's comprehensive likelihood ratio testing (LRT) framework for variant calling, which now includes both population-level variant detection and individual sample genotype likelihood calculations. The framework encompasses theoretical foundations of LRT in population genetics, the implementation of the LRT algorithm in the BaseType class, and the enhanced Bayesian inference implementation in the calculatePL function for genotype likelihood calculations. It covers mathematical formulations for likelihood calculations, log-likelihood ratios, significance thresholds, and the integration of population-level and individual-level variant calling approaches.
 
 ## Project Structure
-BaseVar2 is organized around a modular C++ architecture:
+BaseVar2 is organized around a modular C++ architecture that combines population-level variant detection with individual sample genotype calling:
 - Core variant calling engine resides in the variant_caller module, which orchestrates batch processing, threading, and VCF output.
 - The BaseType class encapsulates population-level allele frequency estimation via LRT and EM-based marginal likelihood computation.
+- The calculatePL function implements comprehensive Bayesian inference for genotype likelihood calculations, incorporating base quality probability modeling and error rate estimation.
 - Mathematical primitives (EM, chi-square test, combinatorics) are implemented in dedicated headers and sources.
 
 ```mermaid
@@ -38,14 +50,19 @@ Caller["BaseTypeRunner<br/>variant_caller.cpp"] --> Batch["Batchfile Processing<
 Caller --> Threads["Thread Pool<br/>thread_pool.h"]
 Caller --> VCFOut["VCF Writer<br/>variant_caller.cpp"]
 Batch --> BaseType["BaseType<br/>basetype.cpp/.h"]
+Batch --> CallerUtils["Caller Utils<br/>caller_utils.cpp/.h"]
 BaseType --> EM["EM Algorithm<br/>algorithm.cpp/.h"]
 BaseType --> Comb["Combinations<br/>combinations.h"]
 BaseType --> Chi["Chi-Square Test<br/>algorithm.cpp/.h"]
+CallerUtils --> PL["calculatePL<br/>algorithm.cpp/.h"]
+PL --> Bayes["Bayesian Inference<br/>Genotype Likelihoods"]
 ```
 
 **Diagram sources**
 - [variant_caller.cpp:342-438](file://src/variant_caller.cpp#L342-L438)
 - [basetype.cpp:137-210](file://src/basetype.cpp#L137-L210)
+- [caller_utils.cpp:144-200](file://src/caller_utils.cpp#L144-L200)
+- [algorithm.cpp:12-88](file://src/algorithm.cpp#L12-L88)
 - [algorithm.cpp:239-292](file://src/algorithm.cpp#L239-L292)
 - [combinations.h:18-49](file://src/external/combinations.h#L18-L49)
 
@@ -55,10 +72,11 @@ BaseType --> Chi["Chi-Square Test<br/>algorithm.cpp/.h"]
 - [variant_caller.cpp:342-438](file://src/variant_caller.cpp#L342-L438)
 
 ## Core Components
-- BaseType: Computes population-level allele frequencies and variant quality scores using LRT. It initializes unique bases, builds per-read likelihoods, runs EM to estimate marginal likelihoods, and compares nested models via log-likelihood ratios.
-- EM Algorithm: Performs Expectation-Maximization to estimate per-site allele frequencies and compute log marginal likelihoods for each read.
-- Combinations: Generates all combinations of candidate alleles to compare nested models in LRT.
-- Chi-Square Test: Converts the LRT statistic into a p-value for significance assessment.
+- **BaseType**: Computes population-level allele frequencies and variant quality scores using LRT. It initializes unique bases, builds per-read likelihoods, runs EM to estimate marginal likelihoods, and compares nested models via log-likelihood ratios.
+- **calculatePL**: Implements comprehensive Bayesian inference for genotype likelihood calculations, incorporating base quality probability modeling, error rate estimation, and log-likelihood computation with proper error handling.
+- **EM Algorithm**: Performs Expectation-Maximization to estimate per-site allele frequencies and compute log marginal likelihoods for each read.
+- **Combinations**: Generates all combinations of candidate alleles to compare nested models in LRT.
+- **Chi-Square Test**: Converts the LRT statistic into a p-value for significance assessment.
 
 Key constants and thresholds:
 - LRT_THRESHOLD = 24 (corresponding to a chi-square p-value of approximately 10^-6).
@@ -68,21 +86,23 @@ Key constants and thresholds:
 **Section sources**
 - [basetype.h:24-27](file://src/basetype.h#L24-L27)
 - [basetype.cpp:137-210](file://src/basetype.cpp#L137-L210)
+- [algorithm.cpp:12-88](file://src/algorithm.cpp#L12-L88)
 - [algorithm.cpp:4-6](file://src/algorithm.cpp#L4-L6)
 
 ## Architecture Overview
-The LRT pipeline proceeds as follows:
-1. Data ingestion: Batchfiles are created and consumed to collect per-position read information.
-2. Per-read likelihood construction: Each read contributes a likelihood over the unique base set, incorporating base quality.
-3. Candidate selection: Only bases with sufficient depth relative to the minimum allele frequency threshold are considered.
-4. Model comparison: Nested models (smaller vs. larger allele sets) are compared using LRT with a chi-square test.
-5. Finalization: The selected model yields active alleles, their frequencies, and a variant quality score.
+The enhanced LRT pipeline now processes both population-level variant detection and individual sample genotype calling:
+1. **Data ingestion**: Batchfiles are created and consumed to collect per-position read information.
+2. **Population-level processing**: Each read contributes a likelihood over the unique base set, incorporating base quality, and candidate selection is performed based on minimum allele frequency thresholds.
+3. **Model comparison**: Nested models (smaller vs. larger allele sets) are compared using LRT with a chi-square test.
+4. **Individual-level processing**: The calculatePL function computes genotype likelihoods for each possible genotype configuration using Bayesian inference.
+5. **Finalization**: Both population-level active alleles and individual-level genotype calls are produced with their respective quality scores.
 
 ```mermaid
 sequenceDiagram
 participant Runner as "BaseTypeRunner"
 participant Batch as "Batchfile Reader"
 participant BT as "BaseType"
+participant PL as "calculatePL"
 participant EM as "EM Algorithm"
 participant Comb as "Combinations"
 participant Chi as "Chi-Square Test"
@@ -97,6 +117,9 @@ EM-->>BT : Updated allele freq + log-likelihoods
 BT->>BT : Compare LR against threshold
 end
 BT->>Chi : Convert best LR to p-value
+PL->>PL : Calculate genotype likelihoods
+PL->>PL : Bayesian inference with error rates
+PL-->>Runner : Genotype calls with PL scores
 Chi-->>BT : p-value
 BT-->>Runner : Active bases, AF estimates, variant quality
 ```
@@ -104,16 +127,18 @@ BT-->>Runner : Active bases, AF estimates, variant quality
 **Diagram sources**
 - [variant_caller.cpp:1008-1146](file://src/variant_caller.cpp#L1008-L1146)
 - [basetype.cpp:137-210](file://src/basetype.cpp#L137-L210)
+- [caller_utils.cpp:144-200](file://src/caller_utils.cpp#L144-L200)
+- [algorithm.cpp:12-88](file://src/algorithm.cpp#L12-L88)
 - [algorithm.cpp:239-292](file://src/algorithm.cpp#L239-L292)
 - [combinations.h:18-49](file://src/external/combinations.h#L18-L49)
 
 ## Detailed Component Analysis
 
 ### Theoretical Foundation of LRT in Variant Calling
-- Null hypothesis (H0): The observed data are equally well explained by a smaller set of alleles (e.g., a single non-reference allele).
-- Alternative hypothesis (H1): A larger set of alleles (e.g., multiple non-reference alleles) provides a significantly better fit.
-- LRT statistic: 2 × (log L(H1) − log L(H0)). Under H0, this statistic asymptotically follows a chi-square distribution with degrees of freedom equal to the difference in model parameters.
-- Significance threshold: LRT_THRESHOLD = 24 corresponds to a chi-square p-value ≈ 10^-6 for 1 degree of freedom.
+- **Null hypothesis (H0)**: The observed data are equally well explained by a smaller set of alleles (e.g., a single non-reference allele).
+- **Alternative hypothesis (H1)**: A larger set of alleles (e.g., multiple non-reference alleles) provides a significantly better fit.
+- **LRT statistic**: 2 × (log L(H1) − log L(H0)). Under H0, this statistic asymptotically follows a chi-square distribution with degrees of freedom equal to the difference in model parameters.
+- **Significance threshold**: LRT_THRESHOLD = 24 corresponds to a chi-square p-value ≈ 10^-6 for 1 degree of freedom.
 
 Biological significance:
 - A high LRT statistic indicates strong evidence favoring the alternative model (more complex composition of alleles), suggesting a true variant requiring further validation.
@@ -124,17 +149,17 @@ Biological significance:
 - [basetype.cpp:172-179](file://src/basetype.cpp#L172-L179)
 
 ### Implementation Details of the LRT Algorithm in BaseType
-- Initialization:
+- **Initialization**:
   - Unique bases are constructed from input plus canonical A, C, G, T, excluding ambiguous/N and gap/*.
   - Per-read likelihoods are built using Phred-scaled base qualities converted to error probabilities.
-- Candidate selection:
+- **Candidate selection**:
   - Only bases with depth ≥ min_af × total depth are retained as active candidates.
-- Model comparison:
+- **Model comparison**:
   - For decreasing sizes n from active_bases.size() down to 1, combinations are generated.
   - EM computes log marginal likelihoods for each combination.
   - LRT statistic is computed as twice the difference in log-likelihoods between the current best model and each candidate model.
   - If the LRT statistic is below LRT_THRESHOLD, accept the simpler model; otherwise, accept the more complex model and stop.
-- Finalization:
+- **Finalization**:
   - Active bases and their estimated frequencies are stored.
   - Variant quality is derived from the chi-square p-value of the best LRT statistic.
 
@@ -168,24 +193,24 @@ Finalize --> End(["End"])
 - [basetype.cpp:137-210](file://src/basetype.cpp#L137-L210)
 
 ### Mathematical Formulations
-- Per-read likelihood construction:
+- **Per-read likelihood construction**:
   - For each read base b_i at position i, the likelihood over unique bases U is defined such that:
     - P(b_i = u | u) ∝ 1 − ε (correct base probability)
     - P(b_i = u | v ≠ u) ∝ ε / (|U| − 1) (error probability uniformly distributed across other bases)
   - ε is derived from the base quality Q using ε = 10^(-(Q−33)/10) and MLN10TO10 = −ln(10)/10 for conversion to natural logarithm.
-- EM algorithm:
+- **EM algorithm**:
   - E-step: Compute posterior probabilities of each base for each read using current allele frequencies and per-read likelihoods.
   - M-step: Update allele frequencies as the average of posteriors across reads.
   - Repeat until convergence or a fixed iteration limit.
   - Log marginal likelihood per read is recorded for LRT comparisons.
-- LRT:
+- **LRT**:
   - For a given combination of alleles, compute log L(H1) and compare to log L(H0) from the simpler model.
   - Statistic: χ² = 2 × (log L(H1) − log L(H0)).
   - Significance: p = P(χ² ≥ observed) with df = Δ parameters.
 
 Numerical stability:
-- Log-space computations are used throughout (log marginal likelihoods).
-- Chi-square p-values are computed via the gamma Q function wrapper to avoid overflow/underflow.
+- All likelihoods and marginal likelihoods are computed in log-space to prevent underflow.
+- Chi-square p-values are computed via the gamma Q function wrapper to ensure robustness.
 
 **Section sources**
 - [basetype.cpp:65-69](file://src/basetype.cpp#L65-L69)
@@ -193,11 +218,11 @@ Numerical stability:
 - [algorithm.cpp:4-6](file://src/algorithm.cpp#L4-L6)
 
 ### Practical Examples
-- Reference vs. variant distinction:
+- **Reference vs. variant distinction**:
   - If only one non-reference allele passes depth filtering, the model may remain simple; if multiple alleles are supported, the model expands accordingly.
-- Multiple base combinations:
+- **Multiple base combinations**:
   - The algorithm evaluates combinations of increasing size to find the best-fitting model under the LRT criterion.
-- Determining variant quality:
+- **Determining variant quality**:
   - The best LRT statistic is converted to a p-value using the chi-square distribution; the variant quality is derived from −10 × log10(p), with special handling for extreme values.
 
 **Section sources**
@@ -205,10 +230,10 @@ Numerical stability:
 - [basetype.cpp:198-207](file://src/basetype.cpp#L198-L207)
 
 ### Numerical Stability and Computational Efficiency
-- Numerical stability:
+- **Numerical stability**:
   - All likelihoods and marginal likelihoods are computed in log-space to prevent underflow.
   - Chi-square p-values are computed via the gamma Q function wrapper to ensure robustness.
-- Efficiency optimizations:
+- **Efficiency optimizations**:
   - Unique bases are filtered to remove ambiguous and gap-like symbols, reducing dimensionality.
   - Early stopping in LRT when the simpler model is preferred avoids unnecessary computation.
   - EM iterations are bounded and converge quickly due to log-space updates.
@@ -220,12 +245,66 @@ Numerical stability:
 - [algorithm.cpp:239-292](file://src/algorithm.cpp#L239-L292)
 - [variant_caller.cpp:440-495](file://src/variant_caller.cpp#L440-L495)
 
+## Enhanced Bayesian Inference Framework
+
+### Comprehensive Bayesian Inference Implementation
+The calculatePL function implements a sophisticated Bayesian inference framework for genotype likelihood calculations that goes beyond traditional population-level LRT:
+
+- **Genotype Space Enumeration**: Generates all possible genotype combinations (homozygous and heterozygous) for the given reference and alternative alleles.
+- **Base Quality Modeling**: Incorporates Phred-scaled base quality scores to estimate error probabilities using the formula ε = 10^(-Q/10).
+- **Error Rate Estimation**: Models sequencing errors with uniform distribution across alternative bases, P_error = ε / 3.0 for diploid organisms.
+- **Log-Likelihood Computation**: Computes P(R|G) for each genotype by averaging P(R|allele1) and P(R|allele2) probabilities.
+- **Numerical Stability**: Uses log10-space computations to prevent underflow and applies proper error handling for edge cases.
+
+### Mathematical Formulations for Genotype Likelihoods
+- **Genotype Generation**: For n alleles (including reference), creates n(n+1)/2 possible genotypes ordered as 0/0, 0/1, 1/1, 0/2, 1/2, 2/2, etc.
+- **Error Probability Calculation**: ε = 10^(-Q/10) where Q is the Phred quality score, converted from ASCII encoding (Q - 33).
+- **Correct Base Probability**: P_correct = 1 - ε, representing the probability of correct base identification.
+- **Genotype Likelihood**: P(R|G) = 0.5 × P(R|allele1) + 0.5 × P(R|allele2), accounting for diploid inheritance.
+- **Phred-Scaled Likelihoods**: PL = -10 × log10(P(G)) + max_log10_L, normalized against the maximum likelihood.
+
+### Error Handling and Validation
+- **Input Validation**: Ensures bases and quality vectors have equal length and contain valid base characters.
+- **Quality Score Range**: Handles negative quality scores gracefully by setting error probability to 1.0.
+- **Underflow Protection**: Uses -std::numeric_limits<double>::max() when P(R|G) ≤ 0 to prevent log(0) errors.
+- **Missing Data Handling**: Skips 'N' bases and continues computation with remaining valid reads.
+
+```mermaid
+flowchart TD
+Start(["calculatePL Function"]) --> Validate["Validate Input Parameters<br/>Check vector lengths and base validity"]
+Validate --> Genotypes["Generate All Possible Genotypes<br/>n(n+1)/2 combinations"]
+Genotypes --> Init["Initialize Log-Likelihood Arrays<br/>Zero for all genotypes"]
+Init --> LoopReads["Iterate Through Reads"]
+LoopReads --> Quality["Calculate Error Probabilities<br/>ε = 10^(-Q/10)"]
+Quality --> GenotypeLoop["For Each Genotype"]
+GenotypeLoop --> Correct["P_correct = 1 - ε"]
+Correct --> Error["P_error = ε / 3.0"]
+Error --> Likelihood["P(R|G) = 0.5×P(R|allele1) + 0.5×P(R|allele2)"]
+Likelihood --> LogAdd["Add log10(P(R|G)) to cumulative likelihood"]
+LogAdd --> NextGenotype["Next Genotype"]
+NextGenotype --> NextRead["Next Read"]
+NextRead --> MaxLike["Find Maximum Log-Likelihood"]
+MaxLike --> Normalize["Normalize to Phred Scale<br/>PL = -10×(log10_L - max_log10_L)"]
+Normalize --> Return["Return Genotype Likelihood Vector"]
+```
+
+**Diagram sources**
+- [algorithm.cpp:12-88](file://src/algorithm.cpp#L12-L88)
+
+**Section sources**
+- [algorithm.cpp:12-88](file://src/algorithm.cpp#L12-L88)
+- [caller_utils.cpp:144-200](file://src/caller_utils.cpp#L144-L200)
+
 ## Dependency Analysis
-- BaseType depends on:
+- **BaseType** depends on:
   - EM algorithm for estimating allele frequencies and marginal likelihoods.
   - Combinations to enumerate candidate allele sets.
   - Chi-square test for significance evaluation.
-- VariantCaller coordinates:
+- **calculatePL** depends on:
+  - Mathematical utilities for log-space computations.
+  - Genotype enumeration and ordering.
+  - Quality score conversion and error probability calculations.
+- **VariantCaller** coordinates:
   - Batchfile creation and consumption.
   - Threading for parallel processing.
   - VCF output assembly with INFO fields including AF and DP.
@@ -240,6 +319,12 @@ class BaseType {
 +get_var_qual()
 -_f(bases, n)
 -_set_initial_freq(bases)
+}
+class calculatePL {
++calculatePL(ref_base, alt_bases, align_bases, base_quals)
++genotype_likelihood_computation()
++error_rate_estimation()
++log_likelihood_normalization()
 }
 class EM {
 +EM(ind_allele_likelihood, obs_allele_freq, log_marginal_likelihood)
@@ -258,48 +343,65 @@ class VariantCaller {
 BaseType --> EM : "uses"
 BaseType --> Combinations : "generates combinations"
 BaseType --> ChiSquare : "computes p-value"
+calculatePL --> EM : "Bayesian inference"
 VariantCaller --> BaseType : "constructs and calls"
+VariantCaller --> calculatePL : "calls for genotypes"
 ```
 
 **Diagram sources**
 - [basetype.h:29-143](file://src/basetype.h#L29-L143)
-- [algorithm.h:150-177](file://src/algorithm.h#L150-L177)
+- [algorithm.h:90-177](file://src/algorithm.h#L90-L177)
 - [combinations.h:18-49](file://src/external/combinations.h#L18-L49)
 - [variant_caller.h:41-174](file://src/variant_caller.h#L41-L174)
 
 **Section sources**
 - [basetype.h:29-143](file://src/basetype.h#L29-L143)
-- [algorithm.h:150-177](file://src/algorithm.h#L150-L177)
+- [algorithm.h:90-177](file://src/algorithm.h#L90-L177)
 - [variant_caller.h:41-174](file://src/variant_caller.h#L41-L174)
 
 ## Performance Considerations
-- Memory footprint:
+- **Memory footprint**:
   - The algorithm stores per-read likelihoods only for covered positions, avoiding unnecessary allocations.
   - Batch processing limits memory spikes by chunking genomic regions.
-- Speed:
+  - calculatePL uses efficient vector operations and avoids unnecessary intermediate calculations.
+- **Speed**:
   - EM convergence is fast in log-space; early stopping in LRT reduces redundant evaluations.
   - Thread pools parallelize I/O and computation across regions and samples.
-- Scalability:
+  - calculatePL optimizes genotype enumeration and uses vectorized operations for likelihood calculations.
+- **Scalability**:
   - The combination size is capped (BIG_N = 6) to prevent combinatorial explosion.
+  - calculatePL scales efficiently with the number of possible genotypes (n(n+1)/2).
+- **Computational Complexity**:
+  - LRT: O(B × C × E) where B is number of bases, C is combination size, E is EM iterations.
+  - calculatePL: O(R × G) where R is number of reads, G is number of genotypes.
 
 **Section sources**
 - [basetype.cpp:50-75](file://src/basetype.cpp#L50-L75)
 - [basetype.cpp:148-149](file://src/basetype.cpp#L148-L149)
+- [algorithm.cpp:12-88](file://src/algorithm.cpp#L12-L88)
 - [variant_caller.cpp:440-495](file://src/variant_caller.cpp#L440-L495)
 
 ## Troubleshooting Guide
-- Empty coverage or invalid combinations:
+- **Empty coverage or invalid combinations**:
   - The algorithm throws runtime errors when observed frequencies are zero or when a base is not present in the unique set.
-- Unexpected variant quality:
+- **Unexpected variant quality**:
   - If chi2_test returns NaN, the code defaults to a high quality score; ensure LRT statistics are positive and finite.
-- Parameter tuning:
+- **calculatePL errors**:
+  - Invalid argument exceptions are thrown for mismatched vector sizes or negative quality scores.
+  - Underflow protection prevents log(0) errors by using maximum representable values.
+- **Parameter tuning**:
   - Adjust min_af to balance sensitivity and specificity for low-depth data.
   - Increase thread count and batch size to improve throughput, subject to memory constraints.
+- **Genotype likelihood interpretation**:
+  - Lower PL values indicate higher likelihood genotypes.
+  - GQ is calculated as the difference between the best and second-best PL values.
 
 **Section sources**
 - [basetype.cpp:120-123](file://src/basetype.cpp#L120-L123)
 - [basetype.cpp:102-107](file://src/basetype.cpp#L102-L107)
 - [basetype.cpp:198-207](file://src/basetype.cpp#L198-L207)
+- [algorithm.cpp:18-20](file://src/algorithm.cpp#L18-L20)
+- [algorithm.cpp:72-74](file://src/algorithm.cpp#L72-L74)
 
 ## Conclusion
-BaseVar2’s LRT framework provides a robust, numerically stable method for population-level variant detection from low-depth data. By combining per-read likelihood modeling, EM-based marginal likelihood estimation, and nested model comparison guided by LRT, it achieves accurate allele frequency estimation and variant quality scoring. The LRT_THRESHOLD of 24 ensures stringent control of false positives, while practical optimizations enable efficient processing at scale.
+BaseVar2's enhanced LRT framework provides a comprehensive solution for both population-level variant detection and individual sample genotype calling. The integration of population-level LRT with the Bayesian inference implementation in calculatePL enables robust variant calling across diverse sequencing technologies and experimental conditions. By combining per-read likelihood modeling, EM-based marginal likelihood estimation, nested model comparison guided by LRT, and sophisticated genotype likelihood calculations with proper error handling, the framework achieves accurate allele frequency estimation, variant quality scoring, and reliable individual-level genotype calls. The LRT_THRESHOLD of 24 ensures stringent control of false positives, while the comprehensive Bayesian approach in calculatePL provides well-calibrated genotype likelihoods suitable for downstream analyses. The enhanced framework maintains computational efficiency through careful optimization and numerical stability considerations, enabling scalable processing of large genomic datasets.
