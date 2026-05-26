@@ -15,7 +15,8 @@
 
 ## Update Summary
 **Changes Made**
-- Enhanced installation documentation with three installation approaches: pre-built binaries, source compilation, and manual compilation
+- Updated installation documentation to reflect the change from specific versioned download links to automatic latest release endpoints
+- Enhanced pre-built binary installation section with improved distribution link management
 - Updated system requirements to include C++17 compiler and CMake ≥ 3.12
 - Added comprehensive platform-specific compatibility matrix with glibc version requirements
 - Updated version references to reflect 2.2.3 throughout the documentation
@@ -45,18 +46,20 @@ BaseVar2 is a C++ tool designed for variant calling from ultra-low-coverage whol
 BaseVar2 provides three installation methods, each suited for different use cases and environments:
 
 ### Option 1: Pre-built Static Binary (Recommended - No Compilation)
-Download pre-built static binaries that require zero runtime dependencies and run on any modern Linux distribution or macOS.
+Download pre-built static binaries that require zero runtime dependencies and run on any modern Linux distribution or macOS. The distribution links now automatically point to the latest available releases, ensuring you always get the newest version without manual version updates.
 
 **Linux (x86_64, glibc-free)**:
 ```bash
-wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-linux-static
+# Automatically gets the latest release
+wget https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static
 chmod +x basevar-linux-static
 ./basevar-linux-static --help
 ```
 
 **macOS (arm64 / Intel)**:
 ```bash
-curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-macos-static
+# Automatically gets the latest release
+curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-macos-static
 chmod +x basevar-macos-static
 ./basevar-macos-static --help
 ```
@@ -68,7 +71,7 @@ chmod +x basevar-macos-static
 | macOS (Intel) | `basevar-macos-static` | Zero | Compatible with macOS versions shipped with BaseVar2 |
 | macOS (Apple Silicon) | `basevar-macos-static` | Zero | Native arm64 support |
 
-**Updated** Download links now point to version 2.2.3 releases with improved static binary compatibility.
+**Updated** Distribution links now automatically point to the latest release endpoints, improving user experience by ensuring users always receive the newest available binaries without manual version management.
 
 **Section sources**
 - [README.md:32-92](file://README.md#L32-L92)

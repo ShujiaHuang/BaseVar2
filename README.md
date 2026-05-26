@@ -448,7 +448,7 @@ For each read passing the filters, the 5' end-motif of the underlying cfDNA frag
 
 Motifs containing **any non-ACGT base** — i.e. `N` *or* an IUPAC ambiguity code such as `M`/`R`/`W`/`S`/`Y`/`K`/`V`/`H`/`D`/`B` — are excluded from the counts (and reported separately in the summary).
 
-### Full parameter reference
+### Full parameter reference of `basevar motif`
 
 ```bash
 About: Count cfDNA end-motif (k-mer) frequencies from BAM/CRAM alignments.
