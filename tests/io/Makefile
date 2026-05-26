@@ -17,7 +17,7 @@ BSSRC = ../../src   # include all the header files(*.h) of BaseVar
 CPPFLAGS += -I"$(realpath $(BSSRC))"
 
 #modied from htslib makefile
-FLAGS = -O3 -fPIC
+FLAGS = -O3 -fPIC -std=c++17
 FLAGS2 = $(CPPFLAGS) $(FLAGS) $(LDFLAGS)
 CXXFLAGS := $(FLAGS2) $(CXXFLAGS)
 
@@ -47,7 +47,15 @@ test_fasta: test_fasta.o
 	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)
 	#$(CXX) $(FLAGS) -o test_fasta  $(LIBS)
 
+# `basevar motif` subcommand unit test.
+# Links the whole BaseVar source tree (mirrors how the runner is built)
+# minus main.cpp, which would conflict with the test's main().
+MOTIF_BS_OBJ = $(BSSRC)/motif_counter.o $(BSSRC)/io/bam.o $(BSSRC)/io/bam_header.o \
+               $(BSSRC)/io/bam_record.o $(BSSRC)/io/fasta.o $(BSSRC)/io/utils.o
+test_motif_counter: test_motif_counter.o $(MOTIF_BS_OBJ)
+	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)
+
 clean:
-	rm -f $(OBJ) test_fasta
+	rm -f $(OBJ) test_fasta test_motif_counter test_motif_counter.tsv
 
 

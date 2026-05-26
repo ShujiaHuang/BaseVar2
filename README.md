@@ -81,14 +81,14 @@ If you see this — or you are on CentOS / RHEL / Rocky / AlmaLinux / older Ubun
 
 ```bash
 # Linux
-wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-linux-static
+wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.3.0/basevar-linux-static
 chmod +x basevar-linux-static
 ./basevar-linux-static --help
 ```
 
 ```bash
 # macOS
-curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.2.3/basevar-macos-static
+curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.3.0/basevar-macos-static
 chmod +x basevar-macos-static
 ./basevar-macos-static --help
 ```
@@ -184,6 +184,7 @@ Commands:
   pipeline  Generate per-region `basevar caller` commands for whole-genome calling
   concat    Concatenate per-region VCF files into a whole-genome VCF
   subsam    Extract a subset of samples from a VCF file
+  motif     Count cfDNA end-motif (k-mer) frequencies from BAM/CRAM
 ```
 
 ---
@@ -421,6 +422,207 @@ basevar concat chr1_1_2000000.vcf.gz chr1_2000001_4000000.vcf.gz -o chr1.vcf.gz
 ```
 
 > You may also use `bcftools concat` as a drop-in alternative.
+
+---
+
+## `basevar motif` — cfDNA end-motif counting
+
+Extract and count the **5' end-motif** (k-mer) of every cfDNA fragment in BAM/CRAM alignments. End-motifs are a well-established feature of cell-free DNA fragmentomics — the canonical method is **Jiang P. *et al.*, *Cancer Discovery* 2020, "Plasma DNA End-Motif Profiling as a Fragmentomic Marker in Cancer, Pregnancy, and Transplantation"** ([PMID: 32111602](https://pubmed.ncbi.nlm.nih.gov/32111602/), [DOI: 10.1158/2159-8290.CD-19-0622](https://doi.org/10.1158/2159-8290.CD-19-0622)) from Prof. Y.M. Dennis Lo's group — and are particularly informative for non-invasive prenatal testing (NIPT) and other low-pass cfDNA studies.
+
+> **Reproducing the Lo lab convention**: the canonical Jiang 2020 protocol (1) extracts the 5' k-mer **from the reference genome** at each fragment's aligned 5' position — *not* from the BAM SEQ field — as confirmed by the Lo group's open-source reference implementation [FinaleToolkit](https://github.com/epifluidlab/FinaleToolkit) (Zheng *et al.*, bioRxiv 2024.05.29.596414) and the group's follow-up Mao *et al.*, *Cell Genomics* 2026; (2) uses **both** fragment ends per pair (5' of R1 *and* 5' of R2); (3) restricts to **properly paired** reads; (4) requires **MAPQ ≥ 30**; (5) drops chimeric/discordant alignments via an insert-size cap (typically `|isize| ≤ 1000`). The recommended invocation is:
+>
+> ```bash
+> basevar motif --from-reference -f reference.fa \
+>               --reads both --proper-pair --max-insert-size 1000 \
+>               -q 30 -l 4 -o out.tsv  in1.bam in2.bam ...
+> ```
+>
+> The tool's *defaults* deliberately stay conservative (read-derived bases, `--reads R1`, `--proper-pair` off, no insert-size cap, no FASTA required) so that BAM/CRAM inputs from non-cfDNA workflows (e.g. genome-wide variant calling) still produce sensible results out of the box. Users running cfDNA / NIPT / fragmentomic analyses are strongly encouraged to use the canonical invocation above.
+
+**Each input BAM/CRAM is treated as one sample.** Files are processed concurrently (one worker thread per file via `-t/--thread`) and results are emitted side-by-side in a single TSV without merging — every motif row carries its sample ID in the first column.
+
+For each read passing the filters, the 5' end-motif of the underlying cfDNA fragment is extracted via one of two paths:
+
+- **Default (read-based, no FASTA required)** — take the first *k* bases of the BAM SEQ field directly for forward-mapped reads, or the reverse-complement of the last *k* bases for reverse-mapped reads (since BAM stores SEQ in reference-forward orientation, this recovers the original sequencer's 5' bases). This path is BaseVar's conservative fallback; it is itself a deviation from the canonical Lo lab convention.
+- **`--from-reference` (canonical Lo lab path, requires `-f`)** — fetch `ref[chrom, pos, pos + k)` for forward-mapped reads, or `reverse_complement(ref[chrom, end - k, end))` for reverse-mapped reads, directly from the FASTA. This matches FinaleToolkit's `region_end_motifs()` exactly and is the recommended path for cfDNA / NIPT / fragmentomic analyses.
+
+Motifs containing **any non-ACGT base** — i.e. `N` *or* an IUPAC ambiguity code such as `M`/`R`/`W`/`S`/`Y`/`K`/`V`/`H`/`D`/`B` — are excluded from the counts (and reported separately in the summary).
+
+### Full parameter reference
+
+```bash
+About: Count cfDNA end-motif (k-mer) frequencies from BAM/CRAM alignments.
+       Each input BAM/CRAM is treated as one sample; per-sample counts are
+       emitted in a single TSV (long format).
+       Method follows Jiang et al., Cancer Discovery 2020 (PMID: 31911138).
+Usage: basevar motif [options] <-o output.tsv> [-L bam.list] in1.bam [in2.bam ...]
+
+Required arguments:
+  -o, --output FILE            Output TSV file (sample, motif, count, frequency).
+
+Optional arguments:
+  -L, --align-file-list FILE   BAM/CRAM files list, one path per row.
+  -f, --reference FILE         Reference FASTA file (required for CRAM input).
+  -r, --regions REG[,...]      Restrict counting to these regions, comma-separated.
+                               Formats: chr | chr:start | chr:start-end
+  -l, --length INT             Motif length k, range [1, 10] [4]
+  -q, --mapq INT               Minimum MAPQ to keep a read [30]
+  -t, --thread INT             Number of worker threads (one file per thread)
+                               [hardware_concurrency]
+      --reads {R1|R2|both}     Which read in a pair to use for the 5' end-motif [R1].
+                               The default `R1` is conservative and works for any
+                               BAM/CRAM. To reproduce the canonical Lo lab cfDNA
+                               end-motif method (Jiang et al., Cancer Discovery 2020,
+                               PMID: 32111602), use `--reads both` so that EACH
+                               fragment contributes TWO end-motifs (5' of R1 AND
+                               5' of R2).
+      --include-zero           Emit all 4^k motifs (zeros included) in TSV (default ON)
+      --no-include-zero        Suppress motifs with zero count in TSV.
+      --filename-has-samplename
+                               Derive sample IDs from filenames instead of reading the
+                               BAM @RG SM tag.  E.g. /path/SampleA.bam -> SampleA.
+      --proper-pair            Only count reads flagged as properly paired
+                               (BAM_FPROPER_PAIR).  Required by the Lo lab convention
+                               for cfDNA analyses; silently ignored for SE data. [off]
+      --max-insert-size INT    Discard reads whose |insert size| > INT. 0 = no limit.
+                               Lo lab cfDNA pipelines typically use 1000 to drop
+                               chimeric / discordantly-mapped reads.
+                               Silently ignored for SE data. [0]
+      --from-reference         Extract motifs from the REFERENCE genome at each
+                               fragment's 5' alignment position (canonical Lo lab
+                               cfDNA method, as implemented in FinaleToolkit /
+                               Zheng et al., bioRxiv 2024.05.29.596414).  Requires
+                               -f/--reference.  Recommended for cfDNA / NIPT /
+                               fragmentomic analyses.  When OFF (default), motifs
+                               are extracted from the read's own sequenced bases
+                               (BaseVar's conservative fallback that does not
+                               require a FASTA). [off]
+  -h, --help                   Show this help message and exit.
+
+Recommended cfDNA / NIPT invocation (Lo lab convention):
+  basevar motif --from-reference -f ref.fa \
+                --reads both --proper-pair --max-insert-size 1000 \
+                -q 30 -l 4 -o out.tsv  in1.bam in2.bam ...
+```
+
+### Sample identification
+
+For each input file the runner resolves a sample ID using the following order:
+
+1. The `SM` value of the first `@RG` line in the BAM/CRAM header (default).
+2. The filename stem — everything before the first `.` of the basename — when `--filename-has-samplename` is set, **or** when the `@RG` `SM` tag is missing.
+
+If two inputs resolve to the same sample ID, that ID will appear in two distinct row blocks of the TSV; consider `--filename-has-samplename` together with disambiguating filenames (e.g. `SampleA.run1.bam`, `SampleA.run2.bam`) when this matters.
+
+### Default filters (cfDNA-friendly)
+
+A read contributes to the motif count only if **all** the following hold:
+
+- The read is mapped (not `BAM_FUNMAP`).
+- It is not a secondary, supplementary, duplicate, or QC-fail alignment.
+- `MAPQ >= --mapq` (default `30`).
+- For paired-end data, the read matches the `--reads` policy (default `R1`). Single-end reads are treated as an implicit R1 (accepted under `R1`/`both`, rejected under `R2`).
+- The first *k* decoded bases contain only A/C/G/T (no `N` or IUPAC ambiguity codes).
+
+### Output format
+
+The TSV file uses **long format** with one row per (sample, motif) pair:
+
+```tsv
+#sample  motif   count   frequency
+SampleA  AAAA    18342   0.045312
+SampleA  AAAC    7521    0.018584
+...
+SampleB  AAAA    20131   0.048876
+SampleB  AAAC    8033    0.019508
+...
+```
+
+- **`sample`**: sample ID (see *Sample identification* above).
+- **`motif`**: the k-mer (length controlled by `-l`).
+- **`count`**: number of reads in that sample whose 5' end-motif equals this k-mer.
+- **`frequency`**: `count / used_reads_of_that_sample` — frequencies are computed per-sample, not against the pooled total.
+
+When `--include-zero` is enabled (the default), all 4<sup>*k*</sup> motifs are emitted for **every** sample — yielding a tidy, ML-ready fixed-shape feature matrix. Use `--no-include-zero` to drop zero-count rows.
+
+A human-readable summary is also written to **stdout**, listing the per-sample totals (total / filtered / used / N-motif counts) plus an aggregate row.
+
+### Concurrency
+
+File-level parallelism is the granularity used by the motif counter — each worker thread processes a single BAM/CRAM end-to-end, and there is no shared mutable state between workers. The number of workers is automatically capped at `min(--thread, number_of_inputs)`. Pass `-t 1` to force the single-threaded path (useful for deterministic profiling).
+
+### Motif counter examples
+
+**Multi-sample run with 8 worker threads (4-mer end-motif, default filters):**
+
+```bash
+basevar motif \
+    -o end_motif.4mer.tsv \
+    -t 8 \
+    -L bamfile.list
+```
+
+**Restrict to a target region with stricter MAPQ, two samples:**
+
+```bash
+basevar motif \
+    -o end_motif.chr11.tsv \
+    -r chr11:5246595-5248428 \
+    -q 30 \
+    sample1.bam sample2.bam
+```
+
+**Use both R1 and R2 (each fragment contributes two end-motifs), 5-mer:**
+
+```bash
+basevar motif \
+    -o end_motif.5mer.tsv \
+    -l 5 --reads both \
+    -t 4 \
+    -L bamfile.list
+```
+
+**Reproduce the Lo lab cfDNA end-motif method (Jiang 2020) end-to-end:**
+
+```bash
+basevar motif \
+    -o end_motif.lo_lab.tsv \
+    --from-reference -f reference.fa \
+    --reads both --proper-pair --max-insert-size 1000 \
+    -q 30 -l 4 \
+    -t 8 \
+    -L bamfile.list
+```
+
+**Read-based motifs (no FASTA required, BaseVar's conservative default):**
+
+```bash
+basevar motif \
+    -o end_motif.read_based.tsv \
+    -t 8 \
+    -L bamfile.list
+```
+
+With no `--from-reference`, the 5' k-mer is taken directly from the BAM `SEQ` field (the original sequenced bases) rather than the reference. This path does **not** require a FASTA, but it is itself a deviation from the canonical Lo lab convention: the Lo group's reference open-source implementation [FinaleToolkit](https://github.com/epifluidlab/FinaleToolkit) (Zheng et al., bioRxiv 2024.05.29.596414) and the Lo group's own follow-up paper (Mao et al., Cell Genomics 2026) both fetch end-motifs from the FASTA. For cfDNA / NIPT / fragmentomic analyses, prefer the recommended invocation above.
+
+**Force filename-derived sample IDs (useful when BAM headers lack `@RG SM`):**
+
+```bash
+basevar motif \
+    -o end_motif.tsv \
+    --filename-has-samplename \
+    -t 16 \
+    -L bamfile.list
+```
+
+**Process CRAM files (reference required):**
+
+```bash
+basevar motif \
+    -o end_motif.tsv \
+    -f reference.fasta \
+    -L cram.list
+```
 
 ---
 
