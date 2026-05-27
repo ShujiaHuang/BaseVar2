@@ -15,6 +15,7 @@
 #include "concat.h"
 #include "pipeline.h"
 #include "motif_counter.h"
+#include "fetal_fraction.h"  // Hidden subcommand: `basevar fetalfrac` (NOT advertised in usage()).
 
 static int usage() {
     // Usage discription
@@ -87,7 +88,12 @@ int main(int argc, char *argv[]) {
 
     } else if (cmd == "motif") {
         run_stat = basevar::motif::motif_counter_runner(argc-1, argv+1);
-    
+
+    } else if (cmd == "fetalfrac") {
+        // HIDDEN subcommand for NIPT cfDNA male fetal-fraction estimation.
+        // Intentionally not listed in usage() above; invoked only by direct call.
+        run_stat = basevar::fetalfrac::fetal_fraction_runner(argc-1, argv+1);
+
     } else if (cmd == "-h" || cmd == "--help") {
 
         return usage();

@@ -55,7 +55,16 @@ MOTIF_BS_OBJ = $(BSSRC)/motif_counter.o $(BSSRC)/io/bam.o $(BSSRC)/io/bam_header
 test_motif_counter: test_motif_counter.o $(MOTIF_BS_OBJ)
 	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)
 
+# `basevar fetalfrac` (hidden) subcommand unit test.
+# Same linking strategy as test_motif_counter: pull in the module's
+# implementation plus the BaseVar I/O abstractions it depends on.
+FF_BS_OBJ = $(BSSRC)/fetal_fraction.o $(BSSRC)/io/bam.o $(BSSRC)/io/bam_header.o \
+            $(BSSRC)/io/bam_record.o $(BSSRC)/io/utils.o
+test_fetal_fraction: test_fetal_fraction.o $(FF_BS_OBJ)
+	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)
+
 clean:
-	rm -f $(OBJ) test_fasta test_motif_counter test_motif_counter.tsv
+	rm -f $(OBJ) test_fasta test_motif_counter test_motif_counter.tsv \
+	      test_fetal_fraction test_fetal_fraction.tsv test_fetal_fraction.bed
 
 

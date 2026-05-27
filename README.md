@@ -81,14 +81,14 @@ If you see this — or you are on CentOS / RHEL / Rocky / AlmaLinux / older Ubun
 
 ```bash
 # Linux
-wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.3.0/basevar-linux-static
+wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.3.1/basevar-linux-static
 chmod +x basevar-linux-static
 ./basevar-linux-static --help
 ```
 
 ```bash
 # macOS
-curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.3.0/basevar-macos-static
+curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.3.1/basevar-macos-static
 chmod +x basevar-macos-static
 ./basevar-macos-static --help
 ```
