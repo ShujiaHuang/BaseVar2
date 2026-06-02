@@ -24,11 +24,11 @@
 
 ## Update Summary
 **Changes Made**
-- Added comprehensive documentation for the new `basevar fetalfrac` hidden subcommand for NIPT cfDNA male fetal fraction estimation
-- Documented the specialized tool that is intentionally hidden from main help output and used for internal/corporate applications
-- Included detailed parameter references, output formats, and scientific rationale behind the chrY-based estimation method
-- Added practical usage examples for NIPT clinical applications and research workflows
-- Updated command overview and architecture diagrams to reflect the new subcommand
+- Enhanced --noise calibration functionality documentation with comprehensive platform-specific reference values
+- Added mandatory empirical calibration workflow requiring at least 30 confirmed-female-fetus samples processed through identical pipeline configurations
+- Updated fetalfrac command documentation to include detailed calibration procedures, scientific rationale, and extensive citations
+- Added platform-specific noise floor reference values from MGI DNBSEQ/BGISEQ, NovaSeq + UDI, HiSeq X/non-UDI dual, and HiSeq 2500 single-index platforms
+- Updated troubleshooting guidance to address calibration workflow requirements
 
 ## Table of Contents
 1. [Introduction](#introduction)
@@ -43,6 +43,8 @@
 
 ## Introduction
 This document provides a comprehensive command-line interface (CLI) reference for BaseVar2, covering all six primary commands: caller, pipeline, concat, subsam, motif, and the hidden fetalfrac subcommand. It explains syntax, parameters, defaults, output formats, and practical usage scenarios. The caller command focuses on ultra-low-pass WGS variant calling with population-aware allele frequency estimation. The pipeline subcommand generates per-region caller commands for whole-genome analysis. The concat command merges BaseVar-produced VCF files, while subsam extracts specified samples with optional INFO recalculation. The motif subcommand provides cfDNA end-motif counting functionality following the Lo lab convention. The fetalfrac subcommand offers specialized NIPT cfDNA male fetal fraction estimation using chrY read counting methodology, designed for internal/corporate applications and intentionally hidden from main help output.
+
+**Updated** Enhanced documentation for the fetalfrac subcommand with mandatory empirical calibration workflow and comprehensive platform-specific noise floor reference values.
 
 ## Project Structure
 BaseVar2 exposes a unified CLI via a single executable with subcommands routed from the main entry point. Each subcommand is implemented in dedicated modules:
@@ -463,6 +465,25 @@ The fetalfrac subcommand provides specialized NIPT cfDNA male fetal fraction est
 - --noise and --male-threshold enable robust female fetus detection and reporting
 - Use --filename-has-samplename when @RG SM tags are unavailable or unreliable
 
+**Updated** Enhanced documentation for mandatory empirical calibration workflow:
+
+**Mandatory Empirical Calibration Workflow (REQUIRED for clinical use)**:
+1. Run >=30 confirmed-female-fetus samples through the SAME pipeline configuration (same -B / --build / -q / --proper-pair / --max-insert-size / library prep / sequencer model)
+2. From the output TSV, take the empirical y_ratio distribution of those female samples
+3. Set --noise to the median (or 95th percentile) of that distribution
+4. Set --male-threshold to clearly above the noise floor (>= 5x the chosen --noise) so the MALE/FEMALE call is robust
+5. Recalibrate whenever ANY of the inputs in step 1 change
+
+**Platform-Specific Noise Floor Reference Values**:
+- MGI DNBSEQ / BGISEQ: 1e-5 .. 5e-5 (DNB rolling-circle amplification is immune to ExAmp index hopping)
+- NovaSeq + UDI: 1e-5 .. 5e-5
+- HiSeq X / non-UDI dual: 5e-5 .. 1e-4
+- HiSeq 2500 single-index: 1e-4 .. 5e-4
+
+**Scientific Rationale for Calibration Coupling**:
+- --noise and --male-threshold are coupled: if --noise >= --male-threshold, every borderline MALE call is corrected to FF=0 then re-thresholded to FEMALE -- a discontinuity
+- Keep --noise < --male-threshold / 5 to ensure robust MALE/FEMALE classification
+
 **Examples (syntax only)**:
 - Basic NIPT analysis with default scaling
   - basevar fetalfrac -o ff.tsv sample.bam
@@ -536,6 +557,7 @@ F --> G["ngslib::Fasta<br/>Reference genome access"]
 - Reference Access: --from-reference requires loading FASTA index; consider caching reference files for repeated runs.
 - Fetalfrac Performance: File-level parallelism with one worker thread per input file; memory usage scales with number of files and PAR/mappability indexing overhead.
 - PAR Indexing: Building PAR exclusion indices adds startup overhead but improves accuracy for NIPT analysis.
+- Calibration Workflow: The mandatory empirical calibration process requires additional computational resources for processing ≥30 confirmed-female-fetus samples but ensures clinically accurate results.
 
 ## Troubleshooting Guide
 Common issues and resolutions:
@@ -550,7 +572,9 @@ Common issues and resolutions:
 - Motif errors: Verify BAM/CRAM files are indexed; ensure reference FASTA has .fai index when using --from-reference; check that read lengths are sufficient for chosen motif length k.
 - Memory issues: Reduce -t for motif command or use fewer input files; consider --no-include-zero to reduce output size.
 - Fetalfrac errors: Verify BAM/CRAM files are indexed; ensure reference FASTA has .fai index when using CRAM; check that chrY and autosomal regions are present; validate BED files for PAR exclusion and mappability filtering.
+- Calibration workflow errors: Ensure ≥30 confirmed-female-fetus samples are processed through identical pipeline configuration; verify --noise is set to median/95th percentile of female cohort distribution; confirm --male-threshold is ≥5x --noise; validate platform-specific noise floor references.
 - Hidden subcommand: The fetalfrac subcommand is intentionally hidden; ensure you're invoking it directly as `basevar fetalfrac ...` rather than expecting it in `basevar --help`.
+- Calibration coupling violations: If --noise >= --male-threshold, the program will force MALE calls to FF=0 and reclassify as FEMALE; adjust thresholds to maintain robust classification.
 
 **Section sources**
 - [variant_caller.cpp:130-149](file://src/variant_caller.cpp#L130-L149)
@@ -563,4 +587,8 @@ Common issues and resolutions:
 - [fetal_fraction.cpp:529-556](file://src/fetal_fraction.cpp#L529-L556)
 
 ## Conclusion
-BaseVar2's CLI offers a streamlined workflow for ultra-low-pass WGS variant calling, pipeline generation, concatenation, sample subsetting, cfDNA end-motif counting, and specialized NIPT fetal fraction estimation. The enhanced pipeline subcommand provides superior performance and maintainability through native C++ implementation while preserving full backward compatibility with existing workflows. The caller command provides robust defaults and powerful controls for quality thresholds, batching, threading, and population analysis. The concat and subsam commands complement the pipeline by enabling multi-file aggregation and targeted subsetting with optional INFO recalculation. The new motif subcommand represents a major advancement in fragmentomic analysis capabilities, providing comprehensive cfDNA end-motif counting following the Lo lab convention established in Jiang et al., Cancer Discovery 2020. The hidden fetalfrac subcommand provides specialized NIPT cfDNA male fetal fraction estimation using chrY read counting methodology, designed for internal/corporate applications and intentionally hidden from main help output. By tuning parameters to match data scale and hardware resources, users can achieve efficient and accurate variant analysis across single-sample, multi-sample, and large-scale batch scenarios. The native C++ implementation ensures optimal performance for whole-genome analysis while maintaining the flexibility and compatibility of the original Python-based approach. The addition of cfDNA end-motif counting and specialized fetal fraction estimation functionality positions BaseVar2 as a comprehensive toolkit for both traditional variant calling and modern fragmentomic analysis applications, with specialized tools for NIPT clinical workflows.
+BaseVar2's CLI offers a streamlined workflow for ultra-low-pass WGS variant calling, pipeline generation, concatenation, sample subsetting, cfDNA end-motif counting, and specialized NIPT fetal fraction estimation. The enhanced pipeline subcommand provides superior performance and maintainability through native C++ implementation while preserving full backward compatibility with existing workflows. The caller command provides robust defaults and powerful controls for quality thresholds, batching, threading, and population analysis. The concat and subsam commands complement the pipeline by enabling multi-file aggregation and targeted subsetting with optional INFO recalculation. The new motif subcommand represents a major advancement in fragmentomic analysis capabilities, providing comprehensive cfDNA end-motif counting following the Lo lab convention established in Jiang et al., Cancer Discovery 2020. The hidden fetalfrac subcommand provides specialized NIPT cfDNA male fetal fraction estimation using chrY read counting methodology, designed for internal/corporate applications and intentionally hidden from main help output.
+
+**Updated** The fetalfrac subcommand now includes mandatory empirical calibration workflow requiring at least 30 confirmed-female-fetus samples processed through identical pipeline configurations, with comprehensive platform-specific reference values and scientific rationale. This enhancement ensures clinically accurate results across different sequencing platforms and library preparation methods.
+
+By tuning parameters to match data scale and hardware resources, users can achieve efficient and accurate variant analysis across single-sample, multi-sample, and large-scale batch scenarios. The native C++ implementation ensures optimal performance for whole-genome analysis while maintaining the flexibility and compatibility of the original Python-based approach. The addition of cfDNA end-motif counting and specialized fetal fraction estimation functionality positions BaseVar2 as a comprehensive toolkit for both traditional variant calling and modern fragmentomic analysis applications, with specialized tools for NIPT clinical workflows and mandatory calibration requirements for regulatory compliance.
