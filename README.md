@@ -454,7 +454,7 @@ Motifs containing **any non-ACGT base** — i.e. `N` *or* an IUPAC ambiguity cod
 About: Count cfDNA end-motif (k-mer) frequencies from BAM/CRAM alignments.
        Each input BAM/CRAM is treated as one sample; per-sample counts are
        emitted in a single TSV (long format).
-       Method follows Jiang et al., Cancer Discovery 2020 (PMID: 31911138).
+       Method follows Jiang et al., Cancer Discovery 2020 (PMID: 32111602).
 Usage: basevar motif [options] <-o output.tsv> [-L bam.list] in1.bam [in2.bam ...]
 
 Required arguments:
