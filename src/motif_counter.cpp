@@ -244,7 +244,7 @@ static const std::string MOTIF_USAGE =
     "About: Count cfDNA end-motif (k-mer) frequencies from BAM/CRAM alignments.\n"
     "       Each input BAM/CRAM is treated as one sample; per-sample counts are\n"
     "       emitted in a single TSV (long format).\n"
-    "       Method follows Jiang et al., Cancer Discovery 2020 (PMID: 31911138).\n"
+    "       Method follows Jiang et al., Cancer Discovery 2020 (PMID: 32111602).\n"
     "Usage: basevar motif [options] <-o output.tsv> [-L bam.list] in1.bam [in2.bam ...]\n\n"
 
     "Required arguments:\n"
