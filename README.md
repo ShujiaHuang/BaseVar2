@@ -669,7 +669,7 @@ basevar motif \
 
 ### Comparison with FinaleToolkit
 
-[FinaleToolkit](https://github.com/epifluidlab/FinaleToolkit) (Zheng *et al.*, bioRxiv 2024.05.29.596414) is the open-source Python reference implementation from the Lo lab for cfDNA fragmentomics. It provides end-motif counting alongside several other features (WPS, DELFI, cleavage profile, fragment length, breakpoint motifs, and MDS). `basevar motif` focuses exclusively on end-motif counting and F-profile decomposition, but does so with significant performance and deployment advantages:
+[FinaleToolkit](https://github.com/epifluidlab/FinaleToolkit) is the open-source Python reference implementation from the Lo lab for cfDNA fragmentomics. It provides end-motif counting alongside several other features (WPS, DELFI, cleavage profile, fragment length, breakpoint motifs, and MDS). `basevar motif` focuses exclusively on end-motif counting and F-profile decomposition, but does so with significant performance and deployment advantages:
 
 | Feature | `basevar motif` | FinaleToolkit `end-motifs` |
 | ------- | :--------------: | :------------------------: |
