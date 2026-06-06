@@ -15,6 +15,7 @@
 // Date:   2026-05-26
 
 #include <cassert>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
@@ -31,6 +32,7 @@ using basevar::motif::reverse_complement_base;
 using basevar::motif::extract_5p_motif;
 using basevar::motif::extract_5p_motif_from_reference;
 using basevar::motif::MotifCounterRunner;
+using basevar::motif::SampleResult;
 
 static int g_pass = 0;
 static int g_fail = 0;
@@ -458,6 +460,93 @@ static void test_from_reference(const std::string& bam_path,
           "--from-reference: TSV row counts sum to used_reads");
 }
 
+// ------------------------------------------------------------
+// Test 8: --fprofile F-profile decomposition
+// ------------------------------------------------------------
+static void test_fprofile(const std::string& bam_path) {
+    std::cout << "[Test 8] --fprofile F-profile decomposition on " << bam_path << "\n";
+
+    const std::string fp_out = "test_motif_counter_fprofile.tsv";
+
+    // Helper: run with given args, return the runner results.
+    auto run = [&](std::vector<std::string> args) -> std::vector<SampleResult> {
+        std::vector<char*> argv;
+        for (auto& s : args) argv.push_back(&s[0]);
+        MotifCounterRunner runner(static_cast<int>(argv.size()), argv.data());
+        int rc = runner.run();
+        CHECK(rc == 0, "runner.run() returns 0 for --fprofile test");
+        return runner.results();
+    };
+
+    // 8a. --fprofile with k=4 produces weights for every sample.
+    {
+        auto results = run({"motif", "-l", "4", "-q", "0", "-t", "1",
+                            "--fprofile", "--fprofile-output", fp_out,
+                            bam_path});
+        CHECK(!results.empty(), "--fprofile run produces at least one result");
+        if (!results.empty()) {
+            const auto& w = results.front().fprofile_weights;
+            CHECK(w.size() == 6, "fprofile_weights has exactly 6 elements");
+
+            // Weights should sum to ~1.0.
+            double wsum = 0.0;
+            for (double v : w) wsum += v;
+            CHECK(std::abs(wsum - 1.0) < 1e-4,
+                  "F-profile weights sum to ~1.0");
+
+            // Every weight must be non-negative.
+            bool all_nonneg = true;
+            for (double v : w) if (v < -1e-9) { all_nonneg = false; break; }
+            CHECK(all_nonneg, "all F-profile weights are non-negative");
+        }
+
+        // F-profile output TSV should exist and be well-formed.
+        long lines = count_lines(fp_out);
+        CHECK(lines == 2, "F-profile TSV has 2 lines (1 header + 1 sample)");
+
+        std::string hdr = first_line(fp_out);
+        CHECK(hdr.find("F-profile I") != std::string::npos,
+              "F-profile TSV header contains 'F-profile I'");
+        CHECK(hdr.find("F-profile VI") != std::string::npos,
+              "F-profile TSV header contains 'F-profile VI'");
+        CHECK(hdr.find("sample") != std::string::npos,
+              "F-profile TSV header starts with 'sample'");
+    }
+
+    // 8b. --fprofile-output implies --fprofile (no explicit --fprofile needed).
+    {
+        auto results = run({"motif", "-l", "4", "-q", "0", "-t", "1",
+                            "--fprofile-output", fp_out,
+                            bam_path});
+        if (!results.empty()) {
+            CHECK(!results.front().fprofile_weights.empty(),
+                  "--fprofile-output implies --fprofile (weights computed)");
+        }
+    }
+
+    // 8c. Without --fprofile, weights must be empty.
+    {
+        auto results = run({"motif", "-l", "4", "-q", "0", "-t", "1",
+                            bam_path});
+        if (!results.empty()) {
+            CHECK(results.front().fprofile_weights.empty(),
+                  "without --fprofile, fprofile_weights is empty");
+        }
+    }
+
+    // 8d. k != 4 should produce empty weights (F-profiles only defined for k=4).
+    {
+        auto results = run({"motif", "-l", "5", "-q", "0", "-t", "1",
+                            "--fprofile", bam_path});
+        if (!results.empty()) {
+            CHECK(results.front().fprofile_weights.empty(),
+                  "--fprofile with k=5 produces empty weights (k != 4 disabled)");
+        }
+    }
+
+    std::remove(fp_out.c_str());
+}
+
 int main(int argc, char* argv[]) {
     // Allow caller to override the test BAM path; default matches the
     // existing fixture used by test_bam.cpp.
@@ -521,9 +610,18 @@ int main(int argc, char* argv[]) {
     std::remove("test_motif_counter_multi.tsv");
     std::remove("test_motif_counter_ref.tsv");
 
+    // Test 8: --fprofile F-profile decomposition.
+    try {
+        test_fprofile(bam_path);
+    } catch (const std::exception& e) {
+        std::cerr << "[FAIL] exception in fprofile test: " << e.what() << "\n";
+        ++g_fail;
+    }
+
     std::cout << "\n=================================\n";
     std::cout << "  passed: " << g_pass << "\n";
     std::cout << "  failed: " << g_fail << "\n";
     std::cout << "=================================\n";
     return g_fail == 0 ? 0 : 1;
 }
+

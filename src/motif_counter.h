@@ -116,6 +116,7 @@ struct SampleResult {
     uint64_t used_reads      = 0; ///< Reads that contributed to motif counts.
     uint64_t n_motifs_with_n = 0; ///< Reads whose extracted motif contained a non-ACGT base (N or IUPAC ambiguity code, e.g. M/R/Y) - excluded.
     std::map<std::string, uint64_t> motif_counts;  ///< Always populated with all 4^k keys.
+    std::vector<double> fprofile_weights;          ///< F-profile weights (size 6 if computed, empty otherwise).
 };
 
 /**
@@ -138,6 +139,8 @@ struct MotifArgs {
     bool        from_reference;          // --from-reference: extract motif from reference genome
                                          //                   instead of the read's own bases.
                                          //                   Requires --reference. Default off.
+    bool        fprofile;                // --fprofile: compute F-profile decomposition (k=4 only).
+    std::string fprofile_output;         // --fprofile-output FILE: write per-sample F-profile weights TSV.
 
     MotifArgs()
         : motif_length(4),
@@ -148,7 +151,8 @@ struct MotifArgs {
           filename_has_samplename(false),
           proper_pair(false),
           max_insert_size(0),
-          from_reference(false)
+          from_reference(false),
+          fprofile(false)
     {
         if (thread_num < 1) thread_num = 1;
     }
@@ -203,6 +207,9 @@ private:
 
     /// Write the per-sample TSV file.
     void _write_tsv(const std::string& path) const;
+
+    /// Write per-sample F-profile weights to a separate TSV file.
+    void _write_fprofile_tsv(const std::string& path) const;
 
     /// Print a human-readable per-sample summary (English).
     void _print_summary(std::ostream& os) const;

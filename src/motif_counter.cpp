@@ -75,11 +75,13 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <numeric>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_set>
 
 #include "external/thread_pool.h"
+#include "fprofile_data.h"
 #include "io/bam_header.h"
 #include "io/fasta.h"
 #include "io/utils.h"
@@ -154,9 +156,10 @@ std::string extract_5p_motif_from_reference(const ngslib::BamRecord& r,
             const uint32_t s = static_cast<uint32_t>(end - k);
             const uint32_t e = static_cast<uint32_t>(end);
             if (e > chrom_len) return "";
-            // Fasta::fetch is half-open [start, end).  However, htslib's
-            // faidx_fetch_seq treats `end` as INCLUSIVE; ngslib::Fasta::fetch
-            // wraps it directly, so pass (e - 1) to mean "last position".
+            // Fasta::fetch(chrom, start, end) wraps htslib's
+            // faidx_fetch_seq, which takes an INCLUSIVE end position
+            // (0-based).  To fetch k bases at [s, s+k) in half-open
+            // notation, pass end = s + k - 1 (inclusive).
             ref_kmer = fa.fetch(chrom, s, e - 1);
         } else {
             // Forward-mapped read: 5' end is the leftmost aligned position.
@@ -237,6 +240,160 @@ static inline bool is_pure_acgt(const std::string& s) {
 }
 
 // ============================================================
+// NNLS solver (Lawson-Hanson algorithm)
+// ============================================================
+
+// Solve a small dense linear system  M * x = rhs  via Gauss-Jordan
+// elimination with partial pivoting.  M is k x k, rhs is k x 1.
+// Returns false if the matrix is (numerically) singular.
+static bool solve_linear_system(std::vector<double> M,
+                                std::vector<double> rhs,
+                                std::vector<double>& x,
+                                int k) {
+    x.assign(k, 0.0);
+
+    for (int col = 0; col < k; ++col) {
+        // Partial pivoting: find the row with the largest absolute value.
+        int max_row = col;
+        double max_val = std::abs(M[col * k + col]);
+        for (int row = col + 1; row < k; ++row) {
+            double v = std::abs(M[row * k + col]);
+            if (v > max_val) { max_val = v; max_row = row; }
+        }
+        if (max_val < 1e-15) return false;  // singular
+
+        if (max_row != col) {
+            for (int j = 0; j < k; ++j)
+                std::swap(M[col * k + j], M[max_row * k + j]);
+            std::swap(rhs[col], rhs[max_row]);
+        }
+
+        double pivot = M[col * k + col];
+        for (int j = col; j < k; ++j)
+            M[col * k + j] /= pivot;
+        rhs[col] /= pivot;
+
+        for (int row = 0; row < k; ++row) {
+            if (row == col) continue;
+            double factor = M[row * k + col];
+            for (int j = col; j < k; ++j)
+                M[row * k + j] -= factor * M[col * k + j];
+            rhs[row] -= factor * rhs[col];
+        }
+    }
+
+    x = std::move(rhs);
+    return true;
+}
+
+// Non-negative least squares:  minimise ||A x - b||^2  subject to  x >= 0.
+//
+//   m = number of observations  (256 for 4-mer frequencies)
+//   n = number of unknowns      (  6 for F-profiles)
+//   A is stored row-major as m * n.
+//
+// Implements the Lawson-Hanson algorithm (1974, Chapter 23).
+static std::vector<double> nnls_solve(const std::vector<double>& A,
+                                      const std::vector<double>& b,
+                                      int m, int n) {
+    const double EPS = 1e-12;
+    std::vector<double> x(n, 0.0);
+
+    // Pre-compute the Gram matrix  G = A^T A  and  Atb = A^T b.
+    std::vector<double> G(n * n, 0.0), Atb(n, 0.0);
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j)
+            for (int k = 0; k < m; ++k)
+                G[i * n + j] += A[k * n + i] * A[k * n + j];
+        for (int k = 0; k < m; ++k)
+            Atb[i] += A[k * n + i] * b[k];
+    }
+
+    std::vector<bool> in_passive(n, false);
+
+    // Outer loop: at most 3n iterations (Lawson-Hanson bound).
+    for (int outer = 0; outer < 3 * n; ++outer) {
+        // Gradient:  w = A^T (b - A x)  =  Atb  -  G x.
+        std::vector<double> w(n, 0.0);
+        for (int j = 0; j < n; ++j) {
+            w[j] = Atb[j];
+            for (int i = 0; i < n; ++i)
+                w[j] -= G[j * n + i] * x[i];
+        }
+
+        // Find the maximum gradient component among active (non-passive) vars.
+        double max_w = 0.0;
+        int    max_t = -1;
+        for (int j = 0; j < n; ++j) {
+            if (!in_passive[j] && w[j] > max_w) {
+                max_w = w[j];
+                max_t = j;
+            }
+        }
+        if (max_t < 0 || max_w <= EPS) break;  // converged
+
+        in_passive[max_t] = true;
+
+        // Inner loop: shrink passive set until all coefficients are positive.
+        for (int inner = 0; inner < 3 * n; ++inner) {
+            // Collect passive-set indices.
+            std::vector<int> pidx;
+            for (int j = 0; j < n; ++j)
+                if (in_passive[j]) pidx.push_back(j);
+            const int np = static_cast<int>(pidx.size());
+
+            // Solve the normal-equation sub-system on the passive set:
+            //   G_P s_P = Atb_P
+            std::vector<double> Gp(np * np), bp(np), sp(np);
+            for (int i = 0; i < np; ++i) {
+                bp[i] = Atb[pidx[i]];
+                for (int j = 0; j < np; ++j)
+                    Gp[i * np + j] = G[pidx[i] * n + pidx[j]];
+            }
+            if (!solve_linear_system(Gp, bp, sp, np)) break;  // singular
+
+            // Check whether every passive coefficient is positive.
+            bool all_positive = true;
+            for (int i = 0; i < np; ++i) {
+                if (sp[i] <= EPS) { all_positive = false; break; }
+            }
+
+            if (all_positive) {
+                // Accept the unconstrained sub-solution.
+                for (int i = 0; i < np; ++i) x[pidx[i]] = sp[i];
+                break;
+            }
+
+            // Interpolate: find the largest alpha in [0,1] such that
+            //   x_new = x + alpha * (s - x) >= 0  for all passive indices.
+            double alpha = 1.0;
+            for (int i = 0; i < np; ++i) {
+                if (sp[i] <= EPS) {
+                    double denom = x[pidx[i]] - sp[i];
+                    if (denom > EPS) {
+                        double a = x[pidx[i]] / denom;
+                        if (a < alpha) alpha = a;
+                    }
+                }
+            }
+
+            for (int i = 0; i < np; ++i)
+                x[pidx[i]] += alpha * (sp[i] - x[pidx[i]]);
+
+            // Move indices whose weight hit zero back to the active set.
+            for (int i = 0; i < np; ++i) {
+                if (x[pidx[i]] < EPS) {
+                    x[pidx[i]] = 0.0;
+                    in_passive[pidx[i]] = false;
+                }
+            }
+        }
+    }
+
+    return x;
+}
+
+// ============================================================
 // MotifCounterRunner
 // ============================================================
 
@@ -287,6 +444,16 @@ static const std::string MOTIF_USAGE =
     "                               are extracted from the read's own sequenced bases\n"
     "                               (BaseVar's conservative fallback that does not\n"
     "                               require a FASTA). [off]\n"
+    "      --fprofile                Compute F-profile decomposition weights using\n"
+    "                               the 6 reference profiles from Zhou et al. (2023)\n"
+    "                               PNAS (doi: 10.1073/pnas.2220982120).  Uses\n"
+    "                               non-negative least squares (NNLS) to decompose\n"
+    "                               the observed 256 4-mer frequencies into tissue\n"
+    "                               contribution proportions.  Only valid for k=4;\n"
+    "                               silently disabled for other values. [off]\n"
+    "      --fprofile-output FILE    Write per-sample F-profile weights to FILE (TSV).\n"
+    "                               Implies --fprofile.  Output columns: sample,\n"
+    "                               F-profile I through F-profile VI.\n"
     "  -h, --help                   Show this help message and exit.\n\n"
     
     "Recommended cfDNA / NIPT invocation (Lo lab convention):\n"
@@ -305,6 +472,8 @@ enum {
     OPT_PROPER_PAIR,      // 1005
     OPT_MAX_INSERT_SIZE,  // 1006
     OPT_FROM_REFERENCE,   // 1007
+    OPT_FPROFILE,         // 1008
+    OPT_FPROFILE_OUTPUT,  // 1009
 };
 
 MotifCounterRunner::MotifCounterRunner(int argc, char* argv[])
@@ -332,6 +501,8 @@ MotifCounterRunner::MotifCounterRunner(int argc, char* argv[])
         {"proper-pair",             no_argument,       NULL, OPT_PROPER_PAIR},
         {"max-insert-size",   required_argument, NULL, OPT_MAX_INSERT_SIZE},
         {"from-reference",          no_argument,       NULL, OPT_FROM_REFERENCE},
+        {"fprofile",                no_argument,       NULL, OPT_FPROFILE},
+        {"fprofile-output",   required_argument, NULL, OPT_FPROFILE_OUTPUT},
         {"help",                  no_argument, NULL, 'h'},
         {0, 0, 0, 0}
     };
@@ -369,6 +540,8 @@ MotifCounterRunner::MotifCounterRunner(int argc, char* argv[])
             case OPT_PROPER_PAIR:            _args->proper_pair             = true;  break;
             case OPT_MAX_INSERT_SIZE:        ss >> _args->max_insert_size;           break;
             case OPT_FROM_REFERENCE:         _args->from_reference          = true;  break;
+            case OPT_FPROFILE:               _args->fprofile                = true;  break;
+            case OPT_FPROFILE_OUTPUT:        _args->fprofile_output         = optarg; break;
 
             case 'h':
                 std::cout << MOTIF_USAGE << std::endl;
@@ -407,6 +580,15 @@ MotifCounterRunner::MotifCounterRunner(int argc, char* argv[])
                                     "(a FASTA file with a .fai index).");
     }
     if (_args->thread_num < 1) _args->thread_num = 1;
+    // --fprofile-output implies --fprofile.
+    if (!_args->fprofile_output.empty()) _args->fprofile = true;
+    // F-profile decomposition is only defined for k=4.
+    if (_args->fprofile && _args->motif_length != 4) {
+        std::cerr << "[WARN] F-profile decomposition requires k=4 (got k="
+                  << _args->motif_length << "); disabling --fprofile.\n";
+        _args->fprofile = false;
+        _args->fprofile_output.clear();
+    }
 }
 
 MotifCounterRunner::~MotifCounterRunner() {
@@ -579,6 +761,30 @@ void MotifCounterRunner::_write_tsv(const std::string& path) const {
     ofs.close();
 }
 
+void MotifCounterRunner::_write_fprofile_tsv(const std::string& path) const {
+    std::ofstream ofs(path);
+    if (!ofs) {
+        throw std::runtime_error(
+            "[ERROR] Cannot open F-profile output TSV for writing: " + path);
+    }
+
+    // Header.
+    ofs << "sample";
+    for (int i = 0; i < NUM_FPROFILES; ++i)
+        ofs << "\t" << FPROFILE_NAMES[i];
+    ofs << "\n";
+
+    ofs << std::fixed << std::setprecision(6);
+    for (const auto& s : _results) {
+        if (s.fprofile_weights.empty()) continue;
+        ofs << s.sample_id;
+        for (int i = 0; i < NUM_FPROFILES; ++i)
+            ofs << "\t" << s.fprofile_weights[i];
+        ofs << "\n";
+    }
+    ofs.close();
+}
+
 void MotifCounterRunner::_print_summary(std::ostream& os) const {
     os << "\n=== cfDNA End-Motif Statistics ===\n"
        << "Motif length (k):    " << _args->motif_length << "\n"
@@ -638,6 +844,32 @@ void MotifCounterRunner::_print_summary(std::ostream& os) const {
            << std::setw(10) << compute_mds(s) << "\n";
         os.unsetf(std::ios::fixed);  // prevent fixed-point bleed into next iteration
     }
+
+    // F-profile weights section (only if computed).
+    bool has_fprofile = false;
+    for (const auto& s : _results) {
+        if (!s.fprofile_weights.empty()) { has_fprofile = true; break; }
+    }
+    if (!has_fprofile) return;
+
+    os << "\n-- F-profile weights (Zhou et al., PNAS 2023) --\n"
+       << std::left << std::setw(24) << "Sample";
+    for (int i = 0; i < NUM_FPROFILES; ++i)
+        os << std::right << std::setw(14) << FPROFILE_NAMES[i];
+    os << "\n";
+    // 24 + 6 * 14 = 108 characters.
+    for (int i = 0; i < 108; ++i) os << '-';
+    os << "\n";
+
+    for (const auto& s : _results) {
+        if (s.fprofile_weights.empty()) continue;
+        os << std::left << std::setw(24) << s.sample_id;
+        os << std::right << std::fixed << std::setprecision(6);
+        for (int i = 0; i < NUM_FPROFILES; ++i)
+            os << std::setw(14) << s.fprofile_weights[i];
+        os << "\n";
+        os.unsetf(std::ios::fixed);
+    }
 }
 
 int MotifCounterRunner::run() {
@@ -647,6 +879,14 @@ int MotifCounterRunner::run() {
         if (!probe) {
             throw std::runtime_error("[ERROR] Cannot open output TSV for writing: "
                                      + _args->output_file);
+        }
+        probe.close();
+    }
+    if (!_args->fprofile_output.empty()) {
+        std::ofstream probe(_args->fprofile_output);
+        if (!probe) {
+            throw std::runtime_error("[ERROR] Cannot open F-profile output TSV for writing: "
+                                     + _args->fprofile_output);
         }
         probe.close();
     }
@@ -697,10 +937,52 @@ int MotifCounterRunner::run() {
         }
     }
 
+    // Stage 3: F-profile decomposition (k=4 only, opt-in).
+    if (_args->fprofile) {
+        std::cerr << "[INFO] Computing F-profile decomposition (Zhou et al., PNAS 2023)...\n";
+
+        // Build the reference matrix  A  (256 x 6) from the embedded data.
+        std::vector<double> A(NUM_KMERS_FPROFILE * NUM_FPROFILES);
+        for (int i = 0; i < NUM_KMERS_FPROFILE; ++i)
+            for (int j = 0; j < NUM_FPROFILES; ++j)
+                A[i * NUM_FPROFILES + j] = FPROFILE_DATA[i][j];
+
+        for (auto& s : _results) {
+            if (s.used_reads == 0) continue;
+
+            // Build the observed frequency vector in lexicographic kmer order.
+            std::vector<double> b(NUM_KMERS_FPROFILE, 0.0);
+            const double total = static_cast<double>(s.used_reads);
+            for (int i = 0; i < NUM_KMERS_FPROFILE; ++i) {
+                auto it = s.motif_counts.find(FPROFILE_KMER_ORDER[i]);
+                if (it != s.motif_counts.end())
+                    b[i] = static_cast<double>(it->second) / total;
+            }
+
+            // Solve  min ||A x - b||^2  subject to  x >= 0.
+            std::vector<double> raw = nnls_solve(A, b,
+                                                  NUM_KMERS_FPROFILE,
+                                                  NUM_FPROFILES);
+
+            // Normalize to proportions (sum to 1).
+            double wsum = 0.0;
+            for (double w : raw) wsum += w;
+            if (wsum > 0.0) {
+                for (double& w : raw) w /= wsum;
+            }
+            s.fprofile_weights = std::move(raw);
+        }
+    }
+
     _print_summary(std::cout);
     if (!_args->output_file.empty()) {
         _write_tsv(_args->output_file);
         std::cerr << "[INFO] Wrote per-sample TSV to: " << _args->output_file << "\n";
+    }
+    if (_args->fprofile && !_args->fprofile_output.empty()) {
+        _write_fprofile_tsv(_args->fprofile_output);
+        std::cerr << "[INFO] Wrote F-profile weights to: "
+                  << _args->fprofile_output << "\n";
     }
     return 0;
 }

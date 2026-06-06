@@ -81,14 +81,14 @@ If you see this — or you are on CentOS / RHEL / Rocky / AlmaLinux / older Ubun
 
 ```bash
 # Linux
-wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.3.1/basevar-linux-static
+wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.4.0/basevar-linux-static
 chmod +x basevar-linux-static
 ./basevar-linux-static --help
 ```
 
 ```bash
 # macOS
-curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.3.1/basevar-macos-static
+curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.4.0/basevar-macos-static
 chmod +x basevar-macos-static
 ./basevar-macos-static --help
 ```
@@ -497,6 +497,16 @@ Optional arguments:
                                are extracted from the read's own sequenced bases
                                (BaseVar's conservative fallback that does not
                                require a FASTA). [off]
+      --fprofile                Compute F-profile decomposition weights using
+                               the 6 reference profiles from Zhou et al. (2023)
+                               PNAS (doi: 10.1073/pnas.2220982120).  Uses
+                               non-negative least squares (NNLS) to decompose
+                               the observed 256 4-mer frequencies into tissue
+                               contribution proportions.  Only valid for k=4;
+                               silently disabled for other values. [off]
+      --fprofile-output FILE    Write per-sample F-profile weights to FILE (TSV).
+                               Implies --fprofile.  Output columns: sample,
+                               F-profile I through F-profile VI.
   -h, --help                   Show this help message and exit.
 
 Recommended cfDNA / NIPT invocation (Lo lab convention):
@@ -547,6 +557,24 @@ When `--include-zero` is enabled (the default), all 4<sup>*k*</sup> motifs are e
 
 A human-readable summary is also written to **stdout**, listing the per-sample totals (total / filtered / used / N-motif counts) plus an aggregate row.
 
+### F-profile decomposition (`--fprofile`)
+
+When `--fprofile` is enabled (k=4 only), `basevar motif` decomposes each sample's 256 4-mer frequency vector into the six **"founder" end-motif profiles (F-profiles I–VI)** discovered by **Zhou *et al.*, *PNAS* 2023** ([doi: 10.1073/pnas.2220982120](https://doi.org/10.1073/pnas.2220982120)) via non-negative matrix factorization (NMF) on large cfDNA cohorts. The decomposition uses the **Lawson–Hanson non-negative least squares (NNLS)** algorithm, then normalizes the raw weights to proportions summing to 1.0.
+
+Each F-profile represents a distinct cfDNA cleavage pattern, likely corresponding to a different nuclease or biological process. The six weights per sample can be interpreted as tissue contribution proportions — useful for fetal fraction estimation in NIPT, tumor fraction in cancer, and general tissue-of-origin deconvolution.
+
+**F-profile output TSV** (written by `--fprofile-output`):
+
+```tsv
+sample  F-profile I  F-profile II  F-profile III  F-profile IV  F-profile V  F-profile VI
+SampleA  0.234100  0.152300  0.087600  0.201200  0.183400  0.141400
+SampleB  0.189200  0.210300  0.045600  0.253400  0.167800  0.133700
+```
+
+F-profile weights are also displayed in the stdout summary table alongside MDS.
+
+> **Note:** F-profile decomposition is only defined for k=4 (256 4-mers). When `--fprofile` is used with a different motif length, a warning is printed and the feature is silently disabled.
+
 ### Concurrency
 
 File-level parallelism is the granularity used by the motif counter — each worker thread processes a single BAM/CRAM end-to-end, and there is no shared mutable state between workers. The number of workers is automatically capped at `min(--thread, number_of_inputs)`. Pass `-t 1` to force the single-threaded path (useful for deterministic profiling).
@@ -593,6 +621,21 @@ basevar motif \
     -t 8 \
     -L bamfile.list
 ```
+
+**Compute F-profile decomposition weights (tissue deconvolution):**
+
+```bash
+basevar motif \
+    -o end_motif.tsv \
+    --from-reference -f reference.fa \
+    --reads both --proper-pair --max-insert-size 1000 \
+    --fprofile --fprofile-output fprofile_weights.tsv \
+    -q 30 -l 4 \
+    -t 8 \
+    -L bamfile.list
+```
+
+The `fprofile_weights.tsv` file contains 6 columns (F-profile I–VI) per sample, with values summing to 1.0 — representing the proportional contribution of each founder cleavage profile.
 
 **Read-based motifs (no FASTA required, BaseVar's conservative default):**
 
