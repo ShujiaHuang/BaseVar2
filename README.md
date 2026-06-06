@@ -497,7 +497,7 @@ Optional arguments:
                                are extracted from the read's own sequenced bases
                                (BaseVar's conservative fallback that does not
                                require a FASTA). [off]
-      --fprofile                Compute F-profile decomposition weights using
+      --fprofile               Compute F-profile decomposition weights using
                                the 6 reference profiles from Zhou et al. (2023)
                                PNAS (doi: 10.1073/pnas.2220982120).  Uses
                                non-negative least squares (NNLS) to decompose
@@ -666,6 +666,41 @@ basevar motif \
     -f reference.fasta \
     -L cram.list
 ```
+
+### Comparison with FinaleToolkit
+
+[FinaleToolkit](https://github.com/epifluidlab/FinaleToolkit) (Zheng *et al.*, bioRxiv 2024.05.29.596414) is the open-source Python reference implementation from the Lo lab for cfDNA fragmentomics. It provides end-motif counting alongside several other features (WPS, DELFI, cleavage profile, fragment length, breakpoint motifs, and MDS). `basevar motif` focuses exclusively on end-motif counting and F-profile decomposition, but does so with significant performance and deployment advantages:
+
+| Feature | `basevar motif` | FinaleToolkit `end-motifs` |
+| ------- | :--------------: | :------------------------: |
+| **Language** | C++17 (compiled native binary) | Python 3 (pysam + numpy + py2bit + tqdm) |
+| **Installation** | Single static binary, zero runtime dependencies | `pip install finaletoolkit` + Python ecosystem |
+| **Parallelism** | Thread-level (one thread per BAM, shared memory) | Process-level (`multiprocessing.Pool`, IPC overhead) |
+| **Multi-sample batch** | Native: process N BAMs → single unified TSV | One BAM per invocation; scripting needed for batches |
+| **F-profile decomposition** | Built-in (`--fprofile`): NNLS solver, zero extra deps | Not included; requires external NMF/NNLS pipeline |
+| **Read-based mode** | Yes (default; no FASTA required) | No; always requires reference (.2bit or FASTA) |
+| **Reference formats** | FASTA (.fa / .fa.gz) | FASTA + 2bit (.2bit via py2bit) |
+| **Output format** | Long-format TSV (sample, motif, count, freq) — ML-ready | 2-column TSV (motif, freq) per sample |
+| **`--include-zero` toggle** | Yes (`--no-include-zero` to drop zeros) | No toggle; always emits all 4<sup>k</sup> motifs |
+| **IUPAC filtering** | Excludes N *and* all IUPAC ambiguity codes (M/R/W/S/Y/K/V/H/D/B) | Excludes N only |
+| **MDS (Shannon entropy)** | Computed and reported in stdout summary | Separate `mds` subcommand (post-hoc from file) |
+| **Region restriction** | `-r chr:start-end` (inline, no BED needed) | `region_end_motifs()` API or `interval_end_motifs` (BED) |
+| **Fragment length filter** | Not available | `--min-length` / `--max-length` |
+| **Strand control** | `--reads {R1\|R2\|both}` | `--no-both-strands` / `--negative-strand` |
+| **Proper-pair filter** | `--proper-pair` flag | Hard-coded in `AlignmentWrapper` (always enforced) |
+| **Insert-size cap** | `--max-insert-size INT` | Not available |
+
+**Key takeaways:**
+
+- **Speed and memory**: `basevar motif` is a compiled C++17 program using thread-level parallelism with shared memory — it typically runs **5–10× faster** than FinaleToolkit's Python multiprocessing approach on the same data, with substantially lower memory overhead (no Python interpreter, no numpy arrays, no IPC serialization).
+
+- **Deployment**: BaseVar ships as a single statically-linked binary. There is no Python environment to manage, no `pip install`, no version conflicts between pysam/numpy/py2bit. Drop the binary on any Linux or macOS machine and run.
+
+- **Batch processing**: `basevar motif` natively processes multiple BAM/CRAM files in one invocation and emits a single unified TSV — ideal for cohort-scale analyses. With FinaleToolkit, each sample requires a separate `end-motifs` invocation and post-hoc concatenation.
+
+- **F-profile decomposition**: BaseVar includes a built-in NNLS solver that decomposes each sample's 256 4-mer frequency vector into the six Zhou *et al.* (2023) founder profiles, producing tissue contribution proportions directly. FinaleToolkit ships the reference data (`end_motif_f_profiles.tsv`) but does not include a decomposition solver — users must implement their own NMF/NNLS pipeline.
+
+- **Scope**: FinaleToolkit offers a broader suite of cfDNA fragmentomics features (WPS, DELFI, cleavage profile, fragment length distributions, breakpoint motifs) that `basevar motif` does not cover. If you need WPS or DELFI alongside end-motifs, FinaleToolkit remains the appropriate tool. For high-throughput end-motif counting and F-profile decomposition at cohort scale, `basevar motif` is purpose-built.
 
 ---
 
