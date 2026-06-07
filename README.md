@@ -490,12 +490,9 @@ Optional arguments:
                                Silently ignored for SE data. [0]
       --from-reference         Extract motifs from the REFERENCE genome at each
                                fragment's 5' alignment position (canonical Lo lab
-                               cfDNA method, as implemented in FinaleToolkit /
-                               Zheng et al., bioRxiv 2024.05.29.596414).  Requires
-                               -f/--reference.  Recommended for cfDNA / NIPT /
-                               fragmentomic analyses.  When OFF (default), motifs
-                               are extracted from the read's own sequenced bases
-                               (BaseVar's conservative fallback that does not
+                               cfDNA method). -f/--reference.  When OFF (default),
+                               motifs are extracted from the read's own sequenced
+                               bases (BaseVar's conservative fallback that does not
                                require a FASTA). [off]
       --fprofile               Compute F-profile decomposition weights using
                                the 6 reference profiles from Zhou et al. (2023)
@@ -504,8 +501,8 @@ Optional arguments:
                                the observed 256 4-mer frequencies into tissue
                                contribution proportions.  Only valid for k=4;
                                silently disabled for other values. [off]
-      --fprofile-output FILE    Write per-sample F-profile weights to FILE (TSV).
-                               Implies --fprofile.  Output columns: sample,
+      --fprofile-output FILE   Write per-sample F-profile weights to FILE (TSV).
+                               Implies --fprofile. Output columns: sample,
                                F-profile I through F-profile VI.
   -h, --help                   Show this help message and exit.
 
@@ -646,7 +643,7 @@ basevar motif \
     -L bamfile.list
 ```
 
-With no `--from-reference`, the 5' k-mer is taken directly from the BAM `SEQ` field (the original sequenced bases) rather than the reference. This path does **not** require a FASTA, but it is itself a deviation from the canonical Lo lab convention: the Lo group's reference open-source implementation [FinaleToolkit](https://github.com/epifluidlab/FinaleToolkit) (Zheng et al., bioRxiv 2024.05.29.596414) and the Lo group's own follow-up paper (Mao et al., Cell Genomics 2026) both fetch end-motifs from the FASTA. For cfDNA / NIPT / fragmentomic analyses, prefer the recommended invocation above.
+With no `--from-reference`, the 5' k-mer is taken directly from the BAM `SEQ` field (the original sequenced bases) rather than the reference. This path does **not** require a FASTA, but it is itself a deviation from the canonical Lo lab convention: the Lo group's reference open-source implementation [FinaleToolkit](https://github.com/epifluidlab/FinaleToolkit) and the Lo group's own follow-up paper (Mao et al., Cell Genomics 2026) both fetch end-motifs from the FASTA. For cfDNA / NIPT / fragmentomic analyses, prefer the recommended invocation above.
 
 **Force filename-derived sample IDs (useful when BAM headers lack `@RG SM`):**
 
