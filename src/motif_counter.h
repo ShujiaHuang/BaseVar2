@@ -117,6 +117,8 @@ struct SampleResult {
     uint64_t n_motifs_with_n = 0; ///< Reads whose extracted motif contained a non-ACGT base (N or IUPAC ambiguity code, e.g. M/R/Y) - excluded.
     std::map<std::string, uint64_t> motif_counts;  ///< Always populated with all 4^k keys.
     std::vector<double> fprofile_weights;          ///< F-profile weights (size 6 if computed, empty otherwise).
+    double fprofile_raw_sum   = 0.0;               ///< Sum of CNSLS weights (should be 1.0 by constraint; useful as a fit-quality indicator when comparing to unconstrained NNLS).
+    double fprofile_residual  = 0.0;               ///< ||Ax - b||^2 residual norm after F-profile decomposition.
 };
 
 /**

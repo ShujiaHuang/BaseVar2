@@ -81,14 +81,14 @@ If you see this — or you are on CentOS / RHEL / Rocky / AlmaLinux / older Ubun
 
 ```bash
 # Linux
-wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.4.0/basevar-linux-static
+wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.4.1/basevar-linux-static
 chmod +x basevar-linux-static
 ./basevar-linux-static --help
 ```
 
 ```bash
 # macOS
-curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.4.0/basevar-macos-static
+curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.4.1/basevar-macos-static
 chmod +x basevar-macos-static
 ./basevar-macos-static --help
 ```
@@ -497,10 +497,12 @@ Optional arguments:
       --fprofile               Compute F-profile decomposition weights using
                                the 6 reference profiles from Zhou et al. (2023)
                                PNAS (doi: 10.1073/pnas.2220982120).  Uses
-                               non-negative least squares (NNLS) to decompose
-                               the observed 256 4-mer frequencies into tissue
-                               contribution proportions.  Only valid for k=4;
-                               silently disabled for other values. [off]
+                               constrained non-negative least squares (CNSLS)
+                               on the probability simplex (x >= 0, sum = 1)
+                               to decompose the observed 256 4-mer frequencies
+                               into tissue contribution proportions.  Only
+                               valid for k=4; silently disabled for other
+                               values. [off]
       --fprofile-output FILE   Write per-sample F-profile weights to FILE (TSV).
                                Implies --fprofile. Output columns: sample,
                                F-profile I through F-profile VI.
@@ -556,7 +558,7 @@ A human-readable summary is also written to **stdout**, listing the per-sample t
 
 ### F-profile decomposition (`--fprofile`)
 
-When `--fprofile` is enabled (k=4 only), `basevar motif` decomposes each sample's 256 4-mer frequency vector into the six **"founder" end-motif profiles (F-profiles I–VI)** discovered by **Zhou *et al.*, *PNAS* 2023** ([doi: 10.1073/pnas.2220982120](https://doi.org/10.1073/pnas.2220982120)) via non-negative matrix factorization (NMF) on large cfDNA cohorts. The decomposition uses the **Lawson–Hanson non-negative least squares (NNLS)** algorithm, then normalizes the raw weights to proportions summing to 1.0.
+When `--fprofile` is enabled (k=4 only), `basevar motif` decomposes each sample's 256 4-mer frequency vector into the six **"founder" end-motif profiles (F-profiles I–VI)** discovered by **Zhou *et al.*, *PNAS* 2023** ([doi: 10.1073/pnas.2220982120](https://doi.org/10.1073/pnas.2220982120)) via non-negative matrix factorization (NMF) on large cfDNA cohorts. The decomposition uses a **constrained non-negative least squares (CNSLS)** solver — projected gradient descent on the probability simplex {x ≥ 0, Σx = 1} — so the weights are directly constrained to sum to 1.0 without post-hoc normalization.
 
 Each F-profile represents a distinct cfDNA cleavage pattern, likely corresponding to a different nuclease or biological process. The six weights per sample can be interpreted as tissue contribution proportions — useful for fetal fraction estimation in NIPT, tumor fraction in cancer, and general tissue-of-origin deconvolution.
 
@@ -674,7 +676,7 @@ basevar motif \
 | **Installation** | Single static binary, zero runtime dependencies | `pip install finaletoolkit` + Python ecosystem |
 | **Parallelism** | Thread-level (one thread per BAM, shared memory) | Process-level (`multiprocessing.Pool`, IPC overhead) |
 | **Multi-sample batch** | Native: process N BAMs → single unified TSV | One BAM per invocation; scripting needed for batches |
-| **F-profile decomposition** | Built-in (`--fprofile`): NNLS solver, zero extra deps | Not included; requires external NMF/NNLS pipeline |
+| **F-profile decomposition** | Built-in (`--fprofile`): CNSLS solver (simplex-constrained), zero extra deps | Not included; requires external NMF/NNLS pipeline |
 | **Read-based mode** | Yes (default; no FASTA required) | No; always requires reference (.2bit or FASTA) |
 | **Reference formats** | FASTA (.fa / .fa.gz) | FASTA + 2bit (.2bit via py2bit) |
 | **Output format** | Long-format TSV (sample, motif, count, freq) — ML-ready | 2-column TSV (motif, freq) per sample |
@@ -695,7 +697,7 @@ basevar motif \
 
 - **Batch processing**: `basevar motif` natively processes multiple BAM/CRAM files in one invocation and emits a single unified TSV — ideal for cohort-scale analyses. With FinaleToolkit, each sample requires a separate `end-motifs` invocation and post-hoc concatenation.
 
-- **F-profile decomposition**: BaseVar includes a built-in NNLS solver that decomposes each sample's 256 4-mer frequency vector into the six Zhou *et al.* (2023) founder profiles, producing tissue contribution proportions directly. FinaleToolkit ships the reference data (`end_motif_f_profiles.tsv`) but does not include a decomposition solver — users must implement their own NMF/NNLS pipeline.
+- **F-profile decomposition**: BaseVar includes a built-in CNSLS solver (projected gradient descent on the probability simplex) that decomposes each sample's 256 4-mer frequency vector into the six Zhou *et al.* (2023) founder profiles, producing tissue contribution proportions directly — weights are constrained to sum to 1.0 at optimization time rather than normalized post-hoc. FinaleToolkit ships the reference data (`end_motif_f_profiles.tsv`) but does not include a decomposition solver — users must implement their own NMF/NNLS pipeline.
 
 - **Scope**: FinaleToolkit offers a broader suite of cfDNA fragmentomics features (WPS, DELFI, cleavage profile, fragment length distributions, breakpoint motifs) that `basevar motif` does not cover. If you need WPS or DELFI alongside end-motifs, FinaleToolkit remains the appropriate tool. For high-throughput end-motif counting and F-profile decomposition at cohort scale, `basevar motif` is purpose-built.
 

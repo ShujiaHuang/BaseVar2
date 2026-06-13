@@ -394,6 +394,125 @@ static std::vector<double> nnls_solve(const std::vector<double>& A,
 }
 
 // ============================================================
+// CNSLS solver (Constrained Non-Negative Least Squares on the simplex)
+// ============================================================
+
+// Project a vector onto the probability simplex {x >= 0, sum(x) = 1}.
+// Uses the sorting-based algorithm from Duchi et al. (2008) / Michelot (1986).
+//
+//   Time complexity: O(n log n) for the sort.
+//   For the F-profile problem (n = 6), this is effectively O(1).
+static std::vector<double> project_onto_simplex(std::vector<double> v, int n) {
+    // Sort in descending order.
+    std::vector<double> u = v;
+    std::sort(u.begin(), u.end(), std::greater<double>());
+
+    // Find the support size rho.
+    double cumsum = 0.0;
+    int rho = 0;
+    for (int j = 0; j < n; ++j) {
+        cumsum += u[j];
+        if (u[j] - (cumsum - 1.0) / static_cast<double>(j + 1) > 0) {
+            rho = j + 1;
+        }
+    }
+
+    // Compute the threshold.
+    double theta = 0.0;
+    for (int j = 0; j < rho; ++j) theta += u[j];
+    theta = (theta - 1.0) / static_cast<double>(rho);
+
+    // Subtract the threshold and clamp to zero.
+    for (int i = 0; i < n; ++i) {
+        v[i] = std::max(v[i] - theta, 0.0);
+    }
+    return v;
+}
+
+// Constrained Non-Negative Least Squares on the probability simplex:
+//
+//   minimise  ||A x - b||^2   subject to   x >= 0,  sum(x) = 1
+//
+//   m = number of observations (256 for 4-mer frequencies)
+//   n = number of unknowns     (  6 for F-profiles)
+//   A is stored row-major as m * n.
+//
+// Solves via projected gradient descent.  Each iteration computes:
+//
+//   x_{k+1} = proj_simplex( x_k - step * grad_k )
+//
+// where  grad_k = G x_k - A^T b  and  step = 1 / trace(G).
+// The trace of the Gram matrix G = A^T A is an upper bound on its
+// spectral norm (sum of eigenvalues >= max eigenvalue), giving a
+// conservative but safe step size.  For the small system n = 6,
+// convergence is typically reached in a few hundred iterations.
+//
+// This replaces the previous approach (NNLS + post-hoc normalisation)
+// which produced a mathematically sub-optimal solution when the
+// unconstrained NNLS weights did not naturally sum to 1.
+static std::vector<double> cnls_solve(const std::vector<double>& A,
+                                      const std::vector<double>& b,
+                                      int m, int n) {
+    const double EPS = 1e-12;
+    const int MAX_ITER = 10000;
+
+    // Pre-compute Gram matrix  G = A^T A  and  Atb = A^T b.
+    std::vector<double> G(n * n, 0.0), Atb(n, 0.0);
+    double trace_G = 0.0;
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            for (int k = 0; k < m; ++k)
+                G[i * n + j] += A[k * n + i] * A[k * n + j];
+        }
+        for (int k = 0; k < m; ++k)
+            Atb[i] += A[k * n + i] * b[k];
+        trace_G += G[i * n + i];
+    }
+
+    if (trace_G < EPS) {
+        // Degenerate case: A is effectively zero; return uniform weights.
+        return std::vector<double>(n, 1.0 / static_cast<double>(n));
+    }
+
+    // Initial feasible point: uniform distribution on the simplex.
+    std::vector<double> x(n, 1.0 / static_cast<double>(n));
+
+    // Step size: 1 / trace(G) is conservative (trace >= spectral norm).
+    const double step = 1.0 / trace_G;
+
+    for (int iter = 0; iter < MAX_ITER; ++iter) {
+        // Gradient of the quadratic objective: grad = G x - A^T b.
+        std::vector<double> grad(n, 0.0);
+        for (int i = 0; i < n; ++i) {
+            grad[i] = -Atb[i];
+            for (int j = 0; j < n; ++j)
+                grad[i] += G[i * n + j] * x[j];
+        }
+
+        // Projected gradient step.
+        std::vector<double> y(n);
+        for (int i = 0; i < n; ++i)
+            y[i] = x[i] - step * grad[i];
+
+        std::vector<double> x_new = project_onto_simplex(std::move(y), n);
+
+        // Convergence check: ||x_new - x||_2 < EPS.
+        double diff_norm_sq = 0.0;
+        for (int i = 0; i < n; ++i) {
+            double d = x_new[i] - x[i];
+            diff_norm_sq += d * d;
+        }
+        if (diff_norm_sq < EPS * EPS) {
+            x = std::move(x_new);
+            break;
+        }
+        x = std::move(x_new);
+    }
+
+    return x;
+}
+
+// ============================================================
 // MotifCounterRunner
 // ============================================================
 
@@ -867,6 +986,26 @@ void MotifCounterRunner::_print_summary(std::ostream& os) const {
         os << "\n";
         os.unsetf(std::ios::fixed);
     }
+
+    // Fit-quality section.
+    os << "\n-- F-profile fit quality --\n"
+       << std::left
+       << std::setw(24) << "Sample"
+       << std::right
+       << std::setw(14) << "Sum(x)"
+       << std::setw(14) << "Residual" << "\n";
+    // 24 + 2 * 14 = 52 characters.
+    for (int i = 0; i < 52; ++i) os << '-';
+    os << "\n";
+    for (const auto& s : _results) {
+        if (s.fprofile_weights.empty()) continue;
+        os << std::left << std::setw(24) << s.sample_id
+           << std::right << std::fixed << std::setprecision(6)
+           << std::setw(14) << s.fprofile_raw_sum
+           << std::scientific << std::setprecision(4)
+           << std::setw(14) << s.fprofile_residual << "\n";
+        os.unsetf(std::ios::scientific);
+    }
 }
 
 int MotifCounterRunner::run() {
@@ -936,7 +1075,40 @@ int MotifCounterRunner::run() {
 
     // Stage 3: F-profile decomposition (k=4 only, opt-in).
     if (_args->fprofile) {
-        std::cerr << "[INFO] Computing F-profile decomposition (Zhou et al., PNAS 2023)...\n";
+        // PE2 fix: warn when parameters deviate from the canonical Lo lab
+        // method used to derive the F-profile reference matrix.
+        {
+            bool non_canonical = false;
+            std::string reasons;
+            if (!_args->from_reference) {
+                non_canonical = true;
+                reasons += "  - Motif source: read sequence (canonical: --from-reference)\n";
+            }
+            if (_args->read_end != ReadEnd::BOTH) {
+                non_canonical = true;
+                reasons += "  - Read end: " + std::string(read_end_name(_args->read_end))
+                        +  " (canonical: --reads both)\n";
+            }
+            if (!_args->proper_pair) {
+                non_canonical = true;
+                reasons += "  - Proper pair: off (canonical: --proper-pair)\n";
+            }
+            if (_args->max_insert_size <= 0) {
+                non_canonical = true;
+                reasons += "  - Insert size cap: none (canonical: --max-insert-size 1000)\n";
+            }
+            if (non_canonical) {
+                std::cerr << "[WARN] F-profile reference matrix (Zhou et al., PNAS 2023) was derived\n"
+                          << "       using the canonical Lo lab method. Current parameters differ:\n"
+                          << reasons
+                          << "       Recommended: basevar motif --from-reference -f ref.fa \\\n"
+                          << "                    --reads both --proper-pair --max-insert-size 1000 \\\n"
+                          << "                    --fprofile ...\n";
+            }
+        }
+
+        std::cerr << "[INFO] Computing F-profile decomposition (Zhou et al., PNAS 2023) "
+                  << "using CNSLS (simplex-constrained)...\n";
 
         // Build the reference matrix  A  (256 x 6) from the embedded data.
         std::vector<double> A(NUM_KMERS_FPROFILE * NUM_FPROFILES);
@@ -956,18 +1128,37 @@ int MotifCounterRunner::run() {
                     b[i] = static_cast<double>(it->second) / total;
             }
 
-            // Solve  min ||A x - b||^2  subject to  x >= 0.
-            std::vector<double> raw = nnls_solve(A, b,
-                                                  NUM_KMERS_FPROFILE,
-                                                  NUM_FPROFILES);
+            // Solve  min ||A x - b||^2  s.t.  x >= 0,  sum(x) = 1.
+            // This is the CNSLS (Constrained NNLS) formulation, which
+            // correctly embeds the sum-to-one constraint into the
+            // optimisation, unlike the previous NNLS + post-hoc
+            // normalisation approach (see PE1 analysis).
+            std::vector<double> weights = cnls_solve(A, b,
+                                                    NUM_KMERS_FPROFILE,
+                                                    NUM_FPROFILES);
 
-            // Normalize to proportions (sum to 1).
-            double wsum = 0.0;
-            for (double w : raw) wsum += w;
-            if (wsum > 0.0) {
-                for (double& w : raw) w /= wsum;
+            // Fit-quality diagnostics.
+            s.fprofile_raw_sum = 0.0;
+            for (double w : weights) s.fprofile_raw_sum += w;
+
+            // Residual  ||A x - b||^2.
+            double residual = 0.0;
+            for (int i = 0; i < NUM_KMERS_FPROFILE; ++i) {
+                double pred = 0.0;
+                for (int j = 0; j < NUM_FPROFILES; ++j)
+                    pred += A[i * NUM_FPROFILES + j] * weights[j];
+                double diff = pred - b[i];
+                residual += diff * diff;
             }
-            s.fprofile_weights = std::move(raw);
+            s.fprofile_residual = residual;
+            s.fprofile_weights = std::move(weights);
+
+            std::cerr << "[INFO] " << s.sample_id
+                      << ": sum(x)=" << std::fixed << std::setprecision(6)
+                      << s.fprofile_raw_sum
+                      << ", residual=" << std::scientific << std::setprecision(4)
+                      << s.fprofile_residual << "\n";
+            std::cerr.unsetf(std::ios::scientific);
         }
     }
 
