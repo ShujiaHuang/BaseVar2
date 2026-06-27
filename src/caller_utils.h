@@ -13,18 +13,13 @@
 #include <string>
 #include <vector>
 #include <iostream>
-#include <iomanip>  // std::setprecision
 
 #include <htslib/bgzf.h>
 #include <htslib/kstring.h>
 
-#include "io/fasta.h"
-#include "io/iobgzf.h"
 #include "io/utils.h"
 #include "basetype.h"
-
 #include "external/robin_hood.h"  // robin_hood::unordered_map, robin_hood::unordered_set
-#include "algorithm.h"
 
 struct AlignBase {
     std::string ref_base;   // reference base
@@ -110,14 +105,21 @@ struct AlleleInfo {
     std::map<std::string, int> allele_depths;               // AD, depth for each allele, key is the allele string, value is the depth
     std::map<std::string, StrandBiasInfo> strand_bias_info; // DP4, strand bias info for each allele
     int total_dp = 0;                                       // DP, total depth of all alleles, including REF and ALT
+
+    // Dosage-based counts (from genotype posteriors)
+    std::map<std::string, double> dosage_counts;            // Expected AC from posterior dosages
+    int dosage_total_alleles = 0;                           // = 2 * N_samples
 };
 
 struct VCFSampleAnnotation {
-    int GQ;                               // Genotype Quality
-    std::vector<size_t> gtcode;           // Genotype
-    std::vector<std::string> sample_alts; 
-    std::vector<int> allele_depths;       // AD, depth
-    std::vector<int> PL;                  // PL: A list of phred-scale score of genotype likelihoods
+    double GQ;                             // Genotype Quality (posterior-based when Bayesian mode)
+    std::vector<size_t> gtcode;            // Genotype
+    std::vector<std::string> sample_alts;  
+    std::vector<int> allele_depths;        // AD, depth
+    std::vector<int> PL;                   // PL: A list of phred-scale score of genotype likelihoods (unchanged)
+    // --- Bayesian posterior fields ---
+    std::vector<double> posterior;         // Genotype posterior probabilities
+    double dosage = 0.0;                   // Expected ALT allele dosage
 };
 
 struct VCFRecord {
@@ -214,7 +216,7 @@ AlleleInfo collect_and_normalized_allele_info(VariantInfo &variant, std::vector<
 
 // 单个样本的信息 
 VCFSampleAnnotation process_sample_variant(const std::string& upper_ref_base, const std::vector<std::string>& alts, 
-                                           const BaseType::BatchInfo& smp_bi);
+                                           const BaseType::BatchInfo& smp_bi, double af = -1.0);
 // Helper function: Convert PL index to genotype pair
 std::pair<size_t, size_t> pl_index_to_genotype(size_t pl_idx, size_t n_alleles);
 

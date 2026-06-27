@@ -20,6 +20,8 @@ build/
 CMakeFiles/
 *.egg-info/
 
+handoff/*.md
+.cache/
 .vscode/
 .idea/
 .qoder/

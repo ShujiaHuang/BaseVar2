@@ -7,6 +7,12 @@
  * 
  */
 #include "basetype.h"
+#include <cmath>   // use exp() function
+
+#include "io/utils.h"              // join()
+#include "algorithm.h"
+#include "external/combinations.h"
+
 
 //////////////////////////////////////////////////////////////
 //// The codes for the member function of BaseType class /////

@@ -81,14 +81,14 @@ If you see this — or you are on CentOS / RHEL / Rocky / AlmaLinux / older Ubun
 
 ```bash
 # Linux
-wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.4.1/basevar-linux-static
+wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.5.0/basevar-linux-static
 chmod +x basevar-linux-static
 ./basevar-linux-static --help
 ```
 
 ```bash
 # macOS
-curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.4.1/basevar-macos-static
+curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.5.0/basevar-macos-static
 chmod +x basevar-macos-static
 ./basevar-macos-static --help
 ```
@@ -218,6 +218,10 @@ Optional options:
   --filename-has-samplename    If BAM/CRAM filenames start with the sample ID
                                (e.g. SampleID.bam), set this flag to skip reading
                                the BAM header for sample names — saves significant time.
+  --gt-mode=STRING             Genotype calling mode: 'posterior' (Bayesian
+                               posterior-based GT/GQ, dosage INFO) or
+                               'legacy' (pure likelihood argmin GT, PL-gap GQ).
+                               [posterior]
   --smart-rerun                Skip completed batch files and resume an interrupted run.
   -h, --help                   Show this help message and exit.
 ```
@@ -292,6 +296,31 @@ basevar caller \
 ```
 
 See the [example `sample_group.info` file](https://github.com/ShujiaHuang/BaseVar2/blob/main/tests/data/sample_group.info) for the expected format.
+
+### Bayesian genotype calling (v2.5.0+)
+
+Since v2.5.0, `basevar caller` uses a **two-pass Bayesian architecture** for genotype calling:
+
+1. **First pass** (unchanged): collect per-sample PL and hard-count AC/AN (backward compatible).
+2. **Second pass** (new): use the LRT-estimated population AF as a Hardy-Weinberg prior to compute per-sample genotype posteriors. GT is called as `argmax(posterior)`, GQ is `−10 log₁₀(1 − P(best GT))`, and dosage-based INFO fields (`AC_dosage`, `AN_dosage`, `CAF_dosage`) are emitted.
+
+This is the **default** behavior. To revert to the previous pure-likelihood mode:
+
+```bash
+basevar caller --gt-mode legacy -f ref.fa -o out.vcf.gz -L bamfile.list
+```
+
+**Backward compatibility**: all existing fields (INFO/AC, INFO/CAF, INFO/AF, FORMAT/PL, FORMAT/AD, FORMAT/DP) retain their original values. The new dosage fields are additive. Use `--gt-mode legacy` to produce output identical to pre-v2.5.0.
+
+| Field | Source | Changed? |
+| ----- | ------ | -------- |
+| INFO/AF | LRT EM (pooled) | Unchanged |
+| FORMAT/PL | `calculatePL()` | Unchanged |
+| FORMAT/GT | `argmin(PL)` → `argmax(posterior)` | Changed (revert with `--gt-mode legacy`) |
+| FORMAT/GQ | PL gap → posterior Phred | Changed (revert with `--gt-mode legacy`) |
+| INFO/AC_dosage | Posterior expected ALT count | **New** |
+| INFO/AN_dosage | 2 × N_samples | **New** |
+| INFO/CAF_dosage | AC_dosage / AN_dosage | **New** |
 
 **Resume an interrupted run:**
 

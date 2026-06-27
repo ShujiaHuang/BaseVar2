@@ -63,8 +63,15 @@ FF_BS_OBJ = $(BSSRC)/fetal_fraction.o $(BSSRC)/io/bam.o $(BSSRC)/io/bam_header.o
 test_fetal_fraction: test_fetal_fraction.o $(FF_BS_OBJ)
 	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)
 
+# `basevar caller` Bayesian genotype calling unit test.
+# Phase 1: only links algorithm.o (core Bayesian functions, no I/O deps).
+# Phase 2: will add caller_utils.o + iobgzf.o for integration tests.
+test_bayesian_caller: test_bayesian_caller.o $(BSSRC)/algorithm.o
+	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)
+
 clean:
 	rm -f $(OBJ) test_fasta test_motif_counter test_motif_counter.tsv \
-	      test_fetal_fraction test_fetal_fraction.tsv test_fetal_fraction.bed
+	      test_fetal_fraction test_fetal_fraction.tsv test_fetal_fraction.bed \
+	      test_bayesian_caller
 
 

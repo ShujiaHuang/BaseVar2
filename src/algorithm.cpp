@@ -290,3 +290,186 @@ void EM(const std::vector<std::vector<double>> &ind_allele_likelihood, // n x _U
     
     return;
 }
+
+// ============================================================================
+// Genotype posterior computation (Bayesian genotype calling)
+// ============================================================================
+
+std::vector<double> pl_to_likelihoods(const std::vector<int>& PL) {
+    if (PL.empty()) return {};
+
+    // Subtract min(PL) for numerical stability before conversion
+    int min_pl = *std::min_element(PL.begin(), PL.end());
+
+    std::vector<double> likelihoods(PL.size());
+    double total = 0.0;
+    for (size_t g = 0; g < PL.size(); ++g) {
+        // L(g) = 10^(-(PL(g) - min_pl) / 10)
+        // After subtracting min, the best genotype has PL=0 => L=1.0
+        likelihoods[g] = std::pow(10.0, -(PL[g] - min_pl) / 10.0);
+        total += likelihoods[g];
+    }
+
+    // Normalize so sum(L) = 1
+    if (total > 0) {
+        for (auto& l : likelihoods) l /= total;
+    } else {
+        // Degenerate case: all PLs are identical => uniform
+        double uniform = 1.0 / PL.size();
+        std::fill(likelihoods.begin(), likelihoods.end(), uniform);
+    }
+
+    return likelihoods;
+}
+
+std::vector<double> hw_genotype_prior(size_t n_alleles, const std::vector<double>& allele_freqs) {
+    if (allele_freqs.size() != n_alleles) {
+        throw std::invalid_argument("hw_genotype_prior: allele_freqs size must equal n_alleles");
+    }
+    if (n_alleles < 2) {
+        throw std::invalid_argument("hw_genotype_prior: n_alleles must be >= 2");
+    }
+
+    // Clamp allele frequencies to [1e-6, 1-1e-6]
+    static const double AF_MIN = 1e-6;
+    static const double AF_MAX = 1.0 - 1e-6;
+    std::vector<double> freqs(n_alleles);
+    for (size_t i = 0; i < n_alleles; ++i) {
+        freqs[i] = std::max(AF_MIN, std::min(AF_MAX, allele_freqs[i]));
+    }
+
+    // Compute HW prior in VCF PL ordering: (0,0),(0,1),(1,1),(0,2),(1,2),(2,2),...
+    // For genotype (k,k): P = f_k^2
+    // For genotype (k,j) where k<j: P = 2 * f_k * f_j
+    size_t n_genotypes = (n_alleles * (n_alleles + 1)) / 2;
+    std::vector<double> prior(n_genotypes);
+    size_t idx = 0;
+    for (size_t j = 0; j < n_alleles; ++j) {
+        for (size_t k = 0; k <= j; ++k) {
+            double multiplier = (k == j) ? 1.0 : 2.0;
+            prior[idx] = multiplier * freqs[k] * freqs[j];
+            ++idx;
+        }
+    }
+
+    return prior;
+}
+
+// Helper: count ALT alleles in genotype at PL index
+// VCF PL ordering: (0,0), (0,1), (1,1), (0,2), (1,2), (2,2), ...
+// This matches hw_genotype_prior's loop: for j=0..n-1: for k=0..j:
+// ALT count for genotype (i,j) = (i>0?1:0) + (j>0?1:0)
+static int alt_count_at_pl_index(size_t pl_idx, size_t n_alleles) {
+    // Decode PL index to allele pair (k, j) where k <= j
+    // VCF ordering: j is the outer loop, k is the inner loop
+    size_t idx = 0;
+    for (size_t j = 0; j < n_alleles; ++j) {
+        for (size_t k = 0; k <= j; ++k) {
+            if (idx == pl_idx) {
+                return (k > 0 ? 1 : 0) + (j > 0 ? 1 : 0);
+            }
+            ++idx;
+        }
+    }
+    return 0; // should not reach here
+}
+
+GenotypePosterior compute_genotype_posterior(
+    const std::vector<int>& PL,
+    double af)
+{
+    GenotypePosterior gp;
+
+    if (PL.empty()) {
+        gp.best_gt_idx = 0;
+        gp.posteriors = {};
+        gp.dosage = 0.0;
+        gp.gq = 0.0;
+        return gp;
+    }
+
+    // For biallelic: n_alleles = 2, allele_freqs = {1-af, af}
+    // For multi-allelic: af represents the ALT frequency, simplified to biallelic model
+    size_t n_alleles = 2;  // Default: biallelic
+    // Infer n_alleles from PL size: n_gt = n*(n+1)/2
+    // n_gt=3 => n=2, n_gt=6 => n=3, n_gt=10 => n=4
+    {
+        size_t n_gt = PL.size();
+        size_t n = 2;
+        while (n * (n + 1) / 2 < n_gt) ++n;
+        if (n * (n + 1) / 2 == n_gt) n_alleles = n;
+    }
+
+    // Clamp AF to valid range
+    static const double AF_MIN = 1e-6;
+    static const double AF_MAX = 1.0 - 1e-6;
+    double clamped_af = std::max(AF_MIN, std::min(AF_MAX, af));
+
+    // Step 1: PL -> normalized likelihoods
+    std::vector<double> likelihoods = pl_to_likelihoods(PL);
+
+    // Step 2: HW prior
+    std::vector<double> prior;
+    if (n_alleles == 2) {
+        // Fast path for biallelic (most common case)
+        prior = hw_genotype_prior(2, {1.0 - clamped_af, clamped_af});
+    } else {
+        // Multi-allelic: distribute AF equally among ALT alleles
+        double alt_freq_each = clamped_af / (n_alleles - 1);
+        std::vector<double> freqs = {1.0 - clamped_af};
+        for (size_t i = 1; i < n_alleles; ++i) freqs.push_back(alt_freq_each);
+        prior = hw_genotype_prior(n_alleles, freqs);
+    }
+
+    // Step 3: Posterior = likelihood * prior, normalized
+    size_t n_gt = PL.size();
+    gp.posteriors.resize(n_gt);
+    double total = 0.0;
+    for (size_t g = 0; g < n_gt; ++g) {
+        gp.posteriors[g] = likelihoods[g] * prior[g];
+        total += gp.posteriors[g];
+    }
+    if (total > 0) {
+        for (auto& p : gp.posteriors) p /= total;
+    } else {
+        // Degenerate: use prior as posterior
+        double prior_sum = std::accumulate(prior.begin(), prior.end(), 0.0);
+        for (size_t g = 0; g < n_gt; ++g) {
+            gp.posteriors[g] = prior[g] / prior_sum;
+        }
+    }
+
+    // Step 4: Best genotype = argmax posterior
+    gp.best_gt_idx = argmax(gp.posteriors.begin(), gp.posteriors.end());
+
+    // Step 5: Dosage = sum_g P(g) * alt_count(g)
+    gp.dosage = 0.0;
+    for (size_t g = 0; g < n_gt; ++g) {
+        gp.dosage += gp.posteriors[g] * alt_count_at_pl_index(g, n_alleles);
+    }
+
+    // Step 6: GQ = -10 * log10(1 - P(best_gt))
+    double p_best = gp.posteriors[gp.best_gt_idx];
+    if (p_best >= 1.0 - 1e-15) {
+        gp.gq = 1000.0; // Cap at a large value
+    } else if (p_best <= 1e-15) {
+        gp.gq = 0.0;
+    } else {
+        gp.gq = -10.0 * std::log10(1.0 - p_best);
+    }
+
+    return gp;
+}
+
+std::pair<double, int> compute_dosage_ac(
+    const std::vector<GenotypePosterior>& sample_posts)
+{
+    double expected_ac = 0.0;
+    int n_samples = static_cast<int>(sample_posts.size());
+
+    for (const auto& gp : sample_posts) {
+        expected_ac += gp.dosage;
+    }
+
+    return {expected_ac, 2 * n_samples};
+}

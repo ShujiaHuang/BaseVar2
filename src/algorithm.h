@@ -8,16 +8,15 @@
  * @date 2018-08-30
  * 
  */
-
 #ifndef __INCLUDE_BASRVAR_ALIGORITHM_H__
 #define __INCLUDE_BASRVAR_ALIGORITHM_H__
 
 #include <algorithm>
-#include <iostream>
 #include <vector>
 #include <string>
 #include <cmath>  // use 'log' functon
 #include <numeric>
+#include <utility>
 
 #include <htslib/kfunc.h>
 
@@ -175,5 +174,70 @@ void EM(const std::vector<std::vector<double>> &ind_allele_likelihood, // n x 4 
         std::vector<double> &obs_allele_freq,          // retuen value, 1 x 4, expect allele frequence, it'll be update inplace here.
         std::vector<double> &log_marginal_likelihood,  // return value
         int iter_num=100, const float epsilon=0.001);
+
+// ============================================================================
+// Genotype posterior computation (Bayesian genotype calling)
+// ============================================================================
+
+/**
+ * @brief Convert Phred-scaled PL values to normalized genotype likelihoods.
+ * 
+ * L(g) = 10^(-PL(g)/10), then normalize so sum(L) = 1.
+ * Numerically stable: subtracts min(PL) before conversion.
+ * 
+ * @param PL Phred-scaled genotype likelihoods
+ * @return Normalized likelihoods summing to 1
+ */
+std::vector<double> pl_to_likelihoods(const std::vector<int>& PL);
+
+/**
+ * @brief Compute Hardy-Weinberg genotype prior probabilities.
+ * 
+ * For n alleles with frequencies f_0, f_1, ..., f_{n-1}:
+ *   P(i/j) = (2 - delta_ij) * f_i * f_j
+ * 
+ * Allele frequencies are clamped to [1e-6, 1-1e-6] to avoid degenerate priors.
+ * 
+ * @param n_alleles Number of alleles (including REF)
+ * @param allele_freqs Allele frequency vector (length = n_alleles)
+ * @return Genotype prior probabilities (length = n_alleles*(n_alleles+1)/2)
+ */
+std::vector<double> hw_genotype_prior(size_t n_alleles, const std::vector<double>& allele_freqs);
+
+/**
+ * @brief Structure holding genotype posterior computation results.
+ */
+struct GenotypePosterior {
+    size_t best_gt_idx;                  // Index of genotype with highest posterior
+    std::vector<double> posteriors;      // Posterior probability for each genotype
+    double dosage;                       // Expected ALT allele count = sum P(g) * alt_count(g)
+    double gq;                           // GQ = -10 * log10(1 - P(best_gt))
+};
+
+/**
+ * @brief Compute genotype posterior probabilities using PL and population AF prior.
+ * 
+ * Combines data likelihood (from PL) with Hardy-Weinberg prior (from AF):
+ *   P(g|D,f) propto P(D|g) * P(g|f)
+ * 
+ * @param PL Phred-scaled genotype likelihoods (unchanged, data likelihood)
+ * @param af Population ALT allele frequency (from LRT EM)
+ * @return GenotypePosterior with best GT, posteriors, dosage, and GQ
+ */
+GenotypePosterior compute_genotype_posterior(
+    const std::vector<int>& PL,
+    double af
+);
+
+/**
+ * @brief Compute dosage-based allele count from genotype posteriors.
+ * 
+ * @param sample_posts Genotype posteriors for all samples
+ * @return {expected_ac, expected_an} where
+ *         expected_ac = sum of dosages, expected_an = 2 * N
+ */
+std::pair<double, int> compute_dosage_ac(
+    const std::vector<GenotypePosterior>& sample_posts
+);
 
 #endif

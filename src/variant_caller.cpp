@@ -7,6 +7,7 @@
  * 
  */
 #include "variant_caller.h"
+#include <cstdio>  // snprintf
 
 const std::string BaseTypeRunner::usage() const {
     static const std::string BASETYPE_CALLER_USAGE = 
@@ -35,6 +36,8 @@ const std::string BaseTypeRunner::usage() const {
 
         "  --filename-has-samplename    If the prefix name of BAMfiles/CRAMfiles start with 'Sample ID', something like 'SampleID.bam', set this\n"
         "                               argrument could save a lot of time during get the sample id from BAMfiles.\n"
+        "  --gt-mode=STRING             Genotype calling mode: 'posterior' (Bayesian posterior-based GT/GQ) or\n"
+        "                               'legacy' (pure likelihood argmin GT, PL-gap GQ). [posterior]\n"
         "  --smart-rerun                Rerun process by checking batchfiles.\n"
         "  -h, --help                   Show this help message and exit.\n\n"
 
@@ -75,6 +78,7 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
 
         {"filename-has-samplename", no_argument, NULL, '1'},
         {"smart-rerun",             no_argument, NULL, '2'},
+        {"gt-mode",           required_argument, NULL, '3'},
         {"help",                    no_argument, NULL, 'h'},
 
         // must set this value
@@ -111,6 +115,7 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
             case 'G': _args->pop_group_file          = optarg; break;  // 恒参 
             case '1': _args->filename_has_samplename = true;   break;  // 恒参
             case '2': _args->smart_rerun             = true;   break;  // 恒参
+            case '3': _args->posterior_gt = (std::string(optarg) != "legacy"); break;  // 恒参
             case 'h': 
                 std::cout << usage() << std::endl; 
                 exit(EXIT_SUCCESS);
@@ -1233,8 +1238,11 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
 
     // Add FORMAT field
     vcf_record.format = "GT:GQ:PL:AD:DP";  // Genotype, Genotype Quality, Phred-scaled likelihoods of genotypes, Active allele depth, total coverage reads
-    for (const auto &smp_bi : samples_batchinfo_vector) { // Loop all samples in the batch file
-        // For each sample, we need to collect the genotype information
+
+    // =====================================================================
+    // First pass: original logic — collect PL and hard-count AC (backward compatible)
+    // =====================================================================
+    for (const auto &smp_bi : samples_batchinfo_vector) {
         auto sa = process_sample_variant(vcf_record.ref, vcf_record.alt, smp_bi);
 
         // Update allele counts: include both ref and alt alleles
@@ -1243,8 +1251,38 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
             ai.total_alleles++;
         }
 
-        // Format sample string in GT:PL:AD:DP, returned string looks like: "0/1:100,50,0:30:80"
         vcf_record.samples.push_back(format_sample_string(sa));
+    }
+
+    // =====================================================================
+    // Second pass: Bayesian posterior update (only for bi-allelic sites)
+    // Uses LRT AF as population prior to update GT/GQ/posterior/dosage
+    // Controlled by --gt-mode: 'posterior' (default) or 'legacy'
+    // =====================================================================
+    if (_args->posterior_gt && vcf_record.alt.size() == 1) {
+        const std::string& alt_allele = vcf_record.alt[0];
+        double lrt_af = ai.allele_freqs[alt_allele];
+
+        std::vector<GenotypePosterior> sample_posteriors;
+        sample_posteriors.reserve(samples_batchinfo_vector.size());
+
+        for (size_t i = 0; i < samples_batchinfo_vector.size(); ++i) {
+            auto sa = process_sample_variant(vcf_record.ref, vcf_record.alt,
+                                             samples_batchinfo_vector[i], lrt_af);
+
+            // Collect dosage for dosage-based AC (posteriors already in sa)
+            GenotypePosterior gp;
+            gp.dosage = sa.dosage;
+            sample_posteriors.push_back(gp);
+
+            // Update sample string with posterior-based GT/GQ
+            vcf_record.samples[i] = format_sample_string(sa);
+        }
+
+        // Compute dosage-based AC
+        auto [dosage_ac, dosage_an] = compute_dosage_ac(sample_posteriors);
+        ai.dosage_counts[alt_allele] = dosage_ac;
+        ai.dosage_total_alleles = dosage_an;
     }
 
     // Construct the INFO field, like "AC=1;AN=2;AF=0.5;DP=14;DP4=10,4,0,0;"
@@ -1274,6 +1312,24 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
         "FS="  + ngslib::join(fs, ","),
         "SOR=" + ngslib::join(sor, ",")
     };
+
+    // Add dosage-based INFO fields (available for bi-allelic sites)
+    if (ai.dosage_total_alleles > 0) {
+        for (const auto& alt : vcf_record.alt) {
+            double ac_dosage = ai.dosage_counts.count(alt) ? ai.dosage_counts.at(alt) : 0.0;
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%.4f", ac_dosage);
+            info.push_back("AC_dosage=" + std::string(buf));
+        }
+        info.push_back("AN_dosage=" + std::to_string(ai.dosage_total_alleles));
+
+        std::vector<double> caf_dosage;
+        for (const auto& alt : vcf_record.alt) {
+            double ac_d = ai.dosage_counts.count(alt) ? ai.dosage_counts.at(alt) : 0.0;
+            caf_dosage.push_back(ac_d / ai.dosage_total_alleles);
+        }
+        info.push_back("CAF_dosage=" + ngslib::join(caf_dosage, ","));
+    }
 
     // Add group allele frequency information if available
     if (!group_bt.empty()) {

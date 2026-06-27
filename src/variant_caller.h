@@ -59,6 +59,7 @@ private:
 
         bool filename_has_samplename;       // sample name in file name
         bool smart_rerun;                   // Smart rerun by checking batchfiles
+        bool posterior_gt;                  // Use posterior-based GT/GQ (Bayesian) vs legacy argmin(PL)
 
         // Set default argument
         BaseTypeARGS(): min_af(0.001), 
@@ -67,7 +68,8 @@ private:
                         batchcount(500), 
                         thread_num(std::thread::hardware_concurrency()), 
                         smart_rerun(false), 
-                        filename_has_samplename(false) {}
+                        filename_has_samplename(false),
+                        posterior_gt(true) {}
     };
 
     ngslib::Fasta reference;

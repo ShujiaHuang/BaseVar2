@@ -1,4 +1,9 @@
 #include "caller_utils.h"
+#include <cstdio>  // snprintf
+
+#include "io/fasta.h"
+#include "io/iobgzf.h"
+#include "algorithm.h"
 
 std::string format_double(double value, int precision) {
     std::stringstream ss;
@@ -143,32 +148,45 @@ std::pair<size_t, size_t> pl_index_to_genotype(size_t pl_idx, size_t n_alleles) 
 
 VCFSampleAnnotation process_sample_variant(const std::string& ref_base,          // It's upper case already
                                            const std::vector<std::string>& alts, // It's upper case already
-                                           const BaseType::BatchInfo& smp_bi)    // smp_bi.align_bases should be upper case already
+                                           const BaseType::BatchInfo& smp_bi,    // smp_bi.align_bases should be upper case already
+                                           double af)                            // population AF prior (-1 = disable Bayesian)
 {
     VCFSampleAnnotation sa;
     
-    // Calculate PL values for all possible genotypes in one call
+    // Calculate PL values for all possible genotypes in one call (unchanged)
     sa.PL = calculatePL(ref_base, alts, smp_bi.align_bases, smp_bi.align_base_quals);
 
-    // Find the position of minimum PL value
-    size_t min_idx = argmin(sa.PL.begin(), sa.PL.end());
-
-    // Find the second minimum PL value and set GQ
-    int second_min_pl = std::numeric_limits<int>::max();
-    for (size_t i(0); i < sa.PL.size(); ++i) {
-        if (i != min_idx && sa.PL[i] < second_min_pl) {
-            second_min_pl = sa.PL[i];
-        }
-    }
-    sa.GQ = second_min_pl; // set second_min_pl as the genotype quality (like GATK)
-
-    // Convert PL index to genotype codes
-    // For n alleles (including REF), genotypes are ordered: 0/0, 0/1, 1/1, 0/2, 1/2, 2/2, etc.
     size_t n_alleles = alts.size() + 1;  // Total number of alleles including REF
-    auto [a1, a2] = pl_index_to_genotype(min_idx, n_alleles);
-    
-    // Set genotype codes (0 = REF, 1 = first ALT, 2 = second ALT, etc.)
-    sa.gtcode = {a1, a2};
+
+    if (af >= 0) {
+        // Bayesian mode: compute genotype posterior using population AF prior
+        GenotypePosterior gp = compute_genotype_posterior(sa.PL, af);
+
+        size_t min_idx = gp.best_gt_idx;
+        sa.GQ = gp.gq;
+        sa.posterior = gp.posteriors;
+        sa.dosage = gp.dosage;
+
+        // Convert PL index to genotype codes
+        auto [a1, a2] = pl_index_to_genotype(min_idx, n_alleles);
+        sa.gtcode = {a1, a2};
+    } else {
+        // Original mode: pure likelihood (no prior)
+        size_t min_idx = argmin(sa.PL.begin(), sa.PL.end());
+
+        // Find the second minimum PL value and set GQ
+        int second_min_pl = std::numeric_limits<int>::max();
+        for (size_t i(0); i < sa.PL.size(); ++i) {
+            if (i != min_idx && sa.PL[i] < second_min_pl) {
+                second_min_pl = sa.PL[i];
+            }
+        }
+        sa.GQ = static_cast<double>(second_min_pl);
+
+        // Convert PL index to genotype codes
+        auto [a1, a2] = pl_index_to_genotype(min_idx, n_alleles);
+        sa.gtcode = {a1, a2};
+    }
 
     // Store allele depths in order (REF first, followed by ALTs)
     std::vector<std::string> ref_alts_order = {ref_base};
@@ -184,7 +202,6 @@ VCFSampleAnnotation process_sample_variant(const std::string& ref_base,         
     for (const auto& base : smp_bi.align_bases) {
         if (base[0] == 'N' || base[0] == 'n') continue;
         if (allele_depths.find(base) != allele_depths.end()) {
-            // only count bases that are in the REF and allele list
             allele_depths[base]++;
         }
     }
@@ -205,8 +222,19 @@ std::string format_sample_string(const VCFSampleAnnotation& sa) {
     }
 
     int dp = std::accumulate(sa.allele_depths.begin(), sa.allele_depths.end(), 0);
+
+    // Format GQ: use integer format if in legacy mode (no posterior), otherwise 2 decimal places
+    std::string gq_str;
+    if (sa.posterior.empty()) {
+        gq_str = std::to_string(static_cast<int>(sa.GQ));  // Legacy: integer GQ
+    } else {
+        char buf[32];
+        snprintf(buf, sizeof(buf), "%.2f", sa.GQ);
+        gq_str = buf;
+    }
+
     std::string sample_info = ngslib::join(sa.gtcode, "/")        + ":" +  // GT, genotype
-                              std::to_string(sa.GQ)               + ":" +  // GQ, Genotype Quality
+                              gq_str                              + ":" +  // GQ, Genotype Quality
                               ngslib::join(sa.PL, ",")            + ":" +  // PL, Phred-scaled likelihoods
                               ngslib::join(sa.allele_depths, ",") + ":" +  // AD, active allele depth, so sum(AD) <= PD
                               std::to_string(dp);                          // DP, high quality mapping total depth
@@ -222,7 +250,7 @@ std::string vcf_header_define(const std::string &ref_file_path, const std::vecto
         "##FILTER=<ID=PASS,Description=\"All filters passed\">",
         
         "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">",
-        "##FORMAT=<ID=GQ,Number=1,Type=Integer,Description=\"Genotype Quality\">",
+        "##FORMAT=<ID=GQ,Number=1,Type=Float,Description=\"Genotype Quality: Phred-scaled confidence (posterior-based in Bayesian mode, PL-gap in legacy mode)\">",
         "##FORMAT=<ID=PL,Number=G,Type=Integer,Description=\"List of Normalized, Phred-scaled genotype likelihoods rounded to the closest integer\">",
         "##FORMAT=<ID=AD,Number=R,Type=String,Description=\"Allelic depths for the ref and alt alleles in the order listed\">",
         "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Approximate read depth for specific sample (reads with bad mapped quality or with bad mates are filtered)\">",
@@ -234,7 +262,10 @@ std::string vcf_header_define(const std::string &ref_file_path, const std::vecto
         "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Approximate total read depth (high-quality); some reads may have been filtered\">",
         "##INFO=<ID=DP4,Number=A,Type=Integer,Description=\"A list of number of high-quality ref-forward, ref-reverse, alt1-forward, alt1-reverse, alt2-forward, alt2-reverse, ... ,bases\">",
         "##INFO=<ID=FS,Number=A,Type=Float,Description=\"Phred-scaled P-value using Fisher's exact test to detect strand bias\">",
-        "##INFO=<ID=SOR,Number=A,Type=Float,Description=\"Symmetric Odds Ratio of 2x2 contingency table to detect strand bias\">"
+        "##INFO=<ID=SOR,Number=A,Type=Float,Description=\"Symmetric Odds Ratio of 2x2 contingency table to detect strand bias\">",
+        "##INFO=<ID=AC_dosage,Number=A,Type=Float,Description=\"Expected allele count from genotype posterior dosages (BaseVar B-type improvement)\">",
+        "##INFO=<ID=AN_dosage,Number=1,Type=Integer,Description=\"Total number of alleles for dosage-based counting (= 2 * N_samples)\">",
+        "##INFO=<ID=CAF_dosage,Number=A,Type=Float,Description=\"Dosage-based allele frequency = AC_dosage / AN_dosage (BaseVar B-type improvement)\">"
 
         // "##INFO=<ID=BaseQRankSum,Number=1,Type=Float,Description=\"Phred-score from Wilcoxon rank sum test of Alt Vs. Ref base qualities\">",
         // "##INFO=<ID=MQRankSum,Number=1,Type=Float,Description=\"Phred-score From Wilcoxon rank sum test of Alt vs. Ref read mapping qualities\">",
