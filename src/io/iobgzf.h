@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 #include <memory>  // std::unique_ptr
+#include <stdexcept>
 
 #include <htslib/bgzf.h>
 #include <htslib/tbx.h>

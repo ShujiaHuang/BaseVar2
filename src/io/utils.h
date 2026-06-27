@@ -15,6 +15,7 @@
 #include <set>
 #include <iterator>
 #include <cstdint>    // uint32_t
+#include <stdexcept>
 
 namespace ngslib {
 
