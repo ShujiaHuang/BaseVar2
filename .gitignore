@@ -18,6 +18,7 @@ cmake_install.cmake
 cache_*/
 build/
 CMakeFiles/
+src/version.h
 *.egg-info/
 
 handoff/*.md
