@@ -7,7 +7,8 @@
  * 
  */
 #include "variant_caller.h"
-#include <cstdio>  // snprintf
+#include <cstdio>      // snprintf
+#include <stdexcept>
 
 const std::string BaseTypeRunner::usage() const {
     static const std::string BASETYPE_CALLER_USAGE = 

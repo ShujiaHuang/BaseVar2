@@ -17,6 +17,7 @@
 #include <cmath>  // use 'log' functon
 #include <numeric>
 #include <utility>
+#include <stdexcept>
 
 #include <htslib/kfunc.h>
 
