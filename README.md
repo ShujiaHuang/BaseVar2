@@ -783,6 +783,7 @@ basevar subsam \
 - **Memory estimation**: `threads × batch_size / 200 × ~3–4 GB`. E.g., 24 threads, `-B 200` → ~72–96 GB total.
 - **Output compression**: Always use `.vcf.gz` as the output filename — BaseVar automatically writes bgzipped output when the extension is `.vcf.gz`.
 
+<!-- 
 ---
 
 ## Development
@@ -794,4 +795,4 @@ git pull
 git submodule update --recursive
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
-```
+``` -->
