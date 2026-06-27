@@ -64,9 +64,7 @@
 #include <thread>
 #include <cstdint>
 
-#include "io/bam.h"
 #include "io/bam_record.h"
-#include "io/bam_header.h"
 #include "io/utils.h"  // ngslib::GenomeRegion (1-based, inclusive)
 
 namespace basevar {

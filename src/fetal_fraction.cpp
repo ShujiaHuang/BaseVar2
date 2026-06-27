@@ -77,12 +77,12 @@
 #include <future>
 #include <iomanip>
 #include <iostream>
-#include <memory>
 #include <sstream>
 #include <stdexcept>
 
 #include "external/thread_pool.h"
-#include "io/utils.h"
+#include "io/bam.h"
+#include "io/bam_header.h"
 #include "version.h"
 
 namespace basevar {

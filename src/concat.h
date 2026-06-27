@@ -11,14 +11,8 @@
 #define __INCLUDE_BASEVAR_CONCAT_H__
 
 #include <getopt.h>
-#include <iostream>
-#include <fstream>
 #include <string>
 #include <vector>
-
-#include "caller_utils.h"  // merge_file_by_line
-#include "io/iobgzf.h"
-#include "io/utils.h"      // ngslib::get_firstcolumn_from_file
 
 int _concat_basevar_outfile(const std::vector<std::string> &infiles, const std::string outfile);
 int concat_runner(int argc, char *argv[]);
