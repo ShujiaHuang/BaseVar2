@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/ShujiaHuang/BaseVar2">
-    <img height="230" src="docs/assets/images/basevar_logo.svg">
+    <img height="200" src="docs/assets/images/basevar_logo.svg">
   </a>
   <!-- 
   <h2 align="center">BaseVar: Call variants from ultra low-pass WGS data</h2> 
@@ -81,14 +81,14 @@ If you see this — or you are on CentOS / RHEL / Rocky / AlmaLinux / older Ubun
 
 ```bash
 # Linux
-wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.5.0/basevar-linux-static
+wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.5.1/basevar-linux-static
 chmod +x basevar-linux-static
 ./basevar-linux-static --help
 ```
 
 ```bash
 # macOS
-curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.5.0/basevar-macos-static
+curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.5.1/basevar-macos-static
 chmod +x basevar-macos-static
 ./basevar-macos-static --help
 ```
@@ -222,6 +222,11 @@ Optional options:
                                posterior-based GT/GQ, dosage INFO) or
                                'legacy' (pure likelihood argmin GT, PL-gap GQ).
                                [posterior]
+  --ref-bias=FLOAT             Reference bias coefficient (β) for genotype likelihood.
+                               β=0.5 means no bias (default); β<0.5 corrects for
+                               alignment reference bias. Typical: 0.45-0.48. [0.5]
+  --max-alleles=INT            Maximum active alleles allowed at a site. Sites
+                               exceeding this threshold will be skipped. [6]
   --smart-rerun                Skip completed batch files and resume an interrupted run.
   -h, --help                   Show this help message and exit.
 ```

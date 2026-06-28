@@ -60,6 +60,8 @@ private:
         bool filename_has_samplename;       // sample name in file name
         bool smart_rerun;                   // Smart rerun by checking batchfiles
         bool posterior_gt;                  // Use posterior-based GT/GQ (Bayesian) vs legacy argmin(PL)
+        double ref_bias;                    // Reference bias coefficient β for PL calculation (0.5 = no bias, <0.5 = REF bias)
+        int max_alleles;                    // Max active alleles before skipping site (D5 fix)
 
         // Set default argument
         BaseTypeARGS(): min_af(0.001), 
@@ -69,7 +71,9 @@ private:
                         thread_num(std::thread::hardware_concurrency()), 
                         smart_rerun(false), 
                         filename_has_samplename(false),
-                        posterior_gt(true) {}
+                        posterior_gt(true),
+                        ref_bias(0.5),
+                        max_alleles(6) {}
     };
 
     ngslib::Fasta reference;
