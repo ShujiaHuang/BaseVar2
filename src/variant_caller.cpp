@@ -1040,7 +1040,7 @@ bool BaseTypeRunner::_basevar_caller(const std::vector<std::string> &smp_bf_line
                      size_t n_sample, ngslib::BGZFile &vcf_hd) 
 {
     // Initialize vectors with the size of 'batch_data_capacity'.
-    int batch_data_capacity = n_sample / smp_bf_line_vector.size() + 1;  // number of samples in each batchfile
+    int batch_data_capacity = n_sample / smp_bf_line_vector.size() + 1; 
     std::vector<std::string> map_ref_bases;           map_ref_bases.reserve(batch_data_capacity);
     std::vector<std::string> map_read_bases;          map_read_bases.reserve(batch_data_capacity);
     std::vector<std::string> map_read_base_qualities; map_read_base_qualities.reserve(batch_data_capacity);
@@ -1161,7 +1161,7 @@ bool BaseTypeRunner::_basevar_caller(const std::vector<std::string> &smp_bf_line
         }
 
         VCFRecord vcf_record = _vcfrecord_in_pos(all_smps_bi_vector, global_vi, popgroup_bt, ai);
-        if (vcf_record.is_valid()) {
+        if (vcf_record.is_valid() && vcf_record.ref != "N") {
             // write to file
             vcf_hd << vcf_record.to_string() << "\n";
         } else {
@@ -1292,10 +1292,11 @@ VariantInfo BaseTypeRunner::_get_pos_variant_info(const BaseType &bt, const Base
     return vi;
 }
 
-VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInfo> &samples_batchinfo_vector, // has been normalized with ref and alt bases by 'global_variant_info'
-                                            const VariantInfo &global_variant_info,
-                                            const std::map<std::string, BaseType> &group_bt, 
-                                            AlleleInfo &ai)
+VCFRecord BaseTypeRunner::_vcfrecord_in_pos(
+    const std::vector<BaseType::BatchInfo> &samples_batchinfo_vector, // has been normalized with ref and alt bases by 'global_variant_info'
+    const VariantInfo &global_variant_info,
+    const std::map<std::string, BaseType> &group_bt, 
+    AlleleInfo &ai)
 {
     // Return empty record if no variants
     if (samples_batchinfo_vector.empty()) return VCFRecord();
