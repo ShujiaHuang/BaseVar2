@@ -8,6 +8,7 @@
  */
 #include "basetype.h"
 #include <cmath>   // use exp() function
+#include <iostream> // std::cerr for D5 warning
 
 #include "io/utils.h"              // join()
 #include "algorithm.h"
@@ -51,6 +52,7 @@ BaseType::BaseType(const BatchInfo *smp_bi, double min_af) {
     }
 
     _min_af  = min_af;
+    _max_alleles = 6;  // Default max alleles threshold (D5 fix)
     _ref_id  = smp_bi->ref_id;
     _ref_pos = smp_bi->ref_pos;
     _total_depth = 0;
@@ -89,7 +91,9 @@ BaseType::BaseType(const BaseType &b) {
     this->_active_bases = b._active_bases;
 
     this->_min_af       = b._min_af;
+    this->_max_alleles  = b._max_alleles;
     this->_var_qual     = b._var_qual;
+    this->_final_model_logL = b._final_model_logL;  // D1 fix field must be copied
     this->_af_by_lrt    = b._af_by_lrt;
     this->_allele_likelihood = b._allele_likelihood;
 
@@ -151,8 +155,15 @@ void BaseType::lrt(const std::vector<std::string> &specific_bases) {
             active_bases.push_back(b);
     }
 
-    int  BIG_N = 6; // magic number: 设置大 N 阈值，以便出现组合数爆炸 (选择放弃该位点)
-    if (active_bases.size() == 0 || active_bases.size() > BIG_N) return;
+    if (active_bases.size() == 0 || active_bases.size() > static_cast<size_t>(_max_alleles)) {
+        if (active_bases.size() > static_cast<size_t>(_max_alleles)) {
+            // D5 fix: Warn when skipping high-polymorphism sites
+            std::cerr << "[WARNING] Skipping position " << _ref_id << ":" << _ref_pos
+                      << " with " << active_bases.size() << " active alleles (max=" 
+                      << _max_alleles << ")" << std::endl;
+        }
+        return;
+    }
 
     // init. Base combination of active_bases
     AA var = _f(active_bases, active_bases.size());  // F4
@@ -193,20 +204,39 @@ void BaseType::lrt(const std::vector<std::string> &specific_bases) {
         this->_af_by_lrt[b] = active_bases_freq[_B_IDX[b]];
     }
 
-    // Todo: improve the calculation method for var_qual
+    // Save the final model's log-likelihood (D1 fix)
+    this->_final_model_logL = lr;
+
+    // QUAL computation (D2 fix applied)
     if (!this->_active_bases.empty()) {
 
-        double r = this->_depth[active_bases[0]] / (double)(this->_total_depth);
-        if ((active_bases.size() == 1) && (this->_total_depth > 10) && (r > 0.5)) {
-            // Hard code for 'mono-allelelic' when depth > 10 and r > 0.5
-            this->_var_qual = 10000;
+        if (active_bases.size() == 1 && chi_sqrt_value <= 0) {
+            // D2 fix: Mono-allelic site - compute QUAL from actual LRT statistic
+            // instead of hardcoding 10000. Compute reference-only log-likelihood.
+            std::string ref_base = _bases2ref.begin()->second;  // reference base string
+            double ref_only_logL = 0.0;
+            for (size_t i = 0; i < _allele_likelihood.size(); ++i) {
+                // _allele_likelihood[i] has likelihoods for _UNIQ_BASES
+                if (_B_IDX.find(ref_base) != _B_IDX.end()) {
+                    double p = _allele_likelihood[i][_B_IDX[ref_base]];
+                    if (p > 0) ref_only_logL += std::log(p);
+                }
+            }
+            double mono_chi2 = 2.0 * (lr - ref_only_logL);
+            if (mono_chi2 < 0) mono_chi2 = 0.0;
+            double chi_prob = chi2_test(mono_chi2, 1);
+            if (std::isnan(chi_prob)) chi_prob = 1.0;
+            this->_var_qual = (chi_prob > 0) ? -10.0 * std::log10(chi_prob) : 100000.0;
+            if (this->_var_qual > 100000.0) this->_var_qual = 100000.0;  // Cap at 100000
+            if (this->_var_qual < 0) this->_var_qual = 0.0;
         } else {
             // 'chi2_test' may return nan, which is caused by 'chi_sqrt_value' <= 0 and means p value is 1.0.
             double chi_prob = chi2_test(chi_sqrt_value, 1);  // Python: chi_prob = chi2.sf(chi_sqrt_value, 1)
             if (std::isnan(chi_prob)) 
                 chi_prob = 1.0;
 
-            this->_var_qual = (chi_prob) ? -10 * log10(chi_prob) : 10000;
+            this->_var_qual = (chi_prob) ? -10 * std::log10(chi_prob) : 100000.0;
+            if (this->_var_qual > 100000.0) this->_var_qual = 100000.0;  // D2 fix: Cap at 100000
             // _var_qual will been setted as -0.0 instand of 0.0 if it's 0, because of the phred-scale formular
             if (this->_var_qual == -0.0) this->_var_qual = 0.0;
         }

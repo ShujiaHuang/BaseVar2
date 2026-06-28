@@ -216,7 +216,8 @@ AlleleInfo collect_and_normalized_allele_info(VariantInfo &variant, std::vector<
 
 // 单个样本的信息 
 VCFSampleAnnotation process_sample_variant(const std::string& upper_ref_base, const std::vector<std::string>& alts, 
-                                           const BaseType::BatchInfo& smp_bi, double af = -1.0);
+                                           const BaseType::BatchInfo& smp_bi, double af = -1.0,
+                                           double ref_bias = 0.5);
 // Helper function: Convert PL index to genotype pair
 std::pair<size_t, size_t> pl_index_to_genotype(size_t pl_idx, size_t n_alleles);
 

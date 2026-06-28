@@ -88,10 +88,15 @@ double median(std::vector<T> &value) {
 }
 
 // Calculate the Genotype likelihoods for a given base and quality against the reference base
+// ref_bias: reference bias coefficient β. For het (REF, ALT), the genotype likelihood is:
+//   P(R|G) = (1-β) * P(R|REF) + β * P(R|ALT)
+// Default β=0.5 means no reference bias (standard diploid model).
+// Typical empirical values: 0.45–0.48 (β < 0.5 reflects alignment reference bias).
 std::vector<int> calculatePL(const std::string& ref_base, 
                              const std::vector<std::string>& alt_bases, 
                              const std::vector<std::string>& align_bases, 
-                             const std::vector<char>& base_quals);
+                             const std::vector<char>& base_quals,
+                             double ref_bias = 0.5);
 
 // Function for chi^2 test
 double chi2_test(double chi_sqrt_value, double degree_of_freedom);
@@ -136,6 +141,17 @@ struct ContingencyTable {
 double fisher_exact_test(const ContingencyTable& table, TestSide test_side=TestSide::TWO_SIDED);
 
 double wilcoxon_ranksum_test(const std::vector<double>& sample1, const std::vector<double>& sample2);
+
+/**
+ * @brief Wilcoxon rank sum test returning Z-score (for GATK-compatible RankSum annotations).
+ * 
+ * Positive Z indicates sample1 values tend to be higher; negative indicates lower.
+ * 
+ * @param sample1 First sample (typically REF reads)
+ * @param sample2 Second sample (typically ALT reads)
+ * @return Z-score (0.0 if either sample is empty)
+ */
+double wilcoxon_ranksum_zscore(const std::vector<double>& sample1, const std::vector<double>& sample2);
 
 /**
  * @brief Calculate the posterior probability of individual allele at each site as
@@ -204,6 +220,18 @@ std::vector<double> pl_to_likelihoods(const std::vector<int>& PL);
  * @return Genotype prior probabilities (length = n_alleles*(n_alleles+1)/2)
  */
 std::vector<double> hw_genotype_prior(size_t n_alleles, const std::vector<double>& allele_freqs);
+
+/**
+ * @brief Dosage-based HWE chi-square test (suitable for low-coverage data).
+ * 
+ * Uses per-sample genotype probabilities ("soft" genotype counts) instead of
+ * hard GT calls, making it robust for ultra-low-coverage sequencing.
+ * 
+ * @param genotype_probs Per-sample genotype probability vectors (length = n_genotypes each)
+ * @param n_alleles Number of alleles (including REF), typically 2 for bi-allelic
+ * @return HWE chi-square p-value (1.0 if test is not applicable)
+ */
+double hwe_dosage_test(const std::vector<std::vector<double>>& genotype_probs, size_t n_alleles);
 
 /**
  * @brief Structure holding genotype posterior computation results.

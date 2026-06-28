@@ -12,11 +12,17 @@ double norm_dist(double x) {
 std::vector<int> calculatePL(const std::string& ref_base, 
                              const std::vector<std::string>& alt_bases, 
                              const std::vector<std::string>& align_bases, 
-                             const std::vector<char>& base_quals) 
+                             const std::vector<char>& base_quals,
+                             double ref_bias) 
 {
     // This function calculates the Genotype likelihoods (PL) for given bases and quality against the reference base.
     if (align_bases.size() != base_quals.size()) {
         throw std::invalid_argument("Bases and base quality vectors must be of the same length");
+    }
+
+    // Validate ref_bias range
+    if (ref_bias < 0.0 || ref_bias > 1.0) {
+        throw std::invalid_argument("ref_bias must be between 0.0 and 1.0");
     }
 
     // Calculate number of alleles (REF + ALTs)
@@ -37,6 +43,12 @@ std::vector<int> calculatePL(const std::string& ref_base,
             genotypes.push_back({allele1, allele2});
         }
     }
+
+    // Reference bias correction:
+    // For het genotype (REF, ALT_k), use (1-β) for REF allele and β for ALT allele.
+    // For hom or non-REF het, use standard 0.5/0.5 (bias only affects REF vs ALT distinction).
+    double w_ref  = 1.0 - ref_bias;  // weight for REF allele in het
+    double w_alt  = ref_bias;        // weight for ALT allele in het
 
     // Initialize log-likelihoods for each genotype
     std::vector<double> log10_L(n_genotypes, 0.0);
@@ -62,12 +74,21 @@ std::vector<int> calculatePL(const std::string& ref_base,
             double P_R_given_allele1 = (B == allele1) ? P_correct : P_error;
             double P_R_given_allele2 = (B == allele2) ? P_correct : P_error;
 
-            // P(R|G) = 0.5 * P(R|allele1) + 0.5 * P(R|allele2)
-            double P_R_given_G = 0.5 * P_R_given_allele1 + 0.5 * P_R_given_allele2;
+            // P(R|G): apply reference bias correction for REF/ALT heterozygotes
+            double P_R_given_G;
+            bool is_ref_het = (allele1 == ref_base && allele2 != ref_base);
+            if (is_ref_het && ref_bias != 0.5) {
+                // Het (REF, ALT): apply reference bias correction
+                // P(R|G) = (1-β) * P(R|REF) + β * P(R|ALT)
+                P_R_given_G = w_ref * P_R_given_allele1 + w_alt * P_R_given_allele2;
+            } else {
+                // Hom or non-REF het: standard diploid model (0.5, 0.5)
+                P_R_given_G = 0.5 * P_R_given_allele1 + 0.5 * P_R_given_allele2;
+            }
 
             // Add log10(P(R|G)) to the cumulative log-likelihood
             if (P_R_given_G > 0) {
-                log10_L[g] += log10(P_R_given_G);
+                log10_L[g] += std::log10(P_R_given_G);
             } else {
                 // Handle potential underflow (should be rare)
                 log10_L[g] += -std::numeric_limits<double>::max();
@@ -191,6 +212,67 @@ double wilcoxon_ranksum_test(const std::vector<double>& sample1, const std::vect
     return p;
 }
 
+double wilcoxon_ranksum_zscore(const std::vector<double>& sample1, const std::vector<double>& sample2) {
+    // Return Z-score instead of p-value (GATK convention for RankSum annotations)
+    if (sample1.empty() || sample2.empty()) return 0.0;
+    
+    std::vector<double> combined = sample1;
+    combined.insert(combined.end(), sample2.begin(), sample2.end());
+    
+    // Sort and assign ranks
+    std::vector<size_t> rank_idx(combined.size());
+    std::iota(rank_idx.begin(), rank_idx.end(), 0.0);
+    std::sort(rank_idx.begin(), rank_idx.end(), [&combined](size_t a, size_t b) { return combined[a] > combined[b]; });
+    
+    std::vector<double> rankvalues(combined.size());
+    for (size_t i = 0; i < rank_idx.size(); ++i) {
+        rankvalues[i] = i + 1;
+    }
+    
+    // Handle ties (average ranks)
+    double ranksum = 0.0, same_n = 1;
+    size_t i;
+    for (i = 0; i < rank_idx.size(); ++i) {
+        if (i > 0 && combined[rank_idx[i]] != combined[rank_idx[i-1]]) {
+            if (same_n > 1) {
+                double avg_rank = ranksum / same_n;
+                for (size_t j = i - same_n; j < i; ++j) {
+                    rankvalues[j] = avg_rank;
+                }
+            }
+            same_n = 1;
+            ranksum = 0;
+        } else if (i > 0) {
+            same_n++;
+        }
+        ranksum += i + 1;
+    }
+    // Handle last group of ties
+    if (same_n > 1) {
+        double avg_rank = ranksum / same_n;
+        for (size_t j = i - same_n; j < i; ++j) {
+            rankvalues[j] = avg_rank;
+        }
+    }
+    
+    // Compute rank sum for sample1
+    size_t n1 = sample1.size(), n2 = sample2.size();
+    double smp1_ranksum = 0.0;
+    for (size_t i = 0; i < rank_idx.size(); ++i) {
+        if (rank_idx[i] < n1) {
+            smp1_ranksum += rankvalues[i];
+        }
+    }
+    
+    // Compute Z-score
+    double e = (double)(n1 * (n1 + n2 + 1)) / 2.0;
+    double var = double(n1 * n2 * (n1 + n2 + 1)) / 12.0;
+    if (var < 1e-10) return 0.0;
+    double z = (smp1_ranksum - e) / std::sqrt(var);
+    
+    return z;
+}
+
 void e_step(const std::vector<double> &obs_allele_freq,
             const std::vector<std::vector<double>> &ind_allele_likelihood, 
             std::vector<std::vector<double>> &ind_allele_post_prob,  // return value, update value inplace 
@@ -263,7 +345,7 @@ void EM(const std::vector<std::vector<double>> &ind_allele_likelihood, // n x _U
 
     log_marginal_likelihood = std::vector<double>(n_sample, 0);
     for (size_t i = 0; i < marginal_likelihood.size(); i++) {
-        log_marginal_likelihood[i] = log(marginal_likelihood[i]);
+        log_marginal_likelihood[i] = std::log(marginal_likelihood[i]);
     }
     
     // use 'ind_allele_post_prob' to update 'obs_allele_freq'
@@ -277,7 +359,7 @@ void EM(const std::vector<std::vector<double>> &ind_allele_likelihood, // n x _U
 
         double delta = 0, llh;
         for (size_t i = 0; i < marginal_likelihood.size(); i++) {
-            llh = log(marginal_likelihood[i]);
+            llh = std::log(marginal_likelihood[i]);
             delta += abs(llh - log_marginal_likelihood[i]);
             log_marginal_likelihood[i] = llh;  // update
         }
@@ -285,8 +367,6 @@ void EM(const std::vector<std::vector<double>> &ind_allele_likelihood, // n x _U
         // Todo: be careful here!!!
         if (delta < epsilon) break;
     }
-    // update the lastest expect_allele_freq
-    m_step(ind_allele_post_prob, obs_allele_freq);
     
     return;
 }
@@ -353,6 +433,93 @@ std::vector<double> hw_genotype_prior(size_t n_alleles, const std::vector<double
     }
 
     return prior;
+}
+
+double hwe_dosage_test(const std::vector<std::vector<double>>& genotype_probs, size_t n_alleles) {
+    // Dosage-based HWE test suitable for low-coverage data
+    // Uses "soft" genotype counts from posterior probabilities
+    
+    if (n_alleles < 2 || genotype_probs.empty()) return 1.0;
+    
+    size_t n_samples = genotype_probs.size();
+    size_t n_genotypes = (n_alleles * (n_alleles + 1)) / 2;
+    
+    // Validate input
+    for (const auto& gp : genotype_probs) {
+        if (gp.size() != n_genotypes) return 1.0;
+    }
+    
+    // For bi-allelic sites (most common case), use standard HWE chi-square
+    if (n_alleles == 2) {
+        // Compute "soft" genotype counts by summing posterior probabilities
+        // PL ordering: (0,0)=0, (0,1)=1, (1,1)=2
+        double obs_hom_ref = 0.0, obs_het = 0.0, obs_hom_alt = 0.0;
+        for (const auto& gp : genotype_probs) {
+            obs_hom_ref += gp[0];
+            obs_het     += gp[1];
+            obs_hom_alt += gp[2];
+        }
+        
+        // Estimate allele frequency from soft counts
+        // p = freq(ALT) = (obs_het + 2*obs_hom_alt) / (2*N)
+        double total = obs_hom_ref + obs_het + obs_hom_alt;
+        if (total < 1e-10) return 1.0; // No informative samples
+        
+        double alt_count = obs_het + 2.0 * obs_hom_alt;
+        double p = alt_count / (2.0 * total); // ALT frequency
+        double q = 1.0 - p;                    // REF frequency
+        
+        // Expected genotype counts under HWE
+        double exp_hom_ref = q * q * total;
+        double exp_het     = 2.0 * p * q * total;
+        double exp_hom_alt = p * p * total;
+        
+        // Chi-square statistic (df=1)
+        double chi2 = 0.0;
+        if (exp_hom_ref > 1e-10) chi2 += (obs_hom_ref - exp_hom_ref) * (obs_hom_ref - exp_hom_ref) / exp_hom_ref;
+        if (exp_het > 1e-10)       chi2 += (obs_het - exp_het) * (obs_het - exp_het) / exp_het;
+        if (exp_hom_alt > 1e-10)   chi2 += (obs_hom_alt - exp_hom_alt) * (obs_hom_alt - exp_hom_alt) / exp_hom_alt;
+        
+        return chi2_test(chi2, 1);
+    }
+    
+    // Multi-allelic: fall back to bi-allelic test by collapsing all ALTs
+    // (simplified approach; full multi-allelic HWE is more complex)
+    double obs_hom_ref = 0.0, obs_het = 0.0, obs_hom_alt = 0.0;
+    for (const auto& gp : genotype_probs) {
+        obs_hom_ref += gp[0]; // (0,0)
+        // Sum all het genotypes involving REF: (0,1), (0,2), ...
+        for (size_t j = 1; j < n_alleles; ++j) {
+            // PL index for (0,j): j*(j+1)/2 + 0 = j*(j+1)/2 ... actually need to compute
+            // PL index for genotype (k,j) where k<=j: outer=j, inner=k
+            // For (0,j): idx = j*(j+1)/2
+            size_t idx = j * (j + 1) / 2;
+            if (idx < gp.size()) obs_het += gp[idx];
+        }
+        // Sum all non-REF homozygous: (1,1), (2,2), ...
+        for (size_t j = 1; j < n_alleles; ++j) {
+            size_t idx = j * (j + 1) / 2 + j; // (j,j)
+            if (idx < gp.size()) obs_hom_alt += gp[idx];
+        }
+    }
+    
+    double total = obs_hom_ref + obs_het + obs_hom_alt;
+    if (total < 1e-10) return 1.0;
+    
+    double alt_count = obs_het + 2.0 * obs_hom_alt;
+    double p = alt_count / (2.0 * total);
+    double q = 1.0 - p;
+    
+    double exp_hom_ref = q * q * total;
+    double exp_het     = 2.0 * p * q * total;
+    double exp_hom_alt = p * p * total;
+    
+    double chi2 = 0.0;
+    if (exp_hom_ref > 1e-10) chi2 += (obs_hom_ref - exp_hom_ref) * (obs_hom_ref - exp_hom_ref) / exp_hom_ref;
+    if (exp_het > 1e-10)       chi2 += (obs_het - exp_het) * (obs_het - exp_het) / exp_het;
+    if (exp_hom_alt > 1e-10)   chi2 += (obs_hom_alt - exp_hom_alt) * (obs_hom_alt - exp_hom_alt) / exp_hom_alt;
+    
+    return chi2_test(chi2, 1);
 }
 
 // Helper: count ALT alleles in genotype at PL index

@@ -39,6 +39,12 @@ const std::string BaseTypeRunner::usage() const {
         "                               argrument could save a lot of time during get the sample id from BAMfiles.\n"
         "  --gt-mode=STRING             Genotype calling mode: 'posterior' (Bayesian posterior-based GT/GQ) or\n"
         "                               'legacy' (pure likelihood argmin GT, PL-gap GQ). [posterior]\n"
+        "  --ref-bias=FLOAT             Reference bias coefficient (β) for genotype likelihood calculation.\n"
+        "                               For het (REF,ALT), P(R|G) = (1-β)*P(R|REF) + β*P(R|ALT).\n"
+        "                               β=0.5 means no bias (default); β<0.5 corrects for alignment reference bias.\n"
+        "                               Typical empirical values: 0.45-0.48. [0.5]\n"
+        "  --max-alleles=INT            Maximum number of active alleles allowed at a site.\n"
+        "                               Sites exceeding this threshold will be skipped. [6]\n"
         "  --smart-rerun                Rerun process by checking batchfiles.\n"
         "  -h, --help                   Show this help message and exit.\n\n"
 
@@ -80,6 +86,8 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
         {"filename-has-samplename", no_argument, NULL, '1'},
         {"smart-rerun",             no_argument, NULL, '2'},
         {"gt-mode",           required_argument, NULL, '3'},
+        {"ref-bias",          required_argument, NULL, '4'},
+        {"max-alleles",       required_argument, NULL, '5'},
         {"help",                    no_argument, NULL, 'h'},
 
         // must set this value
@@ -117,6 +125,8 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
             case '1': _args->filename_has_samplename = true;   break;  // 恒参
             case '2': _args->smart_rerun             = true;   break;  // 恒参
             case '3': _args->posterior_gt = (std::string(optarg) != "legacy"); break;  // 恒参
+            case '4': ss >> _args->ref_bias;                   break;  // 恒参
+            case '5': ss >> _args->max_alleles;                break;  // 恒参
             case 'h': 
                 std::cout << usage() << std::endl; 
                 exit(EXIT_SUCCESS);
@@ -152,6 +162,10 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
         throw std::invalid_argument("[ERROR] '-B/--batch-count' argument must be > 0");
     if (_args->thread_num <= 0)
         throw std::invalid_argument("[ERROR] '-t/--thread' argument must be > 0");
+    if (_args->ref_bias < 0.0 || _args->ref_bias > 1.0)
+        throw std::invalid_argument("[ERROR] '--ref-bias' argument must be between 0.0 and 1.0");
+    if (_args->max_alleles < 1 || _args->max_alleles > 10)
+        throw std::invalid_argument("[ERROR] '--max-alleles' argument must be between 1 and 10");
 
     // recovering the absolute paths of output files
     _args->output_vcf = ngslib::abspath(_args->output_vcf);
@@ -678,12 +692,17 @@ void BaseTypeRunner::_seek_position(const std::vector<ngslib::BamRecord> &sample
                 ab.ref_base  = "";  // empty reference base
                 ab.read_base = "+" + aligned_pairs[i].read_base;  // insertion bases
 
-                // mean quality of the whole insertion sequence
-                double total_qual = 0.0;
-                for (char q : aligned_pairs[i].read_qual) {
-                    total_qual += (q - 33);  // convert to int type
+                // Use upstream anchor base quality (D4 fix)
+                if (i > 0) {
+                    ab.base_qual = aligned_pairs[i-1].read_qual[0];
+                } else {
+                    // Fallback: mean quality of insertion sequence
+                    double total_qual = 0.0;
+                    for (char q : aligned_pairs[i].read_qual) {
+                        total_qual += (q - 33);
+                    }
+                    ab.base_qual = static_cast<char>(total_qual / aligned_pairs[i].read_qual.size() + 33);
                 }
-                ab.base_qual = static_cast<char>(total_qual / aligned_pairs[i].read_qual.size() + 33); // convert to char type
 
             } else if (aligned_pairs[i].op == BAM_CDEL) {  /* CIGAR: D */
                 // Deletion. 'read_base' is empty, 'ref_base' is the deleted bases.
@@ -696,10 +715,15 @@ void BaseTypeRunner::_seek_position(const std::vector<ngslib::BamRecord> &sample
                 ab.ref_base  = aligned_pairs[i].ref_base;
                 ab.read_base = "-" + aligned_pairs[i].ref_base;  // aligned_pairs[i].ref_base 识别用的 (后面不直接用，要替换的)，同位点可以有多类型的 DEL 
 
-                // mean quality of the whole deletion sequence
-                ab.base_qual = static_cast<char>(al.mean_qqual() + 33); // convert to char type
+                // Use upstream anchor base quality (D4 fix)
+                if (i > 0) {
+                    ab.base_qual = aligned_pairs[i-1].read_qual[0];
+                } else {
+                    // Fallback: mean quality of the whole read
+                    ab.base_qual = static_cast<char>(al.mean_qqual() + 33);
+                }
             } else {
-                // Skip in basevar for other kind of CIGAR symbals.
+                // Skip in basevar for other kind of CIGAR symbols.
                 continue;
             }
 
@@ -1180,6 +1204,7 @@ std::pair<BaseType, VariantInfo> BaseTypeRunner::_basetype_caller_unit(
     }
 
     BaseType bt(&all_smps_bi, _args->min_af);
+    bt.set_max_alleles(_args->max_alleles);  // D5 fix: configurable max alleles
     if (basecombination.empty()) {
         // If basecombination is empty, use the default reference base
         bt.lrt();
@@ -1219,6 +1244,50 @@ VariantInfo BaseTypeRunner::_get_pos_variant_info(const BaseType &bt, const Base
                                              smp_bi->map_strands));
     }
 
+    // D1 fix: Recompute QUAL using overall LRT statistic (final model vs REF-only)
+    // This replaces the last-step Lambda with the global evidence for the variant.
+    // We take the MAX of global LRT QUAL and original stepwise LRT QUAL, to ensure
+    // we don't lose evidence in ultra-low-coverage scenarios where the global LRT
+    // may be weaker than the stepwise LRT.
+    if (!vi.ale_bases.empty() && !vi.ref_bases.empty()) {
+        std::string ref_base_str = vi.ref_bases[0];
+        // Get the reference base character (single base for SNPs)
+        char ref_char = ref_base_str.empty() ? 'N' : std::toupper(ref_base_str[0]);
+        
+        // Compute REF-only log-likelihood (natural log scale, matching EM's log marginal likelihood)
+        double ref_only_logL = 0.0;
+        for (size_t j = 0; j < smp_bi->align_bases.size(); ++j) {
+            char base = std::toupper(smp_bi->align_bases[j][0]);
+            if (base == 'N') continue;  // toupper already called, 'n' check redundant
+            
+            int Q = static_cast<int>(smp_bi->align_base_quals[j]) - 33;
+            double e = (Q < 0) ? 1.0 : std::pow(10.0, -Q / 10.0);
+            double p = (base == ref_char) ? (1.0 - e) : (e / 3.0);
+            if (p > 0) {
+                ref_only_logL += std::log(p);  // natural log to match EM scale
+            }
+        }
+        
+        // Get final model's logL from BaseType (natural log scale from EM)
+        double final_logL = bt.get_final_model_logL();
+        
+        // LRT statistic: Lambda = 2 * (ln_L_alt - ln_L_null)
+        // Both are in natural log scale, so Lambda = 2 * delta
+        double delta_logL = final_logL - ref_only_logL;
+        if (delta_logL > 0) {
+            double lambda = 2.0 * delta_logL;
+            int df = std::max(1, static_cast<int>(vi.ale_bases.size()) - 1);
+            double chi_prob = chi2_test(lambda, df);
+            if (std::isnan(chi_prob)) chi_prob = 1.0;
+            double new_qual = (chi_prob > 0) ? -10.0 * std::log10(chi_prob) : 10000.0;
+            if (new_qual < 0) new_qual = 0.0;
+            int global_qual = static_cast<int>(new_qual + 0.5);
+            // Take the max of global LRT QUAL and original stepwise LRT QUAL
+            vi.qual = std::max(vi.qual, global_qual);
+        }
+        // When delta_logL <= 0, keep the original stepwise LRT QUAL (vi.qual unchanged)
+    }
+
     return vi;
 }
 
@@ -1243,8 +1312,11 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
     // =====================================================================
     // First pass: original logic — collect PL and hard-count AC (backward compatible)
     // =====================================================================
+    std::vector<std::vector<int>> sample_pls;  // For HWE test (D7)
+    sample_pls.reserve(samples_batchinfo_vector.size());
+    
     for (const auto &smp_bi : samples_batchinfo_vector) {
-        auto sa = process_sample_variant(vcf_record.ref, vcf_record.alt, smp_bi);
+        auto sa = process_sample_variant(vcf_record.ref, vcf_record.alt, smp_bi, -1.0, _args->ref_bias);
 
         // Update allele counts: include both ref and alt alleles
         for (const auto& alt : sa.sample_alts) {
@@ -1252,6 +1324,7 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
             ai.total_alleles++;
         }
 
+        sample_pls.push_back(sa.PL);  // Collect PL for HWE
         vcf_record.samples.push_back(format_sample_string(sa));
     }
 
@@ -1269,7 +1342,7 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
 
         for (size_t i = 0; i < samples_batchinfo_vector.size(); ++i) {
             auto sa = process_sample_variant(vcf_record.ref, vcf_record.alt,
-                                             samples_batchinfo_vector[i], lrt_af);
+                                             samples_batchinfo_vector[i], lrt_af, _args->ref_bias);
 
             // Collect dosage for dosage-based AC (posteriors already in sa)
             GenotypePosterior gp;
@@ -1332,18 +1405,92 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
         info.push_back("CAF_dosage=" + ngslib::join(caf_dosage, ","));
     }
 
+    // =====================================================================
+    // HWE test (D7): dosage-based, suitable for low-coverage data
+    // =====================================================================
+    {
+        size_t n_alleles = vcf_record.alt.size() + 1;  // REF + ALTs
+        // Convert PLs to likelihoods (uniform prior => posterior = likelihood)
+        std::vector<std::vector<double>> sample_gt_probs;
+        sample_gt_probs.reserve(sample_pls.size());
+        for (const auto& pl : sample_pls) {
+            sample_gt_probs.push_back(pl_to_likelihoods(pl));
+        }
+        double hwe_pval = hwe_dosage_test(sample_gt_probs, n_alleles);
+        char buf[64];
+        snprintf(buf, sizeof(buf), "%.6g", hwe_pval);
+        info.push_back("HWE=" + std::string(buf));
+    }
+
+    // =====================================================================
+    // RankSum annotations (D8): BaseQ, MQ, ReadPos
+    // =====================================================================
+    if (vcf_record.alt.size() == 1) {  // Only for bi-allelic sites
+        const std::string& alt_allele = vcf_record.alt[0];
+        std::vector<double> ref_bq, alt_bq, ref_mq, alt_mq, ref_rpr, alt_rpr;
+        
+        for (const auto& smp_bi : samples_batchinfo_vector) {
+            for (size_t j = 0; j < smp_bi.align_bases.size(); ++j) {
+                std::string read_base_upper = smp_bi.align_bases[j];
+                std::transform(read_base_upper.begin(), read_base_upper.end(), read_base_upper.begin(), ::toupper);
+                
+                bool is_ref = (read_base_upper == vcf_record.ref);
+                bool is_alt = (read_base_upper == alt_allele);
+                
+                if (is_ref || is_alt) {
+                    double bq = static_cast<double>(smp_bi.align_base_quals[j]) - 33.0;
+                    double mq = static_cast<double>(smp_bi.mapqs[j]);
+                    double rpr = static_cast<double>(smp_bi.base_pos_ranks[j]);
+                    
+                    if (is_ref) {
+                        ref_bq.push_back(bq); ref_mq.push_back(mq); ref_rpr.push_back(rpr);
+                    } else {
+                        alt_bq.push_back(bq); alt_mq.push_back(mq); alt_rpr.push_back(rpr);
+                    }
+                }
+            }
+        }
+        
+        // Compute Z-scores (need at least 1 read in each group)
+        if (!ref_bq.empty() && !alt_bq.empty()) {
+            double bq_z = wilcoxon_ranksum_zscore(ref_bq, alt_bq);
+            double mq_z = wilcoxon_ranksum_zscore(ref_mq, alt_mq);
+            double rpr_z = wilcoxon_ranksum_zscore(ref_rpr, alt_rpr);
+            
+            char buf[64];
+            snprintf(buf, sizeof(buf), "%.3f", bq_z);
+            info.push_back("BaseQRankSum=" + std::string(buf));
+            snprintf(buf, sizeof(buf), "%.3f", mq_z);
+            info.push_back("MQRankSum=" + std::string(buf));
+            snprintf(buf, sizeof(buf), "%.3f", rpr_z);
+            info.push_back("ReadPosRankSum=" + std::string(buf));
+        }
+    }
+
     // Add group allele frequency information if available
     if (!group_bt.empty()) {
         std::vector<std::string> group_af_info, group_dp_info;
         for (std::map<std::string, BaseType>::const_iterator it(group_bt.begin()); it != group_bt.end(); ++it) {
             group_dp_info.push_back("DP_" + it->first + "=" + std::to_string(it->second.get_total_depth())); // DP_group=xxx
 
+            // 原本所存在群组 alt 的与全局 active_bases 不完全一样，所以会导致 ai.alts 
+            // 顺序不一致的风险已经完全通过如下代码修复了。
+            // D9 fix: Iterate over vcf_record.alt (VCF ALT order) instead of
+            // get_active_bases() to ensure AF order matches the ALT field.
             std::vector<double> af;
-            for (auto b : it->second.get_active_bases()) { // must have the same order with ai.ref + ai.alts
-                if (b == ai.ref) continue;  // skip reference base
-
-                // 由于与 active-base 不完全一样，所以存在与 ai.alts 顺序不一致的风险，要改进
-                af.push_back(it->second.get_lrt_af(b));  
+            const auto& group_active = it->second.get_active_bases();
+            for (const auto& alt : vcf_record.alt) {
+                bool found = false;
+                for (const auto& b : group_active) {
+                    if (b == alt) {
+                        af.push_back(it->second.get_lrt_af(b));
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    af.push_back(0.0);  // Alt not in group's active bases
+                }
             }
 
             if (!af.empty()) {

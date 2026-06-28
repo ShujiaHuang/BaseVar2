@@ -1,4 +1,5 @@
 #include "caller_utils.h"
+#include <cmath>
 #include <cstdio>  // snprintf
 
 #include "io/fasta.h"
@@ -45,7 +46,7 @@ StrandBiasInfo strand_bias(const std::string &major_base,
         alt_fwd = alt_rev = int(std::round(0.5 * (maj_fwd + maj_rev)));
     }
 
-    double fs = -10 * log10(fisher_exact_test(maj_fwd, maj_rev, alt_fwd, alt_rev));
+    double fs = -10 * std::log10(fisher_exact_test(maj_fwd, maj_rev, alt_fwd, alt_rev));
     // 应对'全 major allele' 或者是 '全 alt allele'
     if (std::isinf(fs)) {
         fs = 10000;
@@ -53,9 +54,29 @@ StrandBiasInfo strand_bias(const std::string &major_base,
         fs = 0.0;
     }
 
-    // Strand bias estimated by the Symmetric Odds Ratio test
-    // https://software.broadinstitute.org/gatk/documentation/tooldocs/current/org_broadinstitute_gatk_tools_walkers_annotator_StrandOddsRatio.php
-    double sor = (maj_rev * alt_fwd > 0) ? (double)(maj_fwd * alt_rev) / (double)(maj_rev * alt_fwd): 10000;
+    // Symmetric Odds Ratio (GATK-compatible SOR)
+    // Reference: https://software.broadinstitute.org/gatk/documentation/tooldocs/current/org_broadinstitute_gatk_tools_walkers_annotator_StrandOddsRatio.php
+    //
+    // SOR = ln(symRatio) * (refRatio - altRatio)
+    //   symRatio = (Rf*Ar)/(Rr*Af) + (Rr*Af)/(Rf*Ar)
+    //   refRatio = Rr/Rf,  altRatio = Ar/Af
+    //
+    // where Rf=maj_fwd, Rr=maj_rev, Af=alt_fwd, Ar=alt_rev
+    // When any cell count is 0, add pseudocount of 1 to all cells (GATK convention)
+    double Rf = static_cast<double>(maj_fwd);
+    double Rr = static_cast<double>(maj_rev);
+    double Af = static_cast<double>(alt_fwd);
+    double Ar = static_cast<double>(alt_rev);
+
+    // When any cell count is 0, add pseudocount of 1 to all cells (GATK convention)
+    if (maj_fwd == 0 || maj_rev == 0 || alt_fwd == 0 || alt_rev == 0) {
+        Rf += 1.0; Rr += 1.0; Af += 1.0; Ar += 1.0;
+    }
+
+    double sym_ratio = (Rf * Ar) / (Rr * Af) + (Rr * Af) / (Rf * Ar);
+    double ref_ratio = Rr / Rf;
+    double alt_ratio = Ar / Af;
+    double sor = std::log(sym_ratio) * (ref_ratio - alt_ratio);
 
     StrandBiasInfo sbi;
     sbi.fwd = (alt_base == major_base) ? maj_fwd : alt_fwd;
@@ -149,12 +170,13 @@ std::pair<size_t, size_t> pl_index_to_genotype(size_t pl_idx, size_t n_alleles) 
 VCFSampleAnnotation process_sample_variant(const std::string& ref_base,          // It's upper case already
                                            const std::vector<std::string>& alts, // It's upper case already
                                            const BaseType::BatchInfo& smp_bi,    // smp_bi.align_bases should be upper case already
-                                           double af)                            // population AF prior (-1 = disable Bayesian)
+                                           double af,                            // population AF prior (-1 = disable Bayesian)
+                                           double ref_bias)                      // reference bias coefficient β (0.5 = no bias)
 {
     VCFSampleAnnotation sa;
     
-    // Calculate PL values for all possible genotypes in one call (unchanged)
-    sa.PL = calculatePL(ref_base, alts, smp_bi.align_bases, smp_bi.align_base_quals);
+    // Calculate PL values for all possible genotypes in one call
+    sa.PL = calculatePL(ref_base, alts, smp_bi.align_bases, smp_bi.align_base_quals, ref_bias);
 
     size_t n_alleles = alts.size() + 1;  // Total number of alleles including REF
 
@@ -263,15 +285,13 @@ std::string vcf_header_define(const std::string &ref_file_path, const std::vecto
         "##INFO=<ID=DP4,Number=A,Type=Integer,Description=\"A list of number of high-quality ref-forward, ref-reverse, alt1-forward, alt1-reverse, alt2-forward, alt2-reverse, ... ,bases\">",
         "##INFO=<ID=FS,Number=A,Type=Float,Description=\"Phred-scaled P-value using Fisher's exact test to detect strand bias\">",
         "##INFO=<ID=SOR,Number=A,Type=Float,Description=\"Symmetric Odds Ratio of 2x2 contingency table to detect strand bias\">",
-        "##INFO=<ID=AC_dosage,Number=A,Type=Float,Description=\"Expected allele count from genotype posterior dosages (BaseVar B-type improvement)\">",
+        "##INFO=<ID=AC_dosage,Number=A,Type=Float,Description=\"Expected allele count from genotype posterior dosages\">",
         "##INFO=<ID=AN_dosage,Number=1,Type=Integer,Description=\"Total number of alleles for dosage-based counting (= 2 * N_samples)\">",
-        "##INFO=<ID=CAF_dosage,Number=A,Type=Float,Description=\"Dosage-based allele frequency = AC_dosage / AN_dosage (BaseVar B-type improvement)\">"
-
-        // "##INFO=<ID=BaseQRankSum,Number=1,Type=Float,Description=\"Phred-score from Wilcoxon rank sum test of Alt Vs. Ref base qualities\">",
-        // "##INFO=<ID=MQRankSum,Number=1,Type=Float,Description=\"Phred-score From Wilcoxon rank sum test of Alt vs. Ref read mapping qualities\">",
-        // "##INFO=<ID=ReadPosRankSum,Number=1,Type=Float,Description=\"Phred-score from Wilcoxon rank sum test of Alt vs. Ref read position bias\">",
-        // "##INFO=<ID=QD,Number=1,Type=Float,Description=\"Variant Confidence Quality by Depth\">",
-        // "##FILTER=<ID=LowQual,Description=\"Low quality (QUAL < 60)\">"
+        "##INFO=<ID=CAF_dosage,Number=A,Type=Float,Description=\"Dosage-based allele frequency = AC_dosage / AN_dosage\">",
+        "##INFO=<ID=HWE,Number=1,Type=Float,Description=\"Hardy-Weinberg equilibrium chi-square p-value (dosage-based, suitable for low-coverage data)\">",
+        "##INFO=<ID=BaseQRankSum,Number=1,Type=Float,Description=\"Z-score from Wilcoxon rank sum test of Alt Vs. Ref base qualities\">",
+        "##INFO=<ID=MQRankSum,Number=1,Type=Float,Description=\"Z-score from Wilcoxon rank sum test of Alt vs. Ref read mapping qualities\">",
+        "##INFO=<ID=ReadPosRankSum,Number=1,Type=Float,Description=\"Z-score from Wilcoxon rank sum test of Alt vs. Ref read position bias\">"
     };  // initial by common information of header
     if (!addition_info.empty()) header.insert(header.end(), addition_info.begin(), addition_info.end());
 
