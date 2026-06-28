@@ -300,7 +300,7 @@ static const char* genome_build_name(GenomeBuild b) {
 
 static const std::string FF_USAGE =
     "About: Estimate male fetal fraction (FF) from NIPT cfDNA BAM/CRAM data\n"
-    "       using chrY read counts.  HIDDEN BaseVar subcommand for private use.\n"
+    "       using chrY read counts. HIDDEN BaseVar subcommand for private use.\n"
     "       Female fetuses are detected and reported, but FF is NOT computed for\n"
     "       them under lpWGS (use a SNP-based assay instead).\n"
     "Usage: basevar fetalfrac [options] <-o output.tsv> [-L bam.list] in1.bam [in2.bam ...]\n\n"
@@ -388,7 +388,7 @@ static const std::string FF_USAGE =
     "                               2018 BMC Genomics (UDI remediation); Korostin\n"
     "                               2020 PLoS One / Foox 2021 Nat Biotechnol (MGI vs\n"
     "                               Illumina); Liu 2024 Cell Genomics (NIFTY on\n"
-    "                               BGISEQ/MGI).  See Notes below for the coupling\n"
+    "                               BGISEQ/MGI). See Notes below for the coupling\n"
     "                               with --male-threshold.\n"
     "      --male-threshold FLOAT   If Y/Auto < this, the sample is called FEMALE\n"
     "                               and FF is NOT reported.  [1e-4]\n"
@@ -436,10 +436,10 @@ static const std::string FF_USAGE =
     "      -B given             -> 2 * BED_autosome_bp / (BED_chrY_bp - BED chrY n PAR).\n"
     "    The auto value is a uniform-coverage geometric approximation; for clinical\n"
     "    use, calibrate `--scale` empirically against male reference samples\n"
-    "    processed with the SAME -B / --build / region settings.  No reference\n"
+    "    processed with the SAME -B / --build / region settings. No reference\n"
     "    length is inferred from the BAM at runtime; only the BED and the\n"
     "    canonical GRC assembly report are used.\n"
-    "  - The pair (-B, --scale) is a tightly coupled calibration unit.  When you\n"
+    "  - The pair (-B, --scale) is a tightly coupled calibration unit. When you\n"
     "    let --scale auto, the program tracks -B for you.  When you pin --scale\n"
     "    explicitly, you MUST keep -B unchanged across calibration and production.\n"
     "  - --noise calibration procedure (REQUIRED for clinical use):\n"
@@ -459,8 +459,9 @@ static const std::string FF_USAGE =
     "    Without a calibration cohort, leave --noise at 0 (the default never\n"
     "    silently biases FF; raw y_ratio remains visible in the TSV).\n"
     "  - --noise and --male-threshold are coupled: if --noise >= --male-threshold,\n"
-    "    every borderline MALE call is corrected to FF=0 then re-thresholded to\n"
-    "    FEMALE -- a discontinuity.  Keep --noise < --male-threshold / 5.";
+    "    any sample with y_ratio above the threshold but below the noise floor\n"
+    "    will be called MALE with FF=0 (a discontinuity). Keep --noise <\n"
+    "    --male-threshold / 5 to avoid this edge case.";
 
 const std::string FetalFractionRunner::usage() { return FF_USAGE; }
 
