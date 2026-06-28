@@ -53,19 +53,11 @@ BaseVar v2.5.1 is a bug-fix release that addresses all remaining known defects (
 
 ## Defect Status Summary
 
-<<<<<<< HEAD
-All 9 defects (D1–D9) in the caller module are now fixed. The only remaining open item is **PE3** (LRT greedy algorithm does not guarantee global optimum), which is a design limitation requiring algorithmic restructuring.
-=======
 All 9 defects (D1–D9) in the caller module are now fixed.
->>>>>>> 6965d45 (v2.5.1: fix all caller defects (D1-D9) and add --max-alleles option)
 
 | Category | Total | Fixed | Remaining |
 |----------|-------|-------|-----------|
 | Defects (D1–D9) | 9 | 9 | 0 |
-<<<<<<< HEAD
-| Principle Errors (PE1–PE4) | 4 | 2 (PE1, PE2) | 1 (PE3) + 1 mitigated (PE4) |
-=======
 | Principle Errors (PE1–PE4) | 4 | 2 (PE1, PE2) | 1 mitigated (PE4) |
 
 **PE3 reclassification**: The LRT step-down model selection was previously listed as a design limitation. Upon deeper analysis, it has been reclassified as a **design feature** — the algorithm exhaustively searches all combinations at each subset size, which is standard statistical practice (step-down procedure with LRT threshold p≈10⁻⁶). In ultra-low-coverage scenarios, the likelihood surface is too flat for different subsets to be statistically distinguishable, making global optimization unnecessary.
->>>>>>> 6965d45 (v2.5.1: fix all caller defects (D1-D9) and add --max-alleles option)
