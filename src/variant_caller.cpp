@@ -1244,8 +1244,8 @@ VariantInfo BaseTypeRunner::_get_pos_variant_info(const BaseType &bt, const Base
                                              smp_bi->map_strands));
     }
 
-    // D1 fix: Recompute QUAL using overall LRT statistic (final model vs REF-only)
-    // This replaces the last-step Lambda with the global evidence for the variant.
+    // D1 fix: Recompute QUAL using overall LRT statistic (full model vs REF-only)
+    // Uses the full (pre-step-down) model logL for correct degrees of freedom.
     // We take the MAX of global LRT QUAL and original stepwise LRT QUAL, to ensure
     // we don't lose evidence in ultra-low-coverage scenarios where the global LRT
     // may be weaker than the stepwise LRT.
@@ -1258,7 +1258,7 @@ VariantInfo BaseTypeRunner::_get_pos_variant_info(const BaseType &bt, const Base
         double ref_only_logL = 0.0;
         for (size_t j = 0; j < smp_bi->align_bases.size(); ++j) {
             char base = std::toupper(smp_bi->align_bases[j][0]);
-            if (base == 'N') continue;  // toupper already called, 'n' check redundant
+            if (base == 'N') continue;
             
             int Q = static_cast<int>(smp_bi->align_base_quals[j]) - 33;
             double e = (Q < 0) ? 1.0 : std::pow(10.0, -Q / 10.0);
@@ -1268,12 +1268,13 @@ VariantInfo BaseTypeRunner::_get_pos_variant_info(const BaseType &bt, const Base
             }
         }
         
-        // Get final model's logL from BaseType (natural log scale from EM)
-        double final_logL = bt.get_final_model_logL();
+        // Get full model's logL (pre-step-down, D1 df fix)
+        // This ensures df = N-1 matches the chi-squared statistic correctly.
+        double full_logL = bt.get_full_model_logL();
         
         // LRT statistic: Lambda = 2 * (ln_L_alt - ln_L_null)
         // Both are in natural log scale, so Lambda = 2 * delta
-        double delta_logL = final_logL - ref_only_logL;
+        double delta_logL = full_logL - ref_only_logL;
         if (delta_logL > 0) {
             double lambda = 2.0 * delta_logL;
             int df = std::max(1, static_cast<int>(vi.ale_bases.size()) - 1);

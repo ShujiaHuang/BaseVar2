@@ -94,6 +94,7 @@ BaseType::BaseType(const BaseType &b) {
     this->_max_alleles  = b._max_alleles;
     this->_var_qual     = b._var_qual;
     this->_final_model_logL = b._final_model_logL;  // D1 fix field must be copied
+    this->_full_model_logL = b._full_model_logL;  // D1 df fix field must be copied
     this->_af_by_lrt    = b._af_by_lrt;
     this->_allele_likelihood = b._allele_likelihood;
 
@@ -171,6 +172,11 @@ void BaseType::lrt(const std::vector<std::string> &specific_bases) {
     double chi_sqrt_value = 0;
     std::vector<double> active_bases_freq = var.bp[0];
     double lr = var.lr[0];  // f4
+
+    // Save the full model's log-likelihood BEFORE step-down (D1 df fix)
+    // This is the logL of the model with ALL active alleles, used for correct
+    // degrees of freedom in the global LRT QUAL computation.
+    this->_full_model_logL = lr;
 
     // Find candinate altnative alleles
     for (size_t n = active_bases.size() - 1; n > 0; --n) {

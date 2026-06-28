@@ -44,6 +44,7 @@ private:
     std::map<std::string, std::string> _bases2ref;  // align/alt bases => ref_base
     double _var_qual;
     double _final_model_logL;  // Log-likelihood of the final selected model (D1 fix)
+    double _full_model_logL;   // Log-likelihood of the full (pre-step-down) model (D1 df fix)
     double _min_af;
     int _max_alleles;                    // Max number of active alleles before skipping (D5 fix)
 
@@ -89,7 +90,7 @@ public:
     };
 
     // Constructor
-    BaseType() : _var_qual(0), _final_model_logL(0), _min_af(0), _max_alleles(6), _total_depth(0) {};
+    BaseType() : _var_qual(0), _final_model_logL(0), _full_model_logL(0), _min_af(0), _max_alleles(6), _total_depth(0) {};
     BaseType(const BatchInfo *smp_bi, double af);
     BaseType(const BaseType &b);  // copy constructor
 
@@ -115,6 +116,7 @@ public:
 
     const double get_var_qual() const { return this->_var_qual; }
     const double get_final_model_logL() const { return this->_final_model_logL; }
+    const double get_full_model_logL() const { return this->_full_model_logL; }
     const int get_total_depth() const { return this->_total_depth; }
     const double get_base_depth(const std::string &b) const {
         // operator[] doesn't have a 'const' qualifier in std::map. Use 'at' instead in C++11

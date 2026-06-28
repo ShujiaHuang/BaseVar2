@@ -360,7 +360,7 @@ void EM(const std::vector<std::vector<double>> &ind_allele_likelihood, // n x _U
         double delta = 0, llh;
         for (size_t i = 0; i < marginal_likelihood.size(); i++) {
             llh = std::log(marginal_likelihood[i]);
-            delta += abs(llh - log_marginal_likelihood[i]);
+            delta += std::abs(llh - log_marginal_likelihood[i]);
             log_marginal_likelihood[i] = llh;  // update
         }
         
