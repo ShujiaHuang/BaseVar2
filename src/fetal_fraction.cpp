@@ -395,6 +395,11 @@ static const std::string FF_USAGE =
     "      --filename-has-samplename\n"
     "                               Derive sample IDs from filenames instead of @RG SM.\n"
     "                               E.g. /path/SampleA.bam -> SampleA.\n"
+    "      --calibrate              Calibration mode: treat all input samples as known\n"
+    "                               pure male (FF=1.0), compute empirical scale as\n"
+    "                               1 / mean(y_ratio - noise), and report the\n"
+    "                               calibrated value.  Use this scale for subsequent\n"
+    "                               --scale <value> runs.\n"
     "  -h, --help                   Show this help message and exit.\n\n"
 
     "Output TSV columns (one row per input BAM/CRAM):\n"
@@ -406,7 +411,8 @@ static const std::string FF_USAGE =
     "  valid_y           chrY reads outside PAR passing all filters (numerator).\n"
     "  y_par_excluded    chrY reads dropped because they fell inside PAR1/PAR2.\n"
     "  total_reads       All reads scanned across the input.\n"
-    "  filtered_reads    Reads rejected by QC / region / mappability filters.\n"
+    "  filtered_reads    Reads rejected by QC / region / mappability filters,\n"
+    "                    or from non-informative contigs (chrX/chrM/ALT).\n"
     "  scale             Scaling factor used for this sample.\n"
     "  noise             Y/Auto noise floor used for this sample.\n"
     "  male_threshold    Y/Auto threshold used to call MALE vs FEMALE.\n\n"
@@ -420,6 +426,9 @@ static const std::string FF_USAGE =
     "                    -o cohort.ff.tsv -L bam.list\n\n"
     "  # CRAM input.  -f is mandatory.\n"
     "  basevar fetalfrac -f hg38.fa -o ff.tsv  sample.cram\n\n"
+    "  # Calibrate scale from known pure male samples.\n"
+    "  basevar fetalfrac --calibrate -f hg38.fa --noise 1e-5 \\\n"
+    "                    -o calibrate.tsv -L pure_male.list\n\n"
 
     "Notes:\n"
     "  - Autosomes are restricted to chr1..chr22 / 1..22; ALT/decoy/HLA contigs\n"
@@ -475,6 +484,7 @@ enum {
     OPT_FILENAME_HAS_SAMPLENAME,
     OPT_PAR_BED,
     OPT_BUILD,
+    OPT_CALIBRATE,
 };
 
 // ============================================================
@@ -508,6 +518,7 @@ FetalFractionRunner::FetalFractionRunner(int argc, char* argv[])
         {"noise",                   required_argument, NULL, OPT_NOISE},
         {"male-threshold",          required_argument, NULL, OPT_MALE_THRESHOLD},
         {"filename-has-samplename", no_argument,       NULL, OPT_FILENAME_HAS_SAMPLENAME},
+        {"calibrate",              no_argument,       NULL, OPT_CALIBRATE},
         {"help",                    no_argument,       NULL, 'h'},
         {0, 0, 0, 0}
     };
@@ -560,6 +571,9 @@ FetalFractionRunner::FetalFractionRunner(int argc, char* argv[])
                 break;
             case OPT_FILENAME_HAS_SAMPLENAME:
                 _args->filename_has_samplename = true;
+                break;
+            case OPT_CALIBRATE:
+                _args->calibrate = true;
                 break;
 
             case 'h':
@@ -832,9 +846,13 @@ void FetalFractionRunner::_process_one_file(FetalFractionResult& s) const {
             ++s.valid_y;
         } else if (is_autosome(chrom)) {
             ++s.valid_autosomal;
+        } else {
+            // chrX / chrM / ALT / decoy / HLA / random: pass QC but not
+            // informative for FF.  Count as filtered for bookkeeping so
+            // total_reads == filtered_reads + valid_y + valid_autosomal
+            // + y_par_excluded always holds.
+            ++s.filtered_reads;
         }
-        // chrX / chrM / ALT / decoy / HLA / random: silently ignored
-        // (not in numerator, not in denominator).
     };
 
     ngslib::BamRecord r;
@@ -969,10 +987,227 @@ void FetalFractionRunner::_print_summary(std::ostream& os) const {
 }
 
 // ============================================================
+// Calibration mode
+// ============================================================
+
+int FetalFractionRunner::_run_calibrate() {
+    // Validate the output path up-front so a bad -o does not waste a long run.
+    if (!_args->output_file.empty()) {
+        std::ofstream probe(_args->output_file);
+        if (!probe) {
+            throw std::runtime_error("[ERROR] Cannot open output TSV for writing: "
+                                     + _args->output_file);
+        }
+        probe.close();
+    }
+
+    // Process all samples first (reuse the standard pipeline).
+    const size_t n_files = _args->input_bf.size();
+    int n_threads = std::min<int>(_args->thread_num, static_cast<int>(n_files));
+    if (n_threads < 1) n_threads = 1;
+
+    std::cerr << "[INFO] basevar fetalfrac v" << BASEVAR_VERSION
+              << " - CALIBRATION MODE: treating " << n_files
+              << " sample(s) as known pure male (FF=1.0).\n";
+
+    // Stage 1: resolve sample IDs.
+    _results.resize(n_files);
+    for (size_t i = 0; i < n_files; ++i) {
+        _results[i].input_path = _args->input_bf[i];
+        _results[i].sample_id  = _resolve_sample_id(_args->input_bf[i]);
+    }
+
+    // Stage 2: process files concurrently.
+    if (n_threads <= 1 || n_files <= 1) {
+        for (size_t i = 0; i < n_files; ++i) {
+            std::cerr << "[INFO] [" << (i + 1) << "/" << n_files << "] "
+                      << _results[i].sample_id << "  <-  "
+                      << _results[i].input_path << "\n";
+            _process_one_file(_results[i]);
+        }
+    } else {
+        ThreadPool pool(n_threads);
+        std::vector<std::future<void>> futures;
+        futures.reserve(n_files);
+        for (size_t i = 0; i < n_files; ++i) {
+            futures.emplace_back(pool.submit(
+                [this, i]() {
+                    std::cerr << "[INFO] processing sample "
+                              << _results[i].sample_id << "  <-  "
+                              << _results[i].input_path << "\n";
+                    _process_one_file(_results[i]);
+                }));
+        }
+        for (auto& f : futures) f.get();
+        if (pool.has_error()) {
+            std::cerr << "[ERROR] one or more worker threads failed.\n";
+            return 1;
+        }
+    }
+
+    // Stage 3: compute empirical scale from samples passing male_threshold.
+    std::vector<double> valid_ratios;
+    size_t n_male = 0, n_female = 0, n_undetermined = 0;
+    for (const auto& s : _results) {
+        if (s.sex == FetalSex::MALE) {
+            ++n_male;
+            valid_ratios.push_back(s.y_ratio);
+        } else if (s.sex == FetalSex::FEMALE) {
+            ++n_female;
+        } else {
+            ++n_undetermined;
+        }
+    }
+
+    if (valid_ratios.empty()) {
+        std::cerr << "[ERROR] No samples passed the male threshold (y_ratio > "
+                  << _args->male_threshold << "). Cannot calibrate.\n";
+        return 1;
+    }
+
+    // Compute mean noise-corrected y_ratio.
+    // The production FF formula is: FF = max(0, y_ratio - noise) * scale.
+    // For pure male (FF=1.0): scale = 1 / mean(y_ratio - noise).
+    std::vector<double> corrected_ratios;
+    corrected_ratios.reserve(valid_ratios.size());
+    for (double r : valid_ratios) {
+        corrected_ratios.push_back(std::max(0.0, r - _args->y_noise));
+    }
+    double sum = 0.0;
+    for (double r : corrected_ratios) sum += r;
+    const double mean_corrected = sum / corrected_ratios.size();
+
+    if (mean_corrected <= 0.0) {
+        std::cerr << "[ERROR] Mean noise-corrected y_ratio <= 0. "
+                  << "--noise may be too high. Cannot calibrate.\n";
+        return 1;
+    }
+    const double empirical_scale = 1.0 / mean_corrected;
+
+    // Also report raw mean for reference.
+    double raw_sum = 0.0;
+    for (double r : valid_ratios) raw_sum += r;
+    const double mean_raw = raw_sum / valid_ratios.size();
+
+    // Compute standard deviation of corrected ratios for QC.
+    double var_sum = 0.0;
+    for (double r : corrected_ratios) {
+        const double diff = r - mean_corrected;
+        var_sum += diff * diff;
+    }
+    const double sd_ratio = std::sqrt(var_sum / corrected_ratios.size());
+    const double cv = (mean_corrected > 0.0) ? (sd_ratio / mean_corrected * 100.0) : 0.0;
+
+    // Report calibration results.
+    std::cout << "\n=== Fetal Fraction Calibration Report ===\n"
+              << "Mode:                CALIBRATE (known pure male samples)\n"
+              << "Genome build:        " << genome_build_name(_args->genome_build) << "\n"
+              << "PAR exclusion:       "
+              << (_par_regions.is_loaded() ? "ENABLED" : "disabled") << "\n"
+              << "Mappability mask:    "
+              << (_mappability.is_loaded() ? _args->mappability_bed : std::string("(none)")) << "\n"
+              << "Min MAPQ:            " << _args->min_mapq << "\n"
+              << "Noise floor:         " << _args->y_noise << "\n"
+              << "MALE threshold:      " << _args->male_threshold << "\n"
+              << "\n"
+              << "Samples processed:   " << _results.size() << "\n"
+              << "  MALE (used):       " << n_male << "\n"
+              << "  FEMALE (excluded): " << n_female << "\n"
+              << "  UNDETERMINED:      " << n_undetermined << "\n"
+              << "\n"
+              << "-- Per-sample y_ratio (MALE samples) --\n";
+
+    std::cout << std::left << std::setw(24) << "Sample"
+              << std::setw(16) << "y_ratio"
+              << std::setw(16) << "valid_y"
+              << std::setw(16) << "valid_auto" << "\n";
+    std::cout << std::string(72, '-') << "\n";
+
+    for (const auto& s : _results) {
+        if (s.sex != FetalSex::MALE) continue;
+        std::ostringstream y_str;
+        y_str << std::scientific << std::setprecision(4) << s.y_ratio;
+        std::cout << std::left << std::setw(24) << s.sample_id
+                  << std::setw(16) << y_str.str()
+                  << std::setw(16) << s.valid_y
+                  << std::setw(16) << s.valid_autosomal << "\n";
+    }
+
+    std::cout << "\n=== Calibration Result ===\n";
+    std::cout << std::fixed << std::setprecision(6);
+    std::cout << "Noise floor:         " << _args->y_noise << "\n";
+    std::cout << "Mean raw y_ratio:    " << mean_raw << "\n";
+    std::cout << "Mean corrected:      " << mean_corrected
+              << "  (= raw - noise)\n";
+    std::cout << "SD corrected:        " << sd_ratio << "\n";
+    std::cout << "CV:                  " << cv << "%\n";
+    std::cout << "\n";
+    std::cout << "*** EMPIRICAL SCALE: " << empirical_scale << " ***\n";
+    std::cout << "\n";
+    std::cout << "Usage: add --scale " << empirical_scale
+              << " to your fetalfrac command for accurate FF estimation.\n";
+    std::cout << "\n";
+    std::cout << "Example:\n";
+    std::cout << "  basevar fetalfrac --scale " << empirical_scale
+              << " --noise <your_noise> -o ff.tsv -L bam.list\n";
+
+    // Write calibration TSV if output file specified.
+    if (!_args->output_file.empty()) {
+        std::ofstream ofs(_args->output_file);
+        if (!ofs) {
+            throw std::runtime_error("[ERROR] Cannot open output TSV for writing: "
+                                     + _args->output_file);
+        }
+        ofs << "#sample\tsex\tfetal_fraction\ty_ratio\tvalid_autosomal\tvalid_y"
+               "\ty_par_excluded\ttotal_reads\tfiltered_reads"
+               "\tscale\tnoise\tmale_threshold\n";
+        ofs << std::fixed << std::setprecision(8);
+        for (const auto& s : _results) {
+            ofs << s.sample_id      << "\t"
+                << sex_name(s.sex)  << "\t"
+                << s.fetal_fraction << "\t"
+                << s.y_ratio        << "\t"
+                << s.valid_autosomal<< "\t"
+                << s.valid_y        << "\t"
+                << s.y_par_excluded << "\t"
+                << s.total_reads    << "\t"
+                << s.filtered_reads << "\t"
+                << empirical_scale  << "\t"
+                << _args->y_noise        << "\t"
+                << _args->male_threshold << "\n";
+        }
+        ofs << "#calibration_mean_raw_y_ratio=" << mean_raw << "\n";
+        ofs << "#calibration_mean_corrected_y_ratio=" << mean_corrected << "\n";
+        ofs << "#calibration_sd_corrected_y_ratio=" << sd_ratio << "\n";
+        ofs << "#calibration_cv_percent=" << cv << "\n";
+        ofs << "#calibration_empirical_scale=" << empirical_scale << "\n";
+        ofs.close();
+        std::cerr << "[INFO] Wrote calibration TSV to: " << _args->output_file << "\n";
+    }
+
+    if (n_female > 0 || n_undetermined > 0) {
+        std::cerr << "[WARN] " << (n_female + n_undetermined)
+                  << " sample(s) did not pass the male threshold and were excluded "
+                     "from calibration. Verify these are truly pure male samples.\n";
+    }
+    if (cv > 20.0) {
+        std::cerr << "[WARN] High CV (" << cv << "%) in y_ratio across samples. "
+                  << "Check sample quality / pipeline consistency.\n";
+    }
+
+    return 0;
+}
+
+// ============================================================
 // run()
 // ============================================================
 
 int FetalFractionRunner::run() {
+    // Calibration mode: different output path.
+    if (_args->calibrate) {
+        return _run_calibrate();
+    }
+
     // Validate the output path up-front so a bad -o does not waste a long run.
     if (!_args->output_file.empty()) {
         std::ofstream probe(_args->output_file);

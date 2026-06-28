@@ -208,6 +208,7 @@ struct FetalFractionArgs {
     double      y_noise;                   // --noise, default 0.0.
     double      male_threshold;            // --male-threshold, default 1e-4.
     bool        filename_has_samplename;   // --filename-has-samplename, default false.
+    bool        calibrate;                 // --calibrate, default false.
 
     FetalFractionArgs()
         : genome_build(GenomeBuild::GRCh38),
@@ -219,7 +220,8 @@ struct FetalFractionArgs {
           scale_user_set(false),
           y_noise(0.0),
           male_threshold(1e-4),
-          filename_has_samplename(false)
+          filename_has_samplename(false),
+          calibrate(false)
     {
         if (thread_num < 1) thread_num = 1;
     }
@@ -286,6 +288,11 @@ private:
 
     /// Print a human-readable per-sample summary to `os` (English).
     void _print_summary(std::ostream& os) const;
+
+    /// Calibration mode: process all samples, compute empirical scale
+    /// from the mean y_ratio of samples passing the male threshold,
+    /// and report the calibrated scale.  Returns 0 on success.
+    int _run_calibrate();
 
     FetalFractionRunner(const FetalFractionRunner&) = delete;
     FetalFractionRunner& operator=(const FetalFractionRunner&) = delete;
