@@ -1319,7 +1319,7 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(const std::vector<BaseType::BatchInf
         for (const auto& alt : vcf_record.alt) {
             double ac_dosage = ai.dosage_counts.count(alt) ? ai.dosage_counts.at(alt) : 0.0;
             char buf[64];
-            snprintf(buf, sizeof(buf), "%.0f", ac_dosage);
+            snprintf(buf, sizeof(buf), "%.2f", ac_dosage);
             info.push_back("AC_dosage=" + std::string(buf));
         }
         info.push_back("AN_dosage=" + std::to_string(ai.dosage_total_alleles));
