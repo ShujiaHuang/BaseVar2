@@ -620,7 +620,7 @@ bool BaseTypeRunner::_fetch_base_in_region(const std::vector<std::string> &batch
                 if (gr.start > map_ref_end) continue;
                 if (gr.end < map_ref_start) break;
 
-                sample_target_reads.push_back(al);  // record the proper reads of sample
+                sample_target_reads.push_back(std::move(al));  // move BamRecord to avoid deep copy (P1-2)
             }
 
             sample_posinfo_map.clear();  // make sure it's empty
@@ -677,47 +677,50 @@ void BaseTypeRunner::_seek_position(const std::vector<ngslib::BamRecord> &sample
                 aligned_pairs[i].op == BAM_CEQUAL ||  /* CIGAR: = */
                 aligned_pairs[i].op == BAM_CDIFF)     /* CIGAR: X */
             {
-                // SNV. Only one base in 'ref_base' and 'read_base'.
-                ab.ref_base  = aligned_pairs[i].ref_base[0];
-                ab.read_base = aligned_pairs[i].read_base[0];
-                ab.base_qual = aligned_pairs[i].read_qual[0];
+                // SNV. ref_base and read_base are now char (P1-1 optimization).
+                ab.ref_base  = std::string(1, aligned_pairs[i].ref_base);
+                ab.read_base = std::string(1, aligned_pairs[i].read_base);
+                ab.base_qual = aligned_pairs[i].read_qual;
             } else if (aligned_pairs[i].op == BAM_CINS) {  /* CIGAR: I */
-                // Insertion. 'ref_base' is empty, 'read_base' is the inserted bases.
-                if (!aligned_pairs[i].ref_base.empty()) {
+                // Insertion. ref_base is '\0' for insertions.
+                if (aligned_pairs[i].ref_base != '\0') {
                     std::cerr << al << "\n";
                     throw std::runtime_error("[ERROR] We got reference base in insertion region.");
                 }
 
                 // do not roll back position here
                 ab.ref_base  = "";  // empty reference base
-                ab.read_base = "+" + aligned_pairs[i].read_base;  // insertion bases
+                // Build insertion bases: read_base (first) + multi_base (rest)
+                ab.read_base = std::string("+") + aligned_pairs[i].read_base + aligned_pairs[i].multi_base;
 
                 // Use upstream anchor base quality (D4 fix)
                 if (i > 0) {
-                    ab.base_qual = aligned_pairs[i-1].read_qual[0];
+                    ab.base_qual = aligned_pairs[i-1].read_qual;
                 } else {
                     // Fallback: mean quality of insertion sequence
-                    double total_qual = 0.0;
-                    for (char q : aligned_pairs[i].read_qual) {
+                    double total_qual = (aligned_pairs[i].read_qual - 33);
+                    for (char q : aligned_pairs[i].multi_base) {
                         total_qual += (q - 33);
                     }
-                    ab.base_qual = static_cast<char>(total_qual / aligned_pairs[i].read_qual.size() + 33);
+                    size_t ins_len = 1 + aligned_pairs[i].multi_base.size();
+                    ab.base_qual = static_cast<char>(total_qual / ins_len + 33);
                 }
 
             } else if (aligned_pairs[i].op == BAM_CDEL) {  /* CIGAR: D */
-                // Deletion. 'read_base' is empty, 'ref_base' is the deleted bases.
-                if (!aligned_pairs[i].read_base.empty()) {
+                // Deletion. read_base is '\0' for deletions.
+                if (aligned_pairs[i].read_base != '\0') {
                     std::cerr << al << "\n";
                     throw std::runtime_error("[ERROR] We got read bases in deletion region.");
                 }
 
                 // do not roll back position here
-                ab.ref_base  = aligned_pairs[i].ref_base;
-                ab.read_base = "-" + aligned_pairs[i].ref_base;  // aligned_pairs[i].ref_base 识别用的 (后面不直接用，要替换的)，同位点可以有多类型的 DEL 
+                // Build deleted ref bases: ref_base (first) + multi_base (rest)
+                ab.ref_base  = std::string(1, aligned_pairs[i].ref_base) + aligned_pairs[i].multi_base;
+                ab.read_base = "-" + ab.ref_base;  // 识别用的 (后面不直接用，要替换的)，同位点可以有多类型的 DEL 
 
                 // Use upstream anchor base quality (D4 fix)
                 if (i > 0) {
-                    ab.base_qual = aligned_pairs[i-1].read_qual[0];
+                    ab.base_qual = aligned_pairs[i-1].read_qual;
                 } else {
                     // Fallback: mean quality of the whole read
                     ab.base_qual = static_cast<char>(al.mean_qqual() + 33);

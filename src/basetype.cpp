@@ -121,13 +121,32 @@ std::vector<double> BaseType::_set_initial_freq(const std::vector<std::string> &
     return obs_allele_freq;  // 1 x _UNIQ_BASES.size() vector. The allele frequence for _UNIQ_BASES
 }
 
-BaseType::AA BaseType::_f(const std::vector<std::string> &bases, int n) {
+BaseType::AA BaseType::_f(const std::vector<std::string> &bases, int n,
+                          const std::vector<double> &hot_start_freq) {
     AA data;
     Combinations<std::string> c(bases, n);
     std::vector<std::vector<std::string>> cbs_v = c.get();  // combination bases vector
     for (size_t i = 0; i < cbs_v.size(); i++) { // 循环该位点每一种可能的碱基组合
 
         std::vector<double> obs_allele_freq = this->_set_initial_freq(cbs_v[i]);
+
+        // P1-4: EM hot-start — use converged frequencies from previous step-down level
+        // if available. Project hot-start freq onto current combination by zeroing out
+        // alleles not in the combination and renormalizing.
+        if (!hot_start_freq.empty()) {
+            double hs_sum = 0.0;
+            for (const auto &b : cbs_v[i]) {
+                if (_B_IDX.find(b) != _B_IDX.end()) {
+                    obs_allele_freq[_B_IDX[b]] = hot_start_freq[_B_IDX[b]];
+                    hs_sum += hot_start_freq[_B_IDX[b]];
+                }
+            }
+            if (hs_sum > 0) {
+                for (size_t j = 0; j < obs_allele_freq.size(); ++j)
+                    obs_allele_freq[j] /= hs_sum;
+            }
+        }
+
         if (sum(obs_allele_freq) == 0) // Empty coverage for this type of combination, skip.
             throw std::runtime_error("The sum of frequence of active bases must always > 0. Check: " + 
                                      ngslib::join(cbs_v[i], ",") + " - " + ngslib::join(obs_allele_freq, ","));
@@ -178,9 +197,12 @@ void BaseType::lrt(const std::vector<std::string> &specific_bases) {
     // degrees of freedom in the global LRT QUAL computation.
     this->_full_model_logL = lr;
 
+    // P1-4: Use full model converged frequencies as hot-start for step-down
+    std::vector<double> prev_best_freq = active_bases_freq;
+
     // Find candinate altnative alleles
     for (size_t n = active_bases.size() - 1; n > 0; --n) {
-        var = _f(active_bases, n);
+        var = _f(active_bases, n, prev_best_freq);  // P1-4: hot-start EM
         std::vector<double> lrt_chivalue;
         for (size_t j(0); j < var.lr.size(); ++j) {
             lrt_chivalue.push_back(2 * (lr - var.lr[j])); // 负号代入对数方程了，所以和公式比起来就是分子分母互换
@@ -189,6 +211,9 @@ void BaseType::lrt(const std::vector<std::string> &specific_bases) {
 
         lr = var.lr[i_min];
         chi_sqrt_value = lrt_chivalue[i_min]; // 获得该最优组合的卡方值
+
+        // P1-4: Update hot-start for next level
+        prev_best_freq = var.bp[i_min];
 
         // 注意这 H0 假设是“少碱基的组合与多碱基的组合相比无显著差异”，如果是，那么选H0，也就是少碱基的组合，否则取多碱基组合(H1)。
         // 这和我 Cell 以及 Cell Genomics 文章的计算公式是一致的，只是反过来而已

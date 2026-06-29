@@ -70,7 +70,8 @@ private:
      *              AA.lr: Likelihood of ``bc``
      * 
      */
-    AA _f(const std::vector<std::string> &bases, int n);
+    AA _f(const std::vector<std::string> &bases, int n,
+          const std::vector<double> &hot_start_freq = {});
 
 public:
     struct BatchInfo {

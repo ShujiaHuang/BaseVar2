@@ -25,6 +25,33 @@ namespace ngslib {
         return *this;
     }
 
+    // Move constructor: transfer ownership of resources from source.
+    // P1-2 optimization: avoids bam_dup1() deep copy (~250ns per read).
+    // After move, source is left in a valid empty state (NULL pointers).
+    BamRecord::BamRecord(BamRecord &&b) noexcept
+        : _b(b._b), _p_cigar_field(b._p_cigar_field), _n_cigar_op(b._n_cigar_op) {
+        b._b = NULL;
+        b._p_cigar_field = NULL;
+        b._n_cigar_op = 0;
+    }
+
+    // Move assignment: transfer ownership of resources from source.
+    BamRecord &BamRecord::operator=(BamRecord &&b) noexcept {
+        if (this != &b) {
+            if (this->_b) bam_destroy1(this->_b);
+            if (this->_p_cigar_field) delete [] this->_p_cigar_field;
+
+            this->_b = b._b;
+            this->_p_cigar_field = b._p_cigar_field;
+            this->_n_cigar_op = b._n_cigar_op;
+
+            b._b = NULL;
+            b._p_cigar_field = NULL;
+            b._n_cigar_op = 0;
+        }
+        return *this;
+    }
+
     BamRecord &BamRecord::operator=(const bam1_t *b) {
 
         if (this->_b)
@@ -215,7 +242,8 @@ namespace ngslib {
         }
 
         // mapped pair of read mapped to reference information: 
-        // ReadAlignedPair: (cigar_op, read_pos, ref_pos, read_base, read_qual, ref_base)
+        // ReadAlignedPair: (cigar_op, read_pos, ref_pos, ref_base, qpos, read_base, read_qual, multi_base)
+        // P1-1 optimization: Use char for single-base fields, multi_base string only for multi-base Indels.
         std::vector<ReadAlignedPair> aligned_pairs;
         ReadAlignedPair al_pair;
 
@@ -239,10 +267,11 @@ namespace ngslib {
                 for (hts_pos_t i(rpos); i < rpos + len; ++i) {
                     al_pair.op        = op;                         // cigar op
                     al_pair.ref_pos   = i;                          // reference position, 0-based
-                    al_pair.ref_base  = fa.substr(i, 1);            // reference base
+                    al_pair.ref_base  = fa[i];                      // reference base (char)
                     al_pair.qpos      = qpos;                       // read position, 0-based
-                    al_pair.read_base = read_seq.substr(qpos, 1);   // read base
-                    al_pair.read_qual = read_qual.substr(qpos, 1);  // read quality base
+                    al_pair.read_base = read_seq[qpos];             // read base (char)
+                    al_pair.read_qual = read_qual[qpos];            // read quality (char)
+                    al_pair.multi_base.clear();                     // no multi-base for match
 
                     aligned_pairs.push_back(al_pair);
                     ++qpos;
@@ -251,20 +280,30 @@ namespace ngslib {
             } else if (op == BAM_CINS || op == BAM_CSOFT_CLIP || op == BAM_CPAD) {
                 al_pair.op        = op;                           // cigar op
                 al_pair.ref_pos   = rpos;                         // reference position, 0-based
-                al_pair.ref_base  = "";                           // reference base, empty
+                al_pair.ref_base  = '\0';                         // no reference base for insertion
                 al_pair.qpos      = qpos;                         // read position, 0-based
-                al_pair.read_base = read_seq.substr(qpos, len);   // read base
-                al_pair.read_qual = read_qual.substr(qpos, len);  // read quality base
+                al_pair.read_base = read_seq[qpos];               // first inserted base (char)
+                al_pair.read_qual = read_qual[qpos];              // first base quality (char)
+                if (len > 1) {
+                    al_pair.multi_base = read_seq.substr(qpos + 1, len - 1);
+                } else {
+                    al_pair.multi_base.clear();
+                }
                 
                 aligned_pairs.push_back(al_pair);
                 qpos += len;
             } else if (op == BAM_CDEL || op == BAM_CREF_SKIP) {
                 al_pair.op        = op;                    // cigar op
                 al_pair.ref_pos   = rpos;                  // reference position, 0-based
-                al_pair.ref_base  = fa.substr(rpos, len);  // reference base
+                al_pair.ref_base  = fa[rpos];              // first deleted ref base (char)
                 al_pair.qpos      = qpos;                  // read position, 0-based
-                al_pair.read_base = "";                    // read base, empty
-                al_pair.read_qual = "";   
+                al_pair.read_base = '\0';                  // no read base for deletion
+                al_pair.read_qual = '\0';
+                if (len > 1) {
+                    al_pair.multi_base = fa.substr(rpos + 1, len - 1);
+                } else {
+                    al_pair.multi_base.clear();
+                }
 
                 aligned_pairs.push_back(al_pair);
                 rpos += len;
