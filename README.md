@@ -83,14 +83,16 @@ If you see this — or you are on CentOS / RHEL / Rocky / AlmaLinux / older Ubun
 # Linux
 wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.5.1/basevar-linux-static
 chmod +x basevar-linux-static
-./basevar-linux-static --help
+mv basevar-linux-static basevar
+./basevar --help
 ```
 
 ```bash
 # macOS
 curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.5.1/basevar-macos-static
 chmod +x basevar-macos-static
-./basevar-macos-static --help
+mv basevar-macos-static basevar
+./basevar --help
 ```
 
 ---
@@ -352,9 +354,9 @@ For whole-genome variant calling, the `pipeline` subcommand splits the genome in
 | Option | Description | Default |
 | ------ | ----------- | ------- |
 | `-o, --outdir` | Output directory for VCF files and logs | **required** |
-| `--ref_fai` | Reference FASTA index file (`.fai`) | **required** |
-| `-d, --delta` | Size of each sub-region (bp) | `2000000` |
-| `-c, --chrom` | Restrict to comma-separated chromosome(s) | all chromosomes |
+| `--ref_fai`    | Reference FASTA index file (`.fai`) | **required** |
+| `-d, --delta`  | Size of each sub-region (bp) | `2000000` |
+| `-c, --chrom`  | Restrict to comma-separated chromosome(s) | all chromosomes |
 
 All other options (`-f`, `-L`, `-r`, `-Q`, `-q`, `-B`, `-t`, `--filename-has-samplename`, `--pop-group`, ...) are passed through verbatim to `basevar caller`. This means any new `caller` option works automatically without changes to the pipeline subcommand.
 
@@ -372,6 +374,7 @@ basevar pipeline \
     -L bamfile.list \
     -Q 20 -q 30 -B 500 -t 4 \
     --filename-has-samplename \
+    --smart-rerun \
     > basevar_wgs.sh
 ```
 
@@ -386,10 +389,11 @@ basevar pipeline \
     -L bamfile.list \
     -Q 20 -q 30 -B 500 -t 4 \
     --filename-has-samplename \
+    --smart-rerun \
     > basevar.chr20.sh
 ```
 
-**Generate pipeline for specific regions (split into 1 Mb windows):**
+**Generate pipeline for specific regions:**
 
 ```bash
 basevar pipeline \
@@ -401,6 +405,7 @@ basevar pipeline \
     -L bamfile.list \
     -Q 20 -q 30 -B 500 -t 4 \
     --filename-has-samplename \
+    --smart-rerun \
     > basevar.targets.sh
 ```
 
@@ -419,14 +424,13 @@ while IFS= read -r cmd; do
 done < basevar_wgs.sh
 ```
 
-After all sub-jobs finish, concatenate the per-region VCFs:
+After all sub-jobs finish, concatenate the per-region VCFs by using `basevar concat` or `bcftools concat `:
 
 ```bash
 ls /path/to/outdir/*.vcf.gz | sort -V > vcf.list
 basevar concat -L vcf.list -o final_output.vcf.gz
 ```
 
-> The legacy Python script `scripts/create_pipeline.py` remains available and produces byte-identical output; replace `basevar pipeline` with `basevar=./bin/basevar python scripts/create_pipeline.py` to use it instead.
 
 ---
 
@@ -788,16 +792,3 @@ basevar subsam \
 - **Memory estimation**: `threads × batch_size / 200 × ~3–4 GB`. E.g., 24 threads, `-B 200` → ~72–96 GB total.
 - **Output compression**: Always use `.vcf.gz` as the output filename — BaseVar automatically writes bgzipped output when the extension is `.vcf.gz`.
 
-<!-- 
----
-
-## Development
-
-BaseVar is under active development. To update to the latest version:
-
-```bash
-git pull
-git submodule update --recursive
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-``` -->
