@@ -815,5 +815,7 @@ The file type is auto-detected from the extension (`.bbf` or `.bbi`). If the ext
 - **`--smart-rerun`**: Safe to add on any re-run; the program checks existing batch files and validates the `.bbi` index footer integrity marker to detect truncated files before resuming.
 - **Memory estimation**: `threads × batch_size / 200 × ~3–4 GB`. E.g., 24 threads, `-B 200` → ~72–96 GB total.
 - **Binary batchfile format**: Since v2.5.3, BaseVar uses a BGZF-compressed binary batchfile format (`.bbf` + `.bbi` index) instead of the text-based format. This provides ~1.4× speedup over text batchfiles by eliminating join/split overhead and reducing BGZF I/O calls. Use `basevar dump` to inspect these intermediate files.
+- **Sparse binary index (`.bbi`)**: The binary index skips positions where all samples have zero depth, reducing index size from ~GB to ~MB for typical cohorts. This also enables faster random access and reduces memory usage during variant calling.
+- **Shared index loading**: When using multiple threads, BBI indexes are loaded once and shared across all threads via `std::cref`, eliminating redundant I/O and significantly reducing startup time for large cohorts.
 - **Output compression**: Always use `.vcf.gz` as the output filename — BaseVar automatically writes bgzipped output when the extension is `.vcf.gz`.
 

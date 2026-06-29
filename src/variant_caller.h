@@ -28,6 +28,7 @@
 #include "caller_utils.h"
 #include "basetype.h"
 #include "algorithm.h"
+#include "io/batchfile_binary.h"
 #include "version.h"
 
 #include "external/thread_pool.h"
@@ -118,10 +119,6 @@ private:
                         const ngslib::GenomeRegion target_genome_region, // 获取该区间内所有位点的碱基比对信息，该参数和 '_fetch_base_in_region' 中一样 
                         PosMap &sample_posinfo_map);
 
-    void _write_record_to_batchfile(const PosMapVector &batchsamples_posinfomap_vector, 
-                                    const ngslib::GenomeRegion target_genome_region,  // 该参数和 _seek_position 中一样 
-                                    ngslib::BGZFile &obf);
-
     // Functions for calling variants
     bool _variants_discovery(const std::vector<std::string> &batchfiles, 
                              const ngslib::GenomeRegion genome_region,
@@ -131,15 +128,10 @@ private:
     bool _variant_calling_unit(const std::vector<std::string> &batchfiles, 
                                const std::vector<std::string> &sample_ids,
                                const std::map<std::string, std::vector<size_t>> & group_smp_idx,
+                               const std::vector<std::vector<BinaryIndexEntry>> &shared_indexes,
                                const std::string reg_str,  // genome region format like samtools
                                const std::string vcf_fn);
 
-    // Get sample id from batchfiles header.
-    std::vector<std::string> _get_sampleid_from_batchfiles(const std::vector<std::string> &batchfiles);
-    bool _basevar_caller(const std::vector<std::string> &smp_bf_line_vector, 
-                         const std::map<std::string, std::vector<size_t>> &group_smp_idx,
-                         size_t n_sample, 
-                         ngslib::BGZFile &vcf_hd);
 
     // Binary batchfile variant caller (no text parsing, receives pre-built BatchInfo)
     bool _basevar_caller_binary(std::vector<BaseType::BatchInfo> &all_smps_bi_vector,
