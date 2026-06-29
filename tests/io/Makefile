@@ -69,9 +69,19 @@ test_fetal_fraction: test_fetal_fraction.o $(FF_BS_OBJ)
 test_bayesian_caller: test_bayesian_caller.o $(BSSRC)/algorithm.o
 	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)
 
+# Binary batchfile (.bbf/.bbi) format unit test.
+# Tests write/read roundtrip, index correctness, edge cases (long reads,
+# long indels, empty positions, multi-sample, mixed variant types).
+BBF_BS_OBJ = $(BSSRC)/io/batchfile_binary.o $(BSSRC)/io/iobgzf.o \
+             $(BSSRC)/caller_utils.o $(BSSRC)/basetype.o \
+             $(BSSRC)/algorithm.o $(BSSRC)/io/utils.o \
+             $(BSSRC)/io/fasta.o
+test_batchfile_binary: test_batchfile_binary.o $(BBF_BS_OBJ)
+	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)
+
 clean:
 	rm -f $(OBJ) test_fasta test_motif_counter test_motif_counter.tsv \
 	      test_fetal_fraction test_fetal_fraction.tsv test_fetal_fraction.bed \
-	      test_bayesian_caller
+	      test_bayesian_caller test_batchfile_binary
 
 
