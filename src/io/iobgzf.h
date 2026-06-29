@@ -112,6 +112,29 @@ namespace ngslib {
         bool eof() const { return bgzf_check_EOF(_bgzf); }
         void close();
 
+        // Raw binary I/O for binary batchfile format (.bbf/.bbi)
+        BGZF* bgzf_handle() { return _bgzf; }  // Access underlying BGZF handle
+
+        // Write raw binary data (not text)
+        ssize_t write_raw(const void *data, size_t len) {
+            return bgzf_write(_bgzf, data, len);
+        }
+
+        // Read raw binary data (not text)
+        ssize_t read_raw(void *data, size_t len) {
+            return bgzf_read(_bgzf, data, len);
+        }
+
+        // Seek to a BGZF virtual offset (for .bbi index-based random access)
+        int seek_virtual(int64_t virtual_offset) {
+            return bgzf_seek(_bgzf, virtual_offset, SEEK_SET);
+        }
+
+        // Get current BGZF virtual offset (for building .bbi index)
+        int64_t tell_virtual() {
+            return bgzf_tell(_bgzf);
+        }
+
         /**
          * @brief Force writing of all buffered data to disk.
          * 

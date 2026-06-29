@@ -141,6 +141,15 @@ private:
                          size_t n_sample, 
                          ngslib::BGZFile &vcf_hd);
 
+    // Binary batchfile variant caller (no text parsing, receives pre-built BatchInfo)
+    bool _basevar_caller_binary(std::vector<BaseType::BatchInfo> &all_smps_bi_vector,
+                                const std::string &ref_id,
+                                uint32_t ref_pos,
+                                int total_depth,
+                                const std::map<std::string, std::vector<size_t>> &group_smp_idx,
+                                size_t n_sample,
+                                ngslib::BGZFile &vcf_hd);
+
     std::pair<BaseType, VariantInfo> _basetype_caller_unit(
         const std::vector<BaseType::BatchInfo> &samples_batchinfo_vector, 
         const std::vector<size_t> group_idx = std::vector<size_t>(),
