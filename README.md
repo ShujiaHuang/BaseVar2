@@ -61,7 +61,7 @@ If you see this — or you are on CentOS / RHEL / Rocky / AlmaLinux / older Ubun
 
 ```bash
 # Linux
-wget https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.5.1/basevar-linux-static
+wget https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static
 chmod +x basevar-linux-static
 mv basevar-linux-static basevar
 ./basevar --help
@@ -69,7 +69,7 @@ mv basevar-linux-static basevar
 
 ```bash
 # macOS
-curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/download/v2.5.1/basevar-macos-static
+curl -LO https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-macos-static
 chmod +x basevar-macos-static
 mv basevar-macos-static basevar
 ./basevar --help
@@ -167,6 +167,7 @@ Commands:
   concat    Concatenate per-region VCF files into a whole-genome VCF
   subsam    Extract a subset of samples from a VCF file
   motif     Count cfDNA end-motif (k-mer) frequencies from BAM/CRAM
+  dump      Inspect binary batchfile (.bbf) and binary index (.bbi) files
 ```
 
 ---
@@ -210,6 +211,7 @@ Optional options:
   --max-alleles=INT            Maximum active alleles allowed at a site. Sites
                                exceeding this threshold will be skipped. [6]
   --smart-rerun                Skip completed batch files and resume an interrupted run.
+                               Validates BBI index footer integrity to detect truncated files.
   -h, --help                   Show this help message and exit.
 ```
 
@@ -764,11 +766,54 @@ basevar subsam \
 
 ---
 
+## `basevar dump` — Inspect binary batchfile files
+
+Inspect the intermediate binary batchfile (`.bbf`) and binary index (`.bbi`) files produced by `basevar caller`. This is useful for debugging, verifying file integrity, or examining per-sample read data at specific genomic positions.
+
+```bash
+Usage: basevar dump <file> [options]
+
+Options:
+  --header          Show only file header (sample IDs) and exit (.bbf only)
+  -r, --region      Dump records in region chr:start-end (.bbf only)
+  -n, --limit INT   Dump at most INT records (.bbf only, default: all)
+  -v, --verbose     Show per-sample details for each record (.bbf only)
+  --entries         Show all index entries (.bbi only)
+  -h, --help        Show this help message
+```
+
+**Examples:**
+
+```bash
+# Inspect .bbi index summary (magic, version, entries, position range, footer integrity)
+basevar dump sample.bbf.bbi
+
+# List all index entries
+basevar dump sample.bbf.bbi --entries
+
+# Show .bbf header (sample IDs) only
+basevar dump sample.bbf --header
+
+# Show all positions in compact summary format
+basevar dump sample.bbf
+
+# Show per-sample details at a specific position
+basevar dump sample.bbf -r chr11:5246595-5246595 -v
+
+# Dump first 20 positions with full per-sample read data
+basevar dump sample.bbf -n 20 -v
+```
+
+The file type is auto-detected from the extension (`.bbf` or `.bbi`). If the extension is ambiguous, the tool reads the magic bytes to determine the format.
+
+---
+
 ## Tips and best practices
 
 - **`-B / --batch-count`**: Controls how many samples are processed per batch. Lower values reduce per-thread memory but increase I/O. For large cohorts (>5000 samples) `-B 500` is a good starting point.
 - **`--filename-has-samplename`**: If your BAM files are named `{SampleID}.bam` or `{SampleID}.cram`, always set this flag — it avoids reading every BAM header and can save hours on large cohorts.
-- **`--smart-rerun`**: Safe to add on any re-run; the program checks existing batch files and skips completed work.
+- **`--smart-rerun`**: Safe to add on any re-run; the program checks existing batch files and validates the `.bbi` index footer integrity marker to detect truncated files before resuming.
 - **Memory estimation**: `threads × batch_size / 200 × ~3–4 GB`. E.g., 24 threads, `-B 200` → ~72–96 GB total.
+- **Binary batchfile format**: Since v2.5.3, BaseVar uses a BGZF-compressed binary batchfile format (`.bbf` + `.bbi` index) instead of the text-based format. This provides ~1.4× speedup over text batchfiles by eliminating join/split overhead and reducing BGZF I/O calls. Use `basevar dump` to inspect these intermediate files.
 - **Output compression**: Always use `.vcf.gz` as the output filename — BaseVar automatically writes bgzipped output when the extension is `.vcf.gz`.
 

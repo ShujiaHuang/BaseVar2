@@ -977,20 +977,16 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
         BinaryReader reader;
         reader.index = load_binary_index(file + ".bbi");
 
-        // Read header to get sample_count
-        ngslib::BGZFile tmp(file.c_str(), "r");
-        uint32_t magic;
-        uint16_t version, sample_count;
-        tmp.read_raw(&magic, sizeof(magic));
-        tmp.read_raw(&version, sizeof(version));
-        tmp.read_raw(&sample_count, sizeof(sample_count));
-        tmp.close();
-        reader.sample_count = sample_count;
-
         // Open file for reading
         reader.bf = std::make_unique<ngslib::BGZFile>(file.c_str(), "r");
 
-        // Skip header: magic(4) + version(2) + sample_count(2) + ids_len(4) + ids_string
+        // Read header: magic(4) + version(2) + sample_count(2) + ids_len(4) + ids_string
+        uint32_t magic;
+        uint16_t version;
+        reader.bf->read_raw(&magic, sizeof(magic));
+        reader.bf->read_raw(&version, sizeof(version));
+        reader.bf->read_raw(&reader.sample_count, sizeof(reader.sample_count));
+
         uint32_t ids_len;
         reader.bf->read_raw(&ids_len, sizeof(ids_len));
         if (ids_len > 0) {
@@ -1027,6 +1023,19 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
     // Output VCF file
     ngslib::BGZFile VCF_OUT(tmp_vcf_fn.c_str(), "w");
 
+    // Reusable buffer for position-level data (avoid per-position reallocation)
+    std::vector<BaseType::BatchInfo> all_smps_bi;
+    all_smps_bi.reserve(sample_ids.size());
+
+    // Pre-constructed template for empty samples (depth=0) to avoid repeated construction
+    BaseType::BatchInfo empty_bi_template;
+    empty_bi_template.ref_bases.push_back("N");
+    empty_bi_template.align_bases.push_back("N");
+    empty_bi_template.align_base_quals.push_back('!');
+    empty_bi_template.base_pos_ranks.push_back(0);
+    empty_bi_template.mapqs.push_back(0);
+    empty_bi_template.map_strands.push_back('*');
+
     int n = 0, variant_count = 0;
     bool all_done = false;
     while (!all_done) {
@@ -1041,7 +1050,7 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
         if (all_done) break;
 
         // Read one record from each batchfile and collect all samples' BatchInfo
-        std::vector<BaseType::BatchInfo> all_smps_bi;
+        all_smps_bi.clear();
         std::string ref_id;
         uint32_t ref_pos = 0;
         int total_depth = 0;
@@ -1051,14 +1060,7 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
                 // This batchfile has no more data in range - still need to provide empty BatchInfo
                 // for its samples to maintain correct sample count
                 for (uint16_t s = 0; s < r.sample_count; ++s) {
-                    BaseType::BatchInfo empty_bi(ref_id.empty() ? "" : ref_id, ref_pos);
-                    empty_bi.ref_bases.push_back("N");
-                    empty_bi.align_bases.push_back("N");
-                    empty_bi.align_base_quals.push_back('!');
-                    empty_bi.base_pos_ranks.push_back(0);
-                    empty_bi.mapqs.push_back(0);
-                    empty_bi.map_strands.push_back('*');
-                    all_smps_bi.push_back(std::move(empty_bi));
+                    all_smps_bi.push_back(empty_bi_template);  // copy from template
                 }
                 continue;
             }
@@ -1082,6 +1084,13 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
                 ref_pos = rpos;
             }
             total_depth += depth;
+
+            // Set ref_id/ref_pos once for all samples from this reader (not per-read)
+            for (auto &smp : smp_bi) {
+                smp.ref_id = rid;
+                smp.ref_pos = rpos;
+            }
+
             all_smps_bi.insert(all_smps_bi.end(),
                                std::make_move_iterator(smp_bi.begin()),
                                std::make_move_iterator(smp_bi.end()));
@@ -1089,6 +1098,15 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
             ++r.current_idx;
             // Note: no seek_virtual() needed here — records are sequential in the file.
             // seek_virtual() is only needed when readers fall behind (lockstep alignment below).
+        }
+
+        // Fill ref_id/ref_pos for samples from batchfiles that had no data at this position.
+        // These samples were copied from empty_bi_template with default ref_id="" and ref_pos=0,
+        // but downstream _basetype_caller_unit uses smps_bi_v[0].ref_id/ref_pos for VCF output,
+        // so ALL samples must have consistent values.
+        for (auto &smp : all_smps_bi) {
+            if (smp.ref_id.empty()) smp.ref_id = ref_id;
+            if (smp.ref_pos == 0)   smp.ref_pos = ref_pos;
         }
 
         if (!all_smps_bi.empty() && total_depth > 0) {

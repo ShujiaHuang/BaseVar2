@@ -303,7 +303,7 @@ bool read_binary_record(ngslib::BGZFile &bf,
         bf.read_raw(&depth, sizeof(depth));
         total_depth += depth;
 
-        BaseType::BatchInfo smp_bi(ref_id, ref_pos);
+        BaseType::BatchInfo smp_bi;  // ref_id/ref_pos set once after loop
 
         if (depth > 0) {
             smp_bi.ref_bases.reserve(depth);
@@ -348,6 +348,8 @@ bool read_binary_record(ngslib::BGZFile &bf,
             smp_bi.mapqs.push_back(0);
             smp_bi.map_strands.push_back('*');
         }
+        // Note: ref_id and ref_pos are set once by the caller after the loop,
+        // avoiding a string copy per sample.
 
         samples_bi.push_back(std::move(smp_bi));
     }
