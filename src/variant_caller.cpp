@@ -557,8 +557,9 @@ bool BaseTypeRunner::_create_a_batchfile(const std::vector<std::string>& batch_a
             has_data = true;
         }
 
-        // Write binary records only for positions with data (skip all-depth=0 positions
-        // to dramatically reduce .bbf/.bbi file size — from ~GB to ~MB for ultra-low-depth data)
+        // Write binary records for positions with data (sparse index).
+        // With hundreds of samples per batchfile, almost every position has data from at least one sample,
+        // so we iterate positions sequentially and use early-break when finding data.
         for (uint32_t pos = sub_gr.start; pos <= sub_gr.end; ++pos) {
             bool has_data_at_pos = false;
             for (size_t s = 0; s < batchsamples_posinfomap_vector.size(); ++s) {
@@ -567,7 +568,7 @@ bool BaseTypeRunner::_create_a_batchfile(const std::vector<std::string>& batch_a
                     it->second.ref_id == gr.chrom && it->second.ref_pos == pos &&
                     !it->second.align_bases.empty()) {
                     has_data_at_pos = true;
-                    break;
+                    break;  // early break: only need to know if ANY sample has data
                 }
             }
             if (has_data_at_pos) {
@@ -961,6 +962,7 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
     all_smps_bi.reserve(sample_ids.size());
 
     // Pre-constructed template for empty samples (depth=0) to avoid repeated construction
+    // Note: ref_id/ref_pos are set per-position before use, so we don't set them here
     BaseType::BatchInfo empty_bi_template;
     empty_bi_template.ref_bases.push_back("N");
     empty_bi_template.align_bases.push_back("N");
