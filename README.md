@@ -42,27 +42,7 @@ Pre-built static binaries are available on the [GitHub Releases page](https://gi
 
 #### System requirements for `basevar-linux-static`
 
-The Linux binary is a partial-static build (built on Ubuntu 22.04 / glibc 2.35 in CI). It bundles `libstdc++`, `libgcc`, `htslib`, `zlib`, `bzip2`, `xz` and `openssl` statically; only the system C library (**glibc**) is linked dynamically — and glibc symbol versions are forward-compatible only, so the binary requires the **host glibc to be ≥ 2.35**.
-
-**Confirmed compatible distributions** (glibc ≥ 2.35):
-
-| Distribution | glibc | `basevar-linux-static` |
-| ------------ | ----- | :--------------------: |
-| Ubuntu 22.04 LTS | 2.35 | ✅ |
-| Ubuntu 24.04 LTS | 2.39 | ✅ |
-| Debian 12 (bookworm) | 2.36 | ✅ |
-| Fedora 36+ | 2.35+ | ✅ |
-| openSUSE Tumbleweed | rolling | ✅ |
-
-**Distributions where `basevar-linux-static` will NOT run** (glibc too old — please [compile from source](#option-2--compile-from-source) instead):
-
-| Distribution | glibc | `basevar-linux-static` |
-| ------------ | ----- | :--------------------: |
-| CentOS 7 / RHEL 7 | 2.17 | ❌ |
-| CentOS 8 / RHEL 8 / Rocky 8 / Alma 8 | 2.28 | ❌ |
-| CentOS 9 / RHEL 9 / Rocky 9 / Alma 9 | 2.34 | ❌ |
-| Ubuntu 18.04 / 20.04 | 2.27 / 2.31 | ❌ |
-| Debian 10 / 11 | 2.28 / 2.31 | ❌ |
+The Linux binary is a partial-static build (built on Ubuntu 22.04 / glibc 2.35). It bundles `libstdc++`, `libgcc`, `htslib`, `zlib`, `bzip2`, `xz` and `openssl` statically; only the system C library (**glibc**) is linked dynamically — and glibc symbol versions are forward-compatible only, so the binary requires the **host glibc to be ≥ 2.35**.
 
 **Quick check on your machine:**
 
@@ -459,7 +439,7 @@ basevar concat -L vcf.list -o merged.vcf.gz
 basevar concat chr1_1_2000000.vcf.gz chr1_2000001_4000000.vcf.gz -o chr1.vcf.gz
 ```
 
-> You may also use `bcftools concat` as a drop-in alternative.
+> You may also use `bcftools concat --naive-force` as a drop-in alternative.
 
 ---
 
