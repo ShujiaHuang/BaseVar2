@@ -1087,10 +1087,8 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
                                std::make_move_iterator(smp_bi.end()));
 
             ++r.current_idx;
-            // Pre-fetch next position for lockstep
-            if (r.current_idx < r.index.size() && r.index[r.current_idx].pos <= query_end) {
-                r.bf->seek_virtual(r.index[r.current_idx].virtual_offset);
-            }
+            // Note: no seek_virtual() needed here — records are sequential in the file.
+            // seek_virtual() is only needed when readers fall behind (lockstep alignment below).
         }
 
         if (!all_smps_bi.empty() && total_depth > 0) {
