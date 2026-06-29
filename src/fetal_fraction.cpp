@@ -518,7 +518,7 @@ FetalFractionRunner::FetalFractionRunner(int argc, char* argv[])
         {"noise",                   required_argument, NULL, OPT_NOISE},
         {"male-threshold",          required_argument, NULL, OPT_MALE_THRESHOLD},
         {"filename-has-samplename", no_argument,       NULL, OPT_FILENAME_HAS_SAMPLENAME},
-        {"calibrate",              no_argument,       NULL, OPT_CALIBRATE},
+        {"calibrate",               no_argument,       NULL, OPT_CALIBRATE},
         {"help",                    no_argument,       NULL, 'h'},
         {0, 0, 0, 0}
     };
