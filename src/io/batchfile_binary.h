@@ -11,8 +11,9 @@
  *   Records: per-position binary records with per-sample read data
  *
  * .bbi format:
- *   Header: magic(4) + version(2) + entry_count(4)
- *   Entries: sorted array of (pos, virtual_offset) pairs
+ *   Header:  magic(4) + version(2) + reserved(2) + entry_count(4)
+ *   Entries: sorted array of (pos:4 + virtual_offset:8) pairs
+ *   Footer:  magic(4)  -- integrity marker; if missing the file was truncated
  *
  * @author Shujia Huang
  * @date 2025
@@ -35,6 +36,7 @@ static const uint16_t BBF_VERSION = 1;
 
 static const uint32_t BBI_MAGIC = 0x42424900;  // "BBI\0"
 static const uint16_t BBI_VERSION = 1;
+static const uint32_t BBI_FOOTER_MAGIC = 0x42494546;  // "BIEF" -- marks complete write
 
 // ---- .bbf file header ----
 struct BinaryBBFHeader {
@@ -94,8 +96,15 @@ void write_binary_index(const std::string &index_path, const std::vector<BinaryI
 
 /**
  * @brief Load .bbi index into memory (sorted by position for binary search).
+ *        Throws if the file is incomplete (footer missing).
  */
 std::vector<BinaryIndexEntry> load_binary_index(const std::string &index_path);
+
+/**
+ * @brief Quick integrity check: verify .bbi has a valid footer without loading all entries.
+ * @return true if the index file is complete and valid, false otherwise.
+ */
+bool validate_binary_index(const std::string &index_path);
 
 /**
  * @brief Read sample IDs from .bbf binary header.

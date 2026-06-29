@@ -654,6 +654,70 @@ void test_mixed_variants() {
 }
 
 // =====================================================================
+//  Test 13: BBI footer integrity validation
+// =====================================================================
+void test_bbi_footer_integrity() {
+    std::cout << "--- Test 13: BBI footer integrity ---\n";
+    const std::string idx_fn = "/tmp/test_bb_footer.bbi";
+
+    // Write a valid index
+    std::vector<BinaryIndexEntry> entries = {
+        {100, 0x1000}, {500, 0x2000}, {1000, 0x3000}
+    };
+    write_binary_index(idx_fn, entries);
+
+    // Valid file: validate should return true
+    TEST_ASSERT(validate_binary_index(idx_fn) == true, "FOOTER: valid index passes validation");
+
+    // Valid file: load should succeed
+    {
+        auto loaded = load_binary_index(idx_fn);
+        TEST_ASSERT(loaded.size() == 3, "FOOTER: load valid index succeeds");
+    }
+
+    // Truncate the file (remove last 4 bytes = footer)
+    {
+        FILE *fp = fopen(idx_fn.c_str(), "rb+");
+        TEST_ASSERT(fp != nullptr, "FOOTER: reopen for truncation");
+        fseek(fp, 0, SEEK_END);
+        long full_size = ftell(fp);
+        // Truncate to full_size - 4 (remove footer)
+        // Use freopen trick: write partial content to a temp file
+        fseek(fp, 0, SEEK_SET);
+        std::vector<char> buf(full_size - 4);
+        size_t n = fread(buf.data(), 1, buf.size(), fp);
+        fclose(fp);
+
+        // Rewrite truncated file
+        fp = fopen(idx_fn.c_str(), "wb");
+        fwrite(buf.data(), 1, n, fp);
+        fclose(fp);
+    }
+
+    // Truncated file: validate should return false
+    TEST_ASSERT(validate_binary_index(idx_fn) == false, "FOOTER: truncated index fails validation");
+
+    // Truncated file: load should throw
+    {
+        bool threw = false;
+        try {
+            load_binary_index(idx_fn);
+        } catch (const std::runtime_error &e) {
+            threw = true;
+            std::string msg(e.what());
+            TEST_ASSERT(msg.find("incomplete") != std::string::npos, "FOOTER: error mentions 'incomplete'");
+        }
+        TEST_ASSERT(threw, "FOOTER: load throws on truncated index");
+    }
+
+    // Non-existent file: validate should return false
+    TEST_ASSERT(validate_binary_index("/tmp/nonexistent_bbi_file.bbi") == false,
+                "FOOTER: non-existent file returns false");
+
+    std::remove(idx_fn.c_str());
+}
+
+// =====================================================================
 //  Main
 // =====================================================================
 int main() {
@@ -671,6 +735,7 @@ int main() {
     test_index_binary_search();
     test_multi_sample();
     test_mixed_variants();
+    test_bbi_footer_integrity();
 
     std::cout << "\n=== Results: " << tests_passed << " passed, "
               << tests_failed << " failed ===\n";

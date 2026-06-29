@@ -478,9 +478,10 @@ std::vector<std::string> BaseTypeRunner::_create_batchfiles(
         std::string batchfile_idx = bf_prefix + "." + std::to_string(j) + "_" + std::to_string(bn) + ".bbf.bbi";
         batchfiles.push_back(batchfile);   // Store the name of batchfile into a vector
 
-        if (_args->smart_rerun && ngslib::is_readable(batchfile) && ngslib::is_readable(batchfile_idx)) {
+        if (_args->smart_rerun && ngslib::is_readable(batchfile) && validate_binary_index(batchfile_idx)) {
             // do not create the existed batchfile again if set `--smart-rerun`
-            std::cout << "[INFO] " + batchfile + " and " + batchfile_idx + " already exist, we don't have to "
+            // validate_binary_index() checks the footer to ensure .bbi was fully written
+            std::cout << "[INFO] " + batchfile + " and " + batchfile_idx + " already exist and are valid, we don't have to "
                          "create them again, when we set `--smart-rerun`.\n";
             continue;
         }

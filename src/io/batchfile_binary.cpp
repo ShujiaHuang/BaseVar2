@@ -137,6 +137,10 @@ void write_binary_index(const std::string &index_path, const std::vector<BinaryI
         fwrite(&e.virtual_offset, sizeof(e.virtual_offset), 1, fp);
     }
 
+    // Footer: integrity marker — only written after all entries are flushed
+    uint32_t footer = BBI_FOOTER_MAGIC;
+    fwrite(&footer, sizeof(footer), 1, fp);
+
     fclose(fp);
 }
 
@@ -177,8 +181,31 @@ std::vector<BinaryIndexEntry> load_binary_index(const std::string &index_path) {
         }
     }
 
+    // Verify footer integrity marker
+    uint32_t footer = 0;
+    if (fread(&footer, sizeof(footer), 1, fp) != 1 || footer != BBI_FOOTER_MAGIC) {
+        fclose(fp);
+        throw std::runtime_error("Binary index file is incomplete (missing footer): " + index_path);
+    }
+
     fclose(fp);
     return entries;  // already sorted by pos
+}
+
+bool validate_binary_index(const std::string &index_path) {
+    FILE *fp = fopen(index_path.c_str(), "rb");
+    if (!fp) return false;
+
+    // Seek to the last 4 bytes (footer)
+    if (fseek(fp, -4, SEEK_END) != 0) {
+        fclose(fp);
+        return false;
+    }
+
+    uint32_t footer = 0;
+    bool ok = (fread(&footer, sizeof(footer), 1, fp) == 1) && (footer == BBI_FOOTER_MAGIC);
+    fclose(fp);
+    return ok;
 }
 
 std::vector<std::string> read_binary_sample_ids(const std::string &bbf_path) {
