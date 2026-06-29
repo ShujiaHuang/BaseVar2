@@ -14,6 +14,29 @@
 #include <cstring>   // memcpy
 #include <algorithm> // lower_bound
 #include <stdexcept>
+#include <vector>
+
+// Helper: append raw bytes to a growable buffer
+template <typename T>
+static inline void buf_append(std::vector<char> &buf, const T &val) {
+    const char *p = reinterpret_cast<const char*>(&val);
+    buf.insert(buf.end(), p, p + sizeof(T));
+}
+static inline void buf_append_bytes(std::vector<char> &buf, const char *data, size_t len) {
+    buf.insert(buf.end(), data, data + len);
+}
+
+// Packed per-read fixed fields: read once in a single bgzf_read() call
+#pragma pack(push, 1)
+struct PackedReadFields {
+    uint16_t rb_len;
+    char     qual;
+    uint32_t rpr;
+    uint8_t  mapq;
+    uint8_t  strand;
+};
+#pragma pack(pop)
+static_assert(sizeof(PackedReadFields) == 9, "PackedReadFields size mismatch");
 
 // =====================================================================
 //  Write-side functions
@@ -46,14 +69,19 @@ void write_binary_record(ngslib::BGZFile &bf,
 
     size_t sn = posinfomap_vec.size();
 
+    // Serialize the entire record into a memory buffer first,
+    // then write it to BGZF in a single call.  This avoids hundreds
+    // of tiny bgzf_write() calls which dominate CPU cost at scale.
+    std::vector<char> buf;
+    buf.reserve(64 + sn * 16);
+
     // ---- Position-level fields ----
     uint8_t chrom_len = static_cast<uint8_t>(gr.chrom.size());
-    bf.write_raw(&chrom_len, sizeof(chrom_len));
-    bf.write_raw(gr.chrom.data(), chrom_len);
-    bf.write_raw(&pos, sizeof(pos));
+    buf_append(buf, chrom_len);
+    buf_append_bytes(buf, gr.chrom.data(), chrom_len);
+    buf_append(buf, pos);
 
     // Determine ref_base from the first sample that has data at this position.
-    // After left-alignment, ref_base is identical across all reads at the same position.
     std::string ref_base;
     bool ref_base_found = false;
     for (size_t i = 0; i < sn && !ref_base_found; ++i) {
@@ -65,9 +93,9 @@ void write_binary_record(ngslib::BGZFile &bf,
     }
 
     uint16_t ref_base_len = static_cast<uint16_t>(ref_base.size());
-    bf.write_raw(&ref_base_len, sizeof(ref_base_len));
+    buf_append(buf, ref_base_len);
     if (ref_base_len > 0) {
-        bf.write_raw(ref_base.data(), ref_base_len);
+        buf_append_bytes(buf, ref_base.data(), ref_base_len);
     }
 
     // ---- Per-sample data ----
@@ -75,40 +103,35 @@ void write_binary_record(ngslib::BGZFile &bf,
         auto it = posinfomap_vec[i].find(pos);
         if (it != posinfomap_vec[i].end() && it->second.ref_id == gr.chrom && it->second.ref_pos == pos) {
             uint16_t depth = static_cast<uint16_t>(it->second.align_bases.size());
-            bf.write_raw(&depth, sizeof(depth));
+            buf_append(buf, depth);
 
             for (const auto &ab : it->second.align_bases) {
-                // read_base (variable length, includes +/- prefix for INS/DEL)
                 uint16_t rb_len = static_cast<uint16_t>(ab.read_base.size());
-                bf.write_raw(&rb_len, sizeof(rb_len));
-                if (rb_len > 0) {
-                    bf.write_raw(ab.read_base.data(), rb_len);
-                }
-
-                // qual
-                bf.write_raw(&ab.base_qual, sizeof(ab.base_qual));
-
-                // rpr (uint32, supports long reads up to ~4 billion bp)
+                buf_append(buf, rb_len);
+                // Fixed-size fields packed together for single-call read
+                buf_append(buf, ab.base_qual);
                 uint32_t rpr = static_cast<uint32_t>(ab.rpr);
-                bf.write_raw(&rpr, sizeof(rpr));
-
-                // mapq
+                buf_append(buf, rpr);
                 uint8_t mapq = static_cast<uint8_t>(ab.mapq);
-                bf.write_raw(&mapq, sizeof(mapq));
-
-                // strand: 0='+', 1='-', 2='*'
+                buf_append(buf, mapq);
                 uint8_t strand;
                 if      (ab.map_strand == '+') strand = 0;
                 else if (ab.map_strand == '-') strand = 1;
-                else                           strand = 2;  // '*' or unknown
-                bf.write_raw(&strand, sizeof(strand));
+                else                           strand = 2;
+                buf_append(buf, strand);
+                // Variable-length data last
+                if (rb_len > 0) {
+                    buf_append_bytes(buf, ab.read_base.data(), rb_len);
+                }
             }
         } else {
-            // No data at this position for this sample
             uint16_t depth = 0;
-            bf.write_raw(&depth, sizeof(depth));
+            buf_append(buf, depth);
         }
     }
+
+    // Single BGZF write for the entire position record
+    bf.write_raw(buf.data(), buf.size());
 
     // Record index entry
     out_index.push_back({pos, voffset});
@@ -291,41 +314,28 @@ bool read_binary_record(ngslib::BGZFile &bf,
             smp_bi.map_strands.reserve(depth);
 
             for (uint16_t j = 0; j < depth; ++j) {
-                // read_base (variable length)
-                uint16_t rb_len;
-                bf.read_raw(&rb_len, sizeof(rb_len));
-                std::string read_base(rb_len, '\0');
-                if (rb_len > 0) {
-                    bf.read_raw(&read_base[0], rb_len);
+                // Read all fixed-size fields in a single bgzf_read() call
+                PackedReadFields pf;
+                bf.read_raw(&pf, sizeof(pf));
+
+                // Then read the variable-length read_base
+                std::string read_base(pf.rb_len, '\0');
+                if (pf.rb_len > 0) {
+                    bf.read_raw(&read_base[0], pf.rb_len);
                 }
 
-                // qual
-                char qual;
-                bf.read_raw(&qual, sizeof(qual));
-
-                // rpr (uint32)
-                uint32_t rpr;
-                bf.read_raw(&rpr, sizeof(rpr));
-
-                // mapq
-                uint8_t mapq;
-                bf.read_raw(&mapq, sizeof(mapq));
-
-                // strand
-                uint8_t strand;
-                bf.read_raw(&strand, sizeof(strand));
+                // Decode strand
                 char map_strand;
-                if      (strand == 0) map_strand = '+';
-                else if (strand == 1) map_strand = '-';
-                else                  map_strand = '*';
+                if      (pf.strand == 0) map_strand = '+';
+                else if (pf.strand == 1) map_strand = '-';
+                else                     map_strand = '*';
 
                 // Populate BatchInfo vectors
-                // ref_base is stored once per position; replicate for each read
                 smp_bi.ref_bases.push_back(ref_base);
                 smp_bi.align_bases.push_back(std::move(read_base));
-                smp_bi.align_base_quals.push_back(qual);
-                smp_bi.base_pos_ranks.push_back(static_cast<int>(rpr));
-                smp_bi.mapqs.push_back(static_cast<int>(mapq));
+                smp_bi.align_base_quals.push_back(pf.qual);
+                smp_bi.base_pos_ranks.push_back(static_cast<int>(pf.rpr));
+                smp_bi.mapqs.push_back(static_cast<int>(pf.mapq));
                 smp_bi.map_strands.push_back(map_strand);
             }
         } else {
