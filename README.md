@@ -17,7 +17,7 @@
   <img src="docs/assets/images/basevar.png" width="400">
 </p> -->
 
-BaseVar is fully implemented in C++17 and delivers over **10×** the speed of its [original Python counterpart](https://github.com/ShujiaHuang/basevar/tree/python-version-0.6.1.1), while using dramatically less memory. With `-B 200` and one thread, memory usage is typically 3–4 GB per thread — compared to 20+ GB in the Python version.
+BaseVar is fully implemented in C++17 and delivers over **200×** the speed of its [original Python counterpart](https://github.com/ShujiaHuang/basevar/tree/python-version-0.6.1.1), while using dramatically less memory. With `-B 200` and one thread, memory usage is typically 3–4 GB per thread — compared to 20+ GB in the Python version.
 
 ## Citation
 
