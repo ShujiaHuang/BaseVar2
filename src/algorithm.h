@@ -239,18 +239,33 @@ double hwe_dosage_test(const std::vector<std::vector<double>>& genotype_probs, s
 struct GenotypePosterior {
     size_t best_gt_idx;                  // Index of genotype with highest posterior
     std::vector<double> posteriors;      // Posterior probability for each genotype
-    double dosage;                       // Expected ALT allele count = sum P(g) * alt_count(g)
+    double dosage;                       // Total expected ALT allele count
+    std::vector<double> per_allele_dosage; // Per-ALT expected allele count: [dosage_ALT1, dosage_ALT2, ...]
     double gq;                           // GQ = -10 * log10(1 - P(best_gt))
 };
 
 /**
- * @brief Compute genotype posterior probabilities using PL and population AF prior.
+ * @brief Compute genotype posterior probabilities using PL and per-allele population AF prior.
  * 
- * Combines data likelihood (from PL) with Hardy-Weinberg prior (from AF):
+ * Combines data likelihood (from PL) with Hardy-Weinberg prior (from allele frequencies):
  *   P(g|D,f) propto P(D|g) * P(g|f)
  * 
- * @param PL Phred-scaled genotype likelihoods (unchanged, data likelihood)
- * @param af Population ALT allele frequency (from LRT EM)
+ * Supports multi-allelic sites by accepting per-allele frequency vector.
+ * 
+ * @param PL Phred-scaled genotype likelihoods (VCF PL ordering)
+ * @param allele_freqs Per-allele frequencies: [freq_REF, freq_ALT1, freq_ALT2, ...]
+ * @return GenotypePosterior with best GT, posteriors, per-allele dosage, and GQ
+ */
+GenotypePosterior compute_genotype_posterior(
+    const std::vector<int>& PL,
+    const std::vector<double>& allele_freqs
+);
+
+/**
+ * @brief Overload for backward compatibility: single ALT allele frequency.
+ * 
+ * @param PL Phred-scaled genotype likelihoods
+ * @param af Population ALT allele frequency (bi-allelic: freq_ALT; REF = 1-af)
  * @return GenotypePosterior with best GT, posteriors, dosage, and GQ
  */
 GenotypePosterior compute_genotype_posterior(
@@ -259,13 +274,14 @@ GenotypePosterior compute_genotype_posterior(
 );
 
 /**
- * @brief Compute dosage-based allele count from genotype posteriors.
+ * @brief Compute dosage-based allele counts from genotype posteriors (multi-allelic).
  * 
  * @param sample_posts Genotype posteriors for all samples
- * @return {expected_ac, expected_an} where
- *         expected_ac = sum of dosages, expected_an = 2 * N
+ * @return {expected_ac_per_alt, expected_an} where
+ *         expected_ac_per_alt[k] = sum of per_allele_dosage[k] for all samples,
+ *         expected_an = 2 * N
  */
-std::pair<double, int> compute_dosage_ac(
+std::pair<std::vector<double>, int> compute_dosage_ac(
     const std::vector<GenotypePosterior>& sample_posts
 );
 

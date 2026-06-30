@@ -153,15 +153,14 @@ AlleleInfo collect_and_normalized_allele_info(VariantInfo &variant, std::vector<
 }
 
 // Helper function: Convert PL index to genotype pair
+// VCF 4.2 standard PL ordering: j=0..n-1 (outer), k=0..j (inner)
+// Genotypes: (0,0), (0,1), (1,1), (0,2), (1,2), (2,2), ...
 std::pair<size_t, size_t> pl_index_to_genotype(size_t pl_idx, size_t n_alleles) {
-    // Calculate first and second allele indices from PL index
-    size_t k = 0;
-    for (size_t i = 0; i < n_alleles; i++) {
-        for (size_t j = i; j < n_alleles; j++) {
-            if (k == pl_idx) {
-                return {i, j};
-            }
-            k++;
+    size_t idx = 0;
+    for (size_t j = 0; j < n_alleles; ++j) {
+        for (size_t k = 0; k <= j; ++k) {
+            if (idx == pl_idx) return {k, j};
+            ++idx;
         }
     }
     return {0, 0}; // Default to homozygous reference genotype
@@ -188,6 +187,7 @@ VCFSampleAnnotation process_sample_variant(const std::string& ref_base,         
         sa.GQ = gp.gq;
         sa.posterior = gp.posteriors;
         sa.dosage = gp.dosage;
+        sa.per_allele_dosage = gp.per_allele_dosage;
 
         // Convert PL index to genotype codes
         auto [a1, a2] = pl_index_to_genotype(min_idx, n_alleles);
@@ -245,16 +245,10 @@ std::string format_sample_string(const VCFSampleAnnotation& sa) {
 
     int dp = std::accumulate(sa.allele_depths.begin(), sa.allele_depths.end(), 0);
 
-    // Format GQ: use integer format if in legacy mode (no posterior), otherwise 2 decimal places
-    std::string gq_str;
-    if (sa.posterior.empty()) {
-        gq_str = std::to_string(static_cast<int>(sa.GQ));  // Legacy: integer GQ
-    } else {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%.2f", sa.GQ);
-        gq_str = buf;
-    }
-
+    // Format GQ: always output as integer (VCF spec: Type=Integer)
+    // Legacy mode: GQ = PL-gap (already integer-valued)
+    // Bayesian mode: GQ = -10*log10(1-P_best), rounded to nearest integer
+    std::string gq_str = std::to_string(static_cast<int>(std::round(sa.GQ)));
     std::string sample_info = ngslib::join(sa.gtcode, "/")        + ":" +  // GT, genotype
                               gq_str                              + ":" +  // GQ, Genotype Quality
                               ngslib::join(sa.PL, ",")            + ":" +  // PL, Phred-scaled likelihoods
@@ -271,23 +265,24 @@ std::string vcf_header_define(const std::string &ref_file_path, const std::vecto
         "##fileformat=VCFv4.2",
         "##FILTER=<ID=PASS,Description=\"All filters passed\">",
         
+        // FORMAT fields
         "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">",
-        "##FORMAT=<ID=GQ,Number=1,Type=Float,Description=\"Genotype Quality: Phred-scaled confidence (posterior-based in Bayesian mode, PL-gap in legacy mode)\">",
+        "##FORMAT=<ID=GQ,Number=1,Type=Integer,Description=\"Genotype Quality: Phred-scaled confidence (posterior-based in Bayesian mode, PL-gap in legacy mode)\">",
         "##FORMAT=<ID=PL,Number=G,Type=Integer,Description=\"List of Normalized, Phred-scaled genotype likelihoods rounded to the closest integer\">",
         "##FORMAT=<ID=AD,Number=R,Type=String,Description=\"Allelic depths for the ref and alt alleles in the order listed\">",
         "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Approximate read depth for specific sample (reads with bad mapped quality or with bad mates are filtered)\">",
         
-        "##INFO=<ID=AF,Number=A,Type=Float,Description=\"An ordered, comma delimited list of allele frequencies base on LRT algorithm (Recommend by BaseVar)\">",
-        "##INFO=<ID=CAF,Number=A,Type=Float,Description=\"An ordered, comma delimited list of allele frequencies calculated as raw AC/AN\">",
-        "##INFO=<ID=AC,Number=A,Type=Integer,Description=\"Allele count in genotypes for each ALT allele, in the same order as listed\">",
-        "##INFO=<ID=AN,Number=1,Type=Integer,Description=\"Total number of alleles in called genotypes\">",
+        // INFO fields
+        "##INFO=<ID=AF,Number=A,Type=Float,Description=\"Allele frequency: dosage-based (AC/AN) in posterior mode (Recommend by BaseVar); LRT EM frequency in legacy mode\">",
+        "##INFO=<ID=AC,Number=A,Type=Integer,Description=\"Allele count: expected allele count derived from genotype posterior dosage in posterior mode (dosage-based); reads-based in legacy mode\">",
+        "##INFO=<ID=AN,Number=1,Type=Integer,Description=\"Total number of alleles: 2*N_samples in posterior mode (dosage-based count); reads-based in legacy mode\">",
         "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Approximate total read depth (high-quality); some reads may have been filtered\">",
         "##INFO=<ID=DP4,Number=A,Type=Integer,Description=\"A list of number of high-quality ref-forward, ref-reverse, alt1-forward, alt1-reverse, alt2-forward, alt2-reverse, ... ,bases\">",
         "##INFO=<ID=FS,Number=A,Type=Float,Description=\"Phred-scaled P-value using Fisher's exact test to detect strand bias\">",
         "##INFO=<ID=SOR,Number=A,Type=Float,Description=\"Symmetric Odds Ratio of 2x2 contingency table to detect strand bias\">",
-        "##INFO=<ID=AC_dosage,Number=A,Type=Float,Description=\"Expected allele count from genotype posterior dosages\">",
-        "##INFO=<ID=AN_dosage,Number=1,Type=Integer,Description=\"Total number of alleles for dosage-based counting (= 2 * N_samples)\">",
-        "##INFO=<ID=CAF_dosage,Number=A,Type=Float,Description=\"Dosage-based allele frequency = AC_dosage / AN_dosage\">",
+        "##INFO=<ID=AC_obs,Number=A,Type=Integer,Description=\"Observed allele count from hard genotype calls (GT-based), posterior mode only\">",
+        "##INFO=<ID=AN_obs,Number=1,Type=Integer,Description=\"Total number of observed alleles from called (non-missing) genotype calls, posterior mode only\">",
+        "##INFO=<ID=AF_obs,Number=A,Type=Float,Description=\"Observed allele frequency = AC_obs / AN_obs, posterior mode only\">",
         "##INFO=<ID=HWE,Number=1,Type=Float,Description=\"Hardy-Weinberg equilibrium chi-square p-value (dosage-based, suitable for low-coverage data)\">",
         "##INFO=<ID=BaseQRankSum,Number=1,Type=Float,Description=\"Z-score from Wilcoxon rank sum test of Alt Vs. Ref base qualities\">",
         "##INFO=<ID=MQRankSum,Number=1,Type=Float,Description=\"Z-score from Wilcoxon rank sum test of Alt vs. Ref read mapping qualities\">",

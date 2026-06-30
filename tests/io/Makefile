@@ -64,9 +64,12 @@ test_fetal_fraction: test_fetal_fraction.o $(FF_BS_OBJ)
 	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)
 
 # `basevar caller` Bayesian genotype calling unit test.
-# Phase 1: only links algorithm.o (core Bayesian functions, no I/O deps).
-# Phase 2: will add caller_utils.o + iobgzf.o for integration tests.
-test_bayesian_caller: test_bayesian_caller.o $(BSSRC)/algorithm.o
+# Phase 1: links algorithm.o (core Bayesian functions).
+# Phase 2: adds caller_utils.o + basetype.o for pl_index_to_genotype and
+#          process_sample_variant integration tests.
+CALCPL_BS_OBJ = $(BSSRC)/algorithm.o $(BSSRC)/caller_utils.o $(BSSRC)/basetype.o \
+                $(BSSRC)/io/utils.o $(BSSRC)/io/iobgzf.o $(BSSRC)/io/fasta.o
+test_bayesian_caller: test_bayesian_caller.o $(CALCPL_BS_OBJ)
 	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)
 
 # Binary batchfile (.bbf/.bbi) format unit test.

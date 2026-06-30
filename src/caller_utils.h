@@ -106,8 +106,8 @@ struct AlleleInfo {
     std::map<std::string, StrandBiasInfo> strand_bias_info; // DP4, strand bias info for each allele
     int total_dp = 0;                                       // DP, total depth of all alleles, including REF and ALT
 
-    // Dosage-based counts (from genotype posteriors)
-    std::map<std::string, double> dosage_counts;            // Expected AC from posterior dosages
+    // Dosage-based counts (from genotype posteriors, posterior mode only)
+    std::vector<double> dosage_counts;                      // Per-ALT expected AC: [dosage_ALT1, dosage_ALT2, ...]
     int dosage_total_alleles = 0;                           // = 2 * N_samples
 };
 
@@ -119,7 +119,8 @@ struct VCFSampleAnnotation {
     std::vector<int> PL;                   // PL: A list of phred-scale score of genotype likelihoods (unchanged)
     // --- Bayesian posterior fields ---
     std::vector<double> posterior;         // Genotype posterior probabilities
-    double dosage = 0.0;                   // Expected ALT allele dosage
+    double dosage = 0.0;                   // Expected ALT allele dosage (total)
+    std::vector<double> per_allele_dosage; // Per-ALT expected allele count: [dosage_ALT1, dosage_ALT2, ...]
 };
 
 struct VCFRecord {
