@@ -1,23 +1,25 @@
-<p align="center">
+<h3 align="center">
   <a href="https://github.com/ShujiaHuang/BaseVar2">
     <img height="180" src="docs/assets/images/basevar_logo.svg">
   </a>
-  <!-- 
-  <h2 align="center">BaseVar: Call variants from ultra low-pass WGS data</h2> 
-  -->
-</p>
-<!-- [![BaseVar](https://github.com/ShujiaHuang/basevar/blob/main/docs/assets/images/basevar.png)](https://github.com/ShujiaHuang/basevar2) -->
+  <br>A high-performance C++17 tool for variants calling from ultra low-depth WGS data<br>
+</h3>
 
-# BaseVar: Call variants from ultra low-pass WGS data
-
-***BaseVar*** is a specialized tool for variant calling from ultra low-depth (<1x) sequencing data, with particular focus on non-invasive prenatal testing (NIPT) and large-scale population genomics. Leveraging maximum likelihood and likelihood ratio models, BaseVar accurately identifies polymorphisms at genomic positions and estimates allele frequencies across thousands of samples simultaneously. For the mathematical foundations, refer to the [BaseVar publication in Cell Genomics](https://doi.org/10.1016/j.xgen.2024.100669).
-
-<!-- 
 <p align="center">
-  <img src="docs/assets/images/basevar.png" width="400">
-</p> -->
+  <a href="https://github.com/ShujiaHuang/BaseVar2/actions/workflows/build.yml"><img alt="GitHub Actions CI" src="https://github.com/ShujiaHuang/BaseVar2/actions/workflows/build.yml/badge.svg"></a> 
+  <a href="https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg" alt="License: AGPL v3">
+  </a>
+</p>
 
-BaseVar is fully implemented in C++17 and delivers over **200×** the speed of its [original Python counterpart](https://github.com/ShujiaHuang/basevar/tree/python-version-0.6.1.1), while using dramatically less memory. With `-B 200` and one thread, memory usage is typically 3–4 GB per thread — compared to 20+ GB in the Python version.
+<p align="center">
+  <em>
+    Download: <a href="https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static">Lastest stable version</a>
+  </em>
+</p>
+
+**BaseVar** is a specialized tool for variants calling from ultra low-depth (<1x) sequencing data, with particular focus on non-invasive prenatal testing (NIPT) and large-scale population genomics. Leveraging maximum likelihood and likelihood ratio models, BaseVar accurately identifies polymorphisms at genomic positions and estimates allele frequencies across thousands of samples simultaneously. For the mathematical foundations, refer to the [BaseVar (version 1) publication in Cell Genomics](https://doi.org/10.1016/j.xgen.2024.100669).
+
+BaseVar is fully implemented in C++17 and delivers over **100×** the speed of the [original Python counterpart](https://github.com/ShujiaHuang/basevar/tree/python-version-0.6.1.1), while using dramatically less memory. With `-B 200` and one thread, memory usage is typically 3–4 GB per thread — compared to 20+ GB in the Python version.
 
 ---
 
