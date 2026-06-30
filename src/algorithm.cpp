@@ -436,8 +436,14 @@ std::vector<double> hw_genotype_prior(size_t n_alleles, const std::vector<double
 }
 
 double hwe_dosage_test(const std::vector<std::vector<double>>& genotype_probs, size_t n_alleles) {
-    // Dosage-based HWE test suitable for low-coverage data
-    // Uses "soft" genotype counts from posterior probabilities
+    // Dosage-based HWE chi-square test for low-coverage data.
+    // Uses "soft" genotype counts (posterior probability sums) instead of
+    // hard genotype calls, following Shriner (2011) Genet Epidemiol 35:632.
+    //
+    // Key property: Var(O_g^soft) <= Var(O_g^hard) = N*pi_g*(1-pi_g),
+    // so the standard chi-square denominator E_g is already conservative
+    // (overestimates the true variance), making this test valid but
+    // conservative for soft counts.
     
     if (n_alleles < 2 || genotype_probs.empty()) return 1.0;
     
@@ -449,9 +455,9 @@ double hwe_dosage_test(const std::vector<std::vector<double>>& genotype_probs, s
         if (gp.size() != n_genotypes) return 1.0;
     }
     
-    // For bi-allelic sites (most common case), use standard HWE chi-square
+    // For bi-allelic sites (most common case)
     if (n_alleles == 2) {
-        // Compute "soft" genotype counts by summing posterior probabilities
+        // Compute "soft" genotype counts
         // PL ordering: (0,0)=0, (0,1)=1, (1,1)=2
         double obs_hom_ref = 0.0, obs_het = 0.0, obs_hom_alt = 0.0;
         for (const auto& gp : genotype_probs) {
@@ -461,7 +467,6 @@ double hwe_dosage_test(const std::vector<std::vector<double>>& genotype_probs, s
         }
         
         // Estimate allele frequency from soft counts
-        // p = freq(ALT) = (obs_het + 2*obs_hom_alt) / (2*N)
         double total = obs_hom_ref + obs_het + obs_hom_alt;
         if (total < 1e-10) return 1.0; // No informative samples
         
@@ -474,7 +479,8 @@ double hwe_dosage_test(const std::vector<std::vector<double>>& genotype_probs, s
         double exp_het     = 2.0 * p * q * total;
         double exp_hom_alt = p * p * total;
         
-        // Chi-square statistic (df=1)
+        // Standard chi-square statistic (df=1)
+        // Conservative for soft counts since Var(O_g^soft) <= E_g
         double chi2 = 0.0;
         if (exp_hom_ref > 1e-10) chi2 += (obs_hom_ref - exp_hom_ref) * (obs_hom_ref - exp_hom_ref) / exp_hom_ref;
         if (exp_het > 1e-10)       chi2 += (obs_het - exp_het) * (obs_het - exp_het) / exp_het;
@@ -483,23 +489,29 @@ double hwe_dosage_test(const std::vector<std::vector<double>>& genotype_probs, s
         return chi2_test(chi2, 1);
     }
     
-    // Multi-allelic: fall back to bi-allelic test by collapsing all ALTs
+    // Multi-allelic: collapse all ALTs into bi-allelic test
     // (simplified approach; full multi-allelic HWE is more complex)
     double obs_hom_ref = 0.0, obs_het = 0.0, obs_hom_alt = 0.0;
-    for (const auto& gp : genotype_probs) {
+    
+    for (size_t i = 0; i < n_samples; ++i) {
+        const auto& gp = genotype_probs[i];
         obs_hom_ref += gp[0]; // (0,0)
+        
         // Sum all het genotypes involving REF: (0,1), (0,2), ...
         for (size_t j = 1; j < n_alleles; ++j) {
-            // PL index for (0,j): j*(j+1)/2 + 0 = j*(j+1)/2 ... actually need to compute
-            // PL index for genotype (k,j) where k<=j: outer=j, inner=k
-            // For (0,j): idx = j*(j+1)/2
+            // PL index for genotype (0,j): j*(j+1)/2
             size_t idx = j * (j + 1) / 2;
-            if (idx < gp.size()) obs_het += gp[idx];
+            if (idx < gp.size()) {
+                obs_het += gp[idx];
+            }
         }
+        
         // Sum all non-REF homozygous: (1,1), (2,2), ...
         for (size_t j = 1; j < n_alleles; ++j) {
             size_t idx = j * (j + 1) / 2 + j; // (j,j)
-            if (idx < gp.size()) obs_hom_alt += gp[idx];
+            if (idx < gp.size()) {
+                obs_hom_alt += gp[idx];
+            }
         }
     }
     
@@ -514,6 +526,7 @@ double hwe_dosage_test(const std::vector<std::vector<double>>& genotype_probs, s
     double exp_het     = 2.0 * p * q * total;
     double exp_hom_alt = p * p * total;
     
+    // Standard chi-square (conservative for soft counts)
     double chi2 = 0.0;
     if (exp_hom_ref > 1e-10) chi2 += (obs_hom_ref - exp_hom_ref) * (obs_hom_ref - exp_hom_ref) / exp_hom_ref;
     if (exp_het > 1e-10)       chi2 += (obs_het - exp_het) * (obs_het - exp_het) / exp_het;
