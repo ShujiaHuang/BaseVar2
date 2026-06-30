@@ -81,22 +81,10 @@ void write_binary_record(ngslib::BGZFile &bf,
     buf_append_bytes(buf, gr.chrom.data(), chrom_len);
     buf_append(buf, pos);
 
-    // Determine ref_base from the first sample that has data at this position.
-    std::string ref_base;
-    bool ref_base_found = false;
-    for (size_t i = 0; i < sn && !ref_base_found; ++i) {
-        auto it = posinfomap_vec[i].find(pos);
-        if (it != posinfomap_vec[i].end() && !it->second.align_bases.empty()) {
-            ref_base = it->second.align_bases[0].ref_base;
-            ref_base_found = true;
-        }
-    }
-
-    uint16_t ref_base_len = static_cast<uint16_t>(ref_base.size());
-    buf_append(buf, ref_base_len);
-    if (ref_base_len > 0) {
-        buf_append_bytes(buf, ref_base.data(), ref_base_len);
-    }
+    // Note: ref_base is NOT stored at position level (v2 format).
+    // Each read stores its own ref_base below, because _seek_position's Indel
+    // relocation produces reads with different ref_base lengths at the same
+    // position (e.g., "A" for SNP reads vs "AG" for a deletion at the same site).
 
     // ---- Per-sample data ----
     for (size_t i = 0; i < sn; ++i) {
@@ -106,6 +94,13 @@ void write_binary_record(ngslib::BGZFile &bf,
             buf_append(buf, depth);
 
             for (const auto &ab : it->second.align_bases) {
+                // Per-read ref_base (v2: fixes Indel normalization bug)
+                uint16_t ref_b_len = static_cast<uint16_t>(ab.ref_base.size());
+                buf_append(buf, ref_b_len);
+                if (ref_b_len > 0) {
+                    buf_append_bytes(buf, ab.ref_base.data(), ref_b_len);
+                }
+
                 uint16_t rb_len = static_cast<uint16_t>(ab.read_base.size());
                 buf_append(buf, rb_len);
                 // Fixed-size fields packed together for single-call read
@@ -286,12 +281,8 @@ bool read_binary_record(ngslib::BGZFile &bf,
 
     bf.read_raw(&ref_pos, sizeof(ref_pos));
 
-    uint16_t ref_base_len;
-    bf.read_raw(&ref_base_len, sizeof(ref_base_len));
-    std::string ref_base(ref_base_len, '\0');
-    if (ref_base_len > 0) {
-        bf.read_raw(&ref_base[0], ref_base_len);
-    }
+    // Note: v2 format has NO position-level ref_base.
+    // Each read stores its own ref_base (needed for correct Indel normalization).
 
     // ---- Per-sample data ----
     total_depth = 0;
@@ -314,6 +305,14 @@ bool read_binary_record(ngslib::BGZFile &bf,
             smp_bi.map_strands.reserve(depth);
 
             for (uint16_t j = 0; j < depth; ++j) {
+                // Per-read ref_base (v2 format)
+                uint16_t ref_b_len;
+                bf.read_raw(&ref_b_len, sizeof(ref_b_len));
+                std::string ref_b(ref_b_len, '\0');
+                if (ref_b_len > 0) {
+                    bf.read_raw(&ref_b[0], ref_b_len);
+                }
+
                 // Read all fixed-size fields in a single bgzf_read() call
                 PackedReadFields pf;
                 bf.read_raw(&pf, sizeof(pf));
@@ -331,7 +330,7 @@ bool read_binary_record(ngslib::BGZFile &bf,
                 else                     map_strand = '*';
 
                 // Populate BatchInfo vectors
-                smp_bi.ref_bases.push_back(ref_base);
+                smp_bi.ref_bases.push_back(std::move(ref_b));
                 smp_bi.align_bases.push_back(std::move(read_base));
                 smp_bi.align_base_quals.push_back(pf.qual);
                 smp_bi.base_pos_ranks.push_back(static_cast<int>(pf.rpr));

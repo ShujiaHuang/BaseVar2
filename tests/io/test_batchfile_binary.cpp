@@ -640,7 +640,10 @@ void test_mixed_variants() {
         TEST_ASSERT(samples[0].align_bases.size() == 3, "MIXED: 3 align_bases");
 
         // Verify each read preserved correctly
-        // Note: ref_base is stored once per position (from first read = "A")
+        // v2 format: each read stores its own ref_base (per-read, not position-level)
+        TEST_ASSERT(samples[0].ref_bases[0] == "A", "MIXED: ref_base0=A (SNP)");
+        TEST_ASSERT(samples[0].ref_bases[1] == "", "MIXED: ref_base1='' (INS)");
+        TEST_ASSERT(samples[0].ref_bases[2] == "AC", "MIXED: ref_base2=AC (DEL)");
         TEST_ASSERT(samples[0].align_bases[0] == "T", "MIXED: read0=T (SNP)");
         TEST_ASSERT(samples[0].align_bases[1] == "+CG", "MIXED: read1=+CG (INS)");
         TEST_ASSERT(samples[0].align_bases[2] == "-AC", "MIXED: read2=-AC (DEL)");
@@ -718,6 +721,102 @@ void test_bbi_footer_integrity() {
 }
 
 // =====================================================================
+//  Test 14: Per-read ref_base for Indel normalization bug fix (v2 format)
+//
+//  Simulates the real-world scenario after _seek_position relocation:
+//  At position P-1, a sample has both SNP reads (ref_base="A") and
+//  deletion reads (ref_base="AG"). The v1 format stored ref_base at
+//  position level, so all reads got the same ref_base, breaking Indel
+//  normalization in collect_and_normalized_allele_info.
+// =====================================================================
+void test_indel_refbase_fix() {
+    std::cout << "--- Test 14: Per-read ref_base for Indel normalization fix ---\n";
+    const std::string fn = "/tmp/test_bb_indel_fix.bbf";
+    const std::string chrom = "chr14";
+    const uint32_t pos = 67278837;  // leftmost_pos (anchor base position)
+
+    PosMapVector pmv(2);  // 2 samples
+
+    // Sample 0: 2 SNP reads at this position (ref_base = "A")
+    {
+        AlignInfo ai(chrom, pos);
+        AlignBase ab1; ab1.ref_base = "A"; ab1.read_base = "A"; ab1.base_qual = 'I';
+        ab1.rpr = 10; ab1.mapq = 60; ab1.map_strand = '+';
+        ai.align_bases.push_back(ab1);
+        AlignBase ab2; ab2.ref_base = "A"; ab2.read_base = "G"; ab2.base_qual = 'H';
+        ab2.rpr = 20; ab2.mapq = 55; ab2.map_strand = '-';
+        ai.align_bases.push_back(ab2);
+        pmv[0][pos] = ai;
+    }
+
+    // Sample 1: 4 reads mixed - SNP reads (ref="A") + deletion reads (ref="AG")
+    // This is exactly what _seek_position produces at the anchor position
+    {
+        AlignInfo ai(chrom, pos);
+        // SNP reads (not relocated, ref_base stays "A")
+        AlignBase ab1; ab1.ref_base = "A"; ab1.read_base = "G"; ab1.base_qual = 'I';
+        ab1.rpr = 5; ab1.mapq = 60; ab1.map_strand = '+';
+        ai.align_bases.push_back(ab1);
+        AlignBase ab2; ab2.ref_base = "A"; ab2.read_base = "A"; ab2.base_qual = 'J';
+        ab2.rpr = 15; ab2.mapq = 50; ab2.map_strand = '-';
+        ai.align_bases.push_back(ab2);
+        // Deletion reads (relocated from pos+1, ref_base = "A" + "G" = "AG")
+        AlignBase ab3; ab3.ref_base = "AG"; ab3.read_base = "-G"; ab3.base_qual = 'H';
+        ab3.rpr = 25; ab3.mapq = 40; ab3.map_strand = '+';
+        ai.align_bases.push_back(ab3);
+        // Insertion reads (relocated from pos+1, ref_base = "A")
+        AlignBase ab4; ab4.ref_base = "A"; ab4.read_base = "+G"; ab4.base_qual = 'G';
+        ab4.rpr = 35; ab4.mapq = 45; ab4.map_strand = '-';
+        ai.align_bases.push_back(ab4);
+        pmv[1][pos] = ai;
+    }
+
+    ngslib::GenomeRegion gr(chrom, pos, pos);
+    std::vector<BinaryIndexEntry> idx;
+    {
+        ngslib::BGZFile bf(fn.c_str(), "w");
+        write_binary_header(bf, {"smp_snp", "smp_mixed"});
+        write_binary_record(bf, pmv, gr, pos, idx);
+        bf.close();
+    }
+
+    {
+        ngslib::BGZFile bf(fn.c_str(), "r");
+        uint32_t magic; uint16_t ver, sc, ids_len;
+        bf.read_raw(&magic, 4); bf.read_raw(&ver, 2); bf.read_raw(&sc, 2);
+        bf.read_raw(&ids_len, 4);
+        if (ids_len > 0) { std::string dummy(ids_len, '\0'); bf.read_raw(&dummy[0], ids_len); }
+
+        bf.seek_virtual(idx[0].virtual_offset);
+        std::string ref_id; uint32_t ref_pos; int total_depth;
+        std::vector<BaseType::BatchInfo> samples;
+        read_binary_record(bf, 2, ref_id, ref_pos, total_depth, samples);
+
+        TEST_ASSERT(total_depth == 6, "INDEL_FIX: total_depth=6");
+
+        // Sample 0: all SNP reads, ref_base should be "A" for all
+        TEST_ASSERT(samples[0].ref_bases.size() == 2, "INDEL_FIX: smp0 has 2 reads");
+        TEST_ASSERT(samples[0].ref_bases[0] == "A", "INDEL_FIX: smp0[0] ref=A");
+        TEST_ASSERT(samples[0].ref_bases[1] == "A", "INDEL_FIX: smp0[1] ref=A");
+
+        // Sample 1: mixed reads, each with its own ref_base
+        TEST_ASSERT(samples[1].ref_bases.size() == 4, "INDEL_FIX: smp1 has 4 reads");
+        TEST_ASSERT(samples[1].ref_bases[0] == "A", "INDEL_FIX: smp1[0] SNP ref=A");
+        TEST_ASSERT(samples[1].ref_bases[1] == "A", "INDEL_FIX: smp1[1] SNP ref=A");
+        TEST_ASSERT(samples[1].ref_bases[2] == "AG", "INDEL_FIX: smp1[2] DEL ref=AG (key fix!)");
+        TEST_ASSERT(samples[1].ref_bases[3] == "A", "INDEL_FIX: smp1[3] INS ref=A");
+
+        // Verify align_bases are preserved correctly
+        TEST_ASSERT(samples[1].align_bases[2] == "-G", "INDEL_FIX: smp1[2] read=-G");
+        TEST_ASSERT(samples[1].align_bases[3] == "+G", "INDEL_FIX: smp1[3] read=+G");
+
+        bf.close();
+    }
+
+    std::remove(fn.c_str());
+}
+
+// =====================================================================
 //  Main
 // =====================================================================
 int main() {
@@ -735,6 +834,7 @@ int main() {
     test_index_binary_search();
     test_multi_sample();
     test_mixed_variants();
+    test_indel_refbase_fix();
     test_bbi_footer_integrity();
 
     std::cout << "\n=== Results: " << tests_passed << " passed, "

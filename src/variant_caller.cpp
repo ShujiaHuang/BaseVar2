@@ -565,8 +565,10 @@ bool BaseTypeRunner::_create_a_batchfile(const std::vector<std::string>& batch_a
             for (size_t s = 0; s < batchsamples_posinfomap_vector.size(); ++s) {
                 auto it = batchsamples_posinfomap_vector[s].find(pos);
                 if (it != batchsamples_posinfomap_vector[s].end() &&
-                    it->second.ref_id == gr.chrom && it->second.ref_pos == pos &&
-                    !it->second.align_bases.empty()) {
+                    it->second.ref_id == gr.chrom && 
+                    it->second.ref_pos == pos &&
+                    !it->second.align_bases.empty()) 
+                {
                     has_data_at_pos = true;
                     break;  // early break: only need to know if ANY sample has data
                 }

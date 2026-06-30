@@ -8,7 +8,8 @@
  *
  * .bbf format:
  *   Header: magic(4) + version(2) + sample_count(2) + sample_ids(variable)
- *   Records: per-position binary records with per-sample read data
+ *   Records: per-position binary records with per-sample, per-read data
+ *            (v2: each read stores its own ref_base for correct Indel normalization)
  *
  * .bbi format:
  *   Header:  magic(4) + version(2) + reserved(2) + entry_count(4)
@@ -32,7 +33,7 @@
 
 // ---- Format constants ----
 static const uint32_t BBF_MAGIC = 0x42424600;  // "BBF\0"
-static const uint16_t BBF_VERSION = 1;
+static const uint16_t BBF_VERSION = 2;  // v2: per-read ref_base (fix Indel normalization bug)
 
 static const uint32_t BBI_MAGIC = 0x42424900;  // "BBI\0"
 static const uint16_t BBI_VERSION = 1;
