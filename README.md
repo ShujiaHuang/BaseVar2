@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/ShujiaHuang/BaseVar2">
-    <img height="200" src="docs/assets/images/basevar_logo.svg">
+    <img height="180" src="docs/assets/images/basevar_logo.svg">
   </a>
   <!-- 
   <h2 align="center">BaseVar: Call variants from ultra low-pass WGS data</h2> 
@@ -18,12 +18,6 @@
 </p> -->
 
 BaseVar is fully implemented in C++17 and delivers over **200×** the speed of its [original Python counterpart](https://github.com/ShujiaHuang/basevar/tree/python-version-0.6.1.1), while using dramatically less memory. With `-B 200` and one thread, memory usage is typically 3–4 GB per thread — compared to 20+ GB in the Python version.
-
-## Citation
-
-If you use `BaseVar` in your research work, please cite the following paper:
-
-> Liu, S., Liu, Y., Gu, Y., Lin, X., Zhu, H., Liu, H., Xu, Z., Cheng, S., Lan, X., Li, L., Huang, M., Li, H., Nielsen, R., Davies, RW., Albrechtsen, A., Chen, GB., Qiu, X., Jin, X., **Huang, S.**, (2024). Utilizing non-invasive prenatal test sequencing data for human genetic investigation. *Cell Genomics* 4(10), 100669. [doi:10.1016/j.xgen.2024.100669](https://www.cell.com/cell-genomics/fulltext/S2666-979X(24)00288-X)
 
 ---
 
@@ -819,3 +813,8 @@ The file type is auto-detected from the extension (`.bbf` or `.bbi`). If the ext
 - **Shared index loading**: When using multiple threads, BBI indexes are loaded once and shared across all threads via `std::cref`, eliminating redundant I/O and significantly reducing startup time for large cohorts.
 - **Output compression**: Always use `.vcf.gz` as the output filename — BaseVar automatically writes bgzipped output when the extension is `.vcf.gz`.
 
+## Citation
+
+If you use `BaseVar` in your research work, please cite the following paper:
+
+> Liu, S., Liu, Y., Gu, Y., Lin, X., Zhu, H., Liu, H., Xu, Z., Cheng, S., Lan, X., Li, L., Huang, M., Li, H., Nielsen, R., Davies, RW., Albrechtsen, A., Chen, GB., Qiu, X., Jin, X., **Huang, S.**, (2024). Utilizing non-invasive prenatal test sequencing data for human genetic investigation. *Cell Genomics* 4(10), 100669. [doi:10.1016/j.xgen.2024.100669](https://www.cell.com/cell-genomics/fulltext/S2666-979X(24)00288-X) (basevar version 1.3+)
