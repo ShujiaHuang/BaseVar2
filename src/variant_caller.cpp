@@ -10,6 +10,7 @@
 #include "io/batchfile_binary.h"
 #include <cstdio>      // snprintf
 #include <stdexcept>
+#include <string>
 
 const std::string BaseTypeRunner::usage() const {
     static const std::string BASETYPE_CALLER_USAGE = 
@@ -230,7 +231,7 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
     _samples_id.clear();
     for (size_t i(0); i < _args->input_bf.size(); ++i) {
 
-        if ((i+1) % 1000 == 0)
+        if ((i+1) % 1000 == 0 || (i+1) == _args->input_bf.size())  // print every 1000 files
             std::cout << "[INFO] loading "   << i+1 << "/" << _args->input_bf.size() 
                       << " alignment files." << std::endl;
         
@@ -264,7 +265,8 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
     time_t now = time(0);
     std::string ct(ctime(&now));
     ct.pop_back();  // rm the trailing '\n' put by `asctime`
-    std::cout << "[INFO] " + ct + ". Done for loading all samples' id from alignment files, " 
+    std::cout << "[INFO] " + ct + ". Done for loading all " + std::to_string(_samples_id.size()) + 
+                 " samples' id from alignment files, " 
               << difftime(now, real_start_time) << " seconds elapsed.\n" << std::endl;
 
     return;
