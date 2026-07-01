@@ -6,19 +6,16 @@
 </h4>
 <p align="center">
   <a href="https://github.com/ShujiaHuang/BaseVar2/actions/workflows/build.yml"><img alt="GitHub Actions CI" src="https://github.com/ShujiaHuang/BaseVar2/actions/workflows/build.yml/badge.svg"></a> 
-  <a href="https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg" alt="License: AGPL v3">
-  </a>
-  <a href="https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static"><img  src="https://img.shields.io/github/v/release/ShujiaHuang/BaseVar2?color=#21ed72" alt="GitHub Release">
-  </a> 
+  <a href="https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg" alt="License: AGPL v3"></a>
+  <!-- <a href="https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static"><img  src="https://img.shields.io/github/v/release/ShujiaHuang/BaseVar2?color=#21ed72" alt="GitHub Release"></a>  -->
 </p>
 
-<!-- 
 <p align="center">
   <em>
-    Download: <a href="https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static">Lastest stable version</a>
+    Download: <a href="https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static">Lastest version of linux-static-binary</a>
   </em>
 </p> 
--->
+
 
 **BaseVar** is a fast, memory-efficient variant caller for ultra-low-depth (<1×) sequencing data, designed for non-invasive prenatal testing (NIPT) and population-scale genomics. It simultaneously identifies genomic variants and estimates allele frequencies in cohorts of **tens to hundreds of thousands of samples**. And the first version publication in [*Cell Genomics*](https://doi.org/10.1016/j.xgen.2024.100669).
 
