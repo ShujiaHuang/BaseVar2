@@ -812,7 +812,6 @@ The file type is auto-detected from the extension (`.bbf` or `.bbi`). If the ext
 - **Sparse binary index (`.bbi`)**: The binary index skips positions where all samples have zero depth, reducing index size from ~GB to ~MB for typical cohorts. This also enables faster random access and reduces memory usage during variant calling.
 - **Shared index loading**: When using multiple threads, BBI indexes are loaded once and shared across all threads via `std::cref`, eliminating redundant I/O and significantly reducing startup time for large cohorts.
 - **Output compression**: Always use `.vcf.gz` as the output filename — BaseVar automatically writes bgzipped output when the extension is `.vcf.gz`.
-- **Single-region optimization**: When calling variants in a single region, BaseVar directly renames the temp VCF to the output file instead of merging, eliminating unnecessary I/O.
 
 ## Citation
 
