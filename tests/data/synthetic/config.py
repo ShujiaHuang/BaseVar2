@@ -77,6 +77,32 @@ BASEQ_CLIP = (10, 40)    # Clip base quality to this range
 FRAGMENT_WINDOW = 200    # Variant reads generated within +/- this many bp of variant
 
 # ---------------------------------------------------------------------------
+# Ancient DNA simulation parameters
+#
+# When ANCIENT_DNA_ENABLED = True, the read simulator applies post-mortem
+# damage (PMD) patterns characteristic of ancient DNA sequencing data:
+#   - Short fragment lengths (geometric distribution, mean ~50bp)
+#   - C→T deamination at 5' ends (and symmetric C→T at 3' ends)
+#   - Damage probability decays geometrically from fragment termini
+#   - Optional modern DNA contamination (undamaged reads)
+#
+# These transformations are applied AFTER standard read generation,
+# converting modern-style reads into ancient DNA-like reads.
+# ---------------------------------------------------------------------------
+ANCIENT_DNA_ENABLED = False
+
+# Fragment length distribution (geometric)
+ANCIENT_DNA_FRAG_LENGTH_MEAN = 50   # Mean fragment length in bp
+ANCIENT_DNA_FRAG_LENGTH_MIN = 25    # Minimum fragment length
+
+# PMD damage model (Briggs et al. 2007)
+ANCIENT_DNA_DAMAGE_RATE = 0.30      # Max C→T frequency at terminal position
+ANCIENT_DNA_DAMAGE_DECAY = 0.30     # Geometric decay probability per position
+
+# Modern DNA contamination
+ANCIENT_DNA_CONTAMINATION_RATE = 0.05  # Fraction of undamaged reads (0-1)
+
+# ---------------------------------------------------------------------------
 # Derived helpers
 # ---------------------------------------------------------------------------
 def get_all_samples():

@@ -60,6 +60,10 @@ def main():
         "--evaluate", action="store_true",
         help="Run evaluation after smoke test (requires --basevar)"
     )
+    parser.add_argument(
+        "--ancient-dna", action="store_true",
+        help="Enable ancient DNA simulation (short fragments + PMD damage)"
+    )
     args = parser.parse_args()
 
     seed = args.seed
@@ -76,6 +80,15 @@ def main():
     print(f"  Samples:    {len(get_all_samples())} ({len(SAMPLE_GROUPS)} groups)")
     print(f"  Variants:   {len(VARIANTS)}")
     print(f"  Chromosomes: {len(CHROMOSOMES)}")
+    if args.ancient_dna:
+        from config import (
+            ANCIENT_DNA_FRAG_LENGTH_MEAN, ANCIENT_DNA_DAMAGE_RATE,
+            ANCIENT_DNA_CONTAMINATION_RATE,
+        )
+        print(f"  Ancient DNA: ENABLED")
+        print(f"    Fragment mean: {ANCIENT_DNA_FRAG_LENGTH_MEAN} bp")
+        print(f"    Damage rate:   {ANCIENT_DNA_DAMAGE_RATE}")
+        print(f"    Contamination: {ANCIENT_DNA_CONTAMINATION_RATE}")
     print()
 
     t0 = time.time()
@@ -135,6 +148,15 @@ def main():
         all_sample_reads[sample_id] = reads
         print(f"    {sample_id}: {len(reads)} reads")
     print()
+
+    # ---------------------------------------------------------------
+    # Step 4b (optional): Apply ancient DNA simulation
+    # ---------------------------------------------------------------
+    if args.ancient_dna:
+        print("[Step 4b] Applying ancient DNA simulation (fragmentation + PMD)...")
+        from ancient_dna import simulate_ancient_dna
+        all_sample_reads = simulate_ancient_dna(all_sample_reads, seed=seed)
+        print()
 
     # ---------------------------------------------------------------
     # Step 5: Write BAM/CRAM files
