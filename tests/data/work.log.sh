@@ -5,6 +5,14 @@
 # short options
 ../../bin/basevar caller -Q 0 -q 10 -m 0.05 -B 10 -t 4 -r chr11:5246595-5248428,chr17:41197764-41276135 -G sample_group.info -o tt.vcf -f ~/Projects/BaseVar/tests/data/hg19.NC_012920.fasta.gz -L bam90.list bam100/00alzqq6jw.bam bam100/09t3r9n2rg.bam bam100/0fkpl1p55b.bam bam100/13dg1gvsfk.bam bam100/17phildszl.bam bam100/1dbpgqt0dq.bam bam100/1kyws27hoc.bam bam100/1ych8rmufr.bam bam100/4e56w6ezsx.bam bam100/51rwla2fps.bam
 
+# Test basevar caller by using synthetic data
+../../bin/basevar caller -f synthetic/ref/mini_ref.fa -o out.vcf -G synthetic/samples_group.info synthetic/bam/*.bam
+../../bin/basevar caller -f synthetic/ref/mini_ref.fa -o out_c.vcf -G synthetic/samples_group.info synthetic/cram/*.cram
+python synthetic/evaluate.py --vcf out.vcf --truth synthetic/ground_truth_variants.tsv
+
+
+
+
 # subsam
 ../../bin/basevar subsam -i tt.vcf~ -o t.vcf 5ffp4ybnks 9jikb1nr7d
 le tt.vcf\~ | cut -f 1-10,18-18 |le
@@ -19,4 +27,7 @@ samtools tview --reference ../../learn_from/GLIMPSE/tutorial/reference_genome/hs
 
 # motif
 ../../bin/basevar motif -o ttt -f ~/Projects/BaseVar/tests/data/hg19.NC_012920.fasta.gz -L bam90.list bam100/00alzqq6jw.bam bam100/09t3r9n2rg.bam bam100/0fkpl1p55b.bam bam100/13dg1gvsfk.bam bam100/17phildszl.bam bam100/1dbpgqt0dq.bam bam100/1kyws27hoc.bam bam100/1ych8rmufr.bam bam100/4e56w6ezsx.bam bam100/51rwla2fps.bam -t 10 > log
+
+
+
 
