@@ -51,7 +51,7 @@ int concat_runner(int argc, char *argv[]) {
 
     // Parsing the commandline options. 
     static const struct option CONCAT_CMDLINE_LOPTS[] = {
-        {"align-file-list", optional_argument, NULL, 'L'},
+        {"align-file-list", required_argument, NULL, 'L'},
         {"output",          required_argument, NULL, 'o'},
         {"help",                  no_argument, NULL, 'h'},
 

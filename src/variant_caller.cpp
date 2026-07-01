@@ -70,20 +70,21 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
     
     // Parsing the commandline options. 
     static const struct option BASETYPE_CMDLINE_LOPTS[] = {
-        // Optional arguments to long style command line parameters require 'equals sign' (=). 
-        // https://stackoverflow.com/questions/1052746/getopt-does-not-parse-optional-arguments-to-parameters
+        // All options that take a value use required_argument so that
+        // both "--option value" and "--option=value" syntaxes work.
+        // (optional_argument would require "--option=value" exclusively.)
         {"reference",         required_argument, NULL, 'f'},
         {"output",            required_argument, NULL, 'o'},
-        {"align-file-list",   optional_argument, NULL, 'L'},
+        {"align-file-list",   required_argument, NULL, 'L'},
 
-        {"min-af",            optional_argument, NULL, 'm'},
-        {"min-mapq",          optional_argument, NULL, 'q'},
-        {"min-BQ",            optional_argument, NULL, 'Q'},
-        {"batch-count",       optional_argument, NULL, 'B'},
-        {"thread",            optional_argument, NULL, 't'},
+        {"min-af",            required_argument, NULL, 'm'},
+        {"min-mapq",          required_argument, NULL, 'q'},
+        {"min-BQ",            required_argument, NULL, 'Q'},
+        {"batch-count",       required_argument, NULL, 'B'},
+        {"thread",            required_argument, NULL, 't'},
 
-        {"regions",           optional_argument, NULL, 'r'},
-        {"pop-group",         optional_argument, NULL, 'G'},  // parameter for calculating allele frequency for specific population-group
+        {"regions",           required_argument, NULL, 'r'},
+        {"pop-group",         required_argument, NULL, 'G'},  // parameter for calculating allele frequency for specific population-group
 
         {"filename-has-samplename", no_argument, NULL, '1'},
         {"smart-rerun",             no_argument, NULL, '2'},
