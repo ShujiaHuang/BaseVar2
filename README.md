@@ -16,7 +16,6 @@
   </em>
 </p> 
 
-
 **BaseVar** is a fast, memory-efficient variant caller for ultra-low-depth (<1×) sequencing data, designed for non-invasive prenatal testing (NIPT) and population-scale genomics. It simultaneously identifies genomic variants and estimates allele frequencies in cohorts of **tens to hundreds of thousands of samples**. And the first version publication in [*Cell Genomics*](https://doi.org/10.1016/j.xgen.2024.100669).
 
 Implemented entirely in **C++17**, BaseVar is **over 100× faster** than the [original Python implementation](https://github.com/ShujiaHuang/basevar/tree/v0.6.1.1) and **5–10× faster** than BaseVar [v1](https://github.com/ShujiaHuang/basevar/releases), while using substantially less memory. With `-B 200` and a single thread, it typically requires only **3–4 GB** of RAM, compared with **more than 20 GB** for the original Python implementation.
@@ -26,8 +25,6 @@ Implemented entirely in **C++17**, BaseVar is **over 100× faster** than the [or
 ## Installation
 
 ### Option 1 — Download pre-built binary (Recommended, no compilation needed)
-
-https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static
 
 Pre-built static binaries are available on the [GitHub Releases page](https://github.com/ShujiaHuang/BaseVar2/releases).
 
