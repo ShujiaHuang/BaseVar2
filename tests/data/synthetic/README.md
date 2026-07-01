@@ -11,7 +11,7 @@ This directory contains a complete synthetic test data framework for validating 
 - Automated evaluation pipeline (`evaluate.py`)
 - Systematic test suite covering all caller parameters (`run_tests.sh`)
 
-Generated: 2026-07-01 17:54:21
+Generated: 2026-07-01 21:29:58
 Random seed: 42 (fully reproducible)
 
 ## 2. Directory Structure
@@ -114,7 +114,7 @@ The reference is a small synthetic genome designed for fast testing:
 
 **`samples.list`**
 One BAM path per line (50 lines). Used with `basevar -L`.
-Contains absolute paths; regenerate with `generate.py` if directory changes.
+Contains relative paths (relative to this directory); regenerate with `generate.py` if structure changes.
 
 **`samples_group.info`**
 Tab-separated: `<sample_id>\t<group_name>`. Used with `basevar -G`.
