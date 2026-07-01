@@ -6,9 +6,14 @@
 ../../bin/basevar caller -Q 0 -q 10 -m 0.05 -B 10 -t 4 -r chr11:5246595-5248428,chr17:41197764-41276135 -G sample_group.info -o tt.vcf -f ~/Projects/BaseVar/tests/data/hg19.NC_012920.fasta.gz -L bam90.list bam100/00alzqq6jw.bam bam100/09t3r9n2rg.bam bam100/0fkpl1p55b.bam bam100/13dg1gvsfk.bam bam100/17phildszl.bam bam100/1dbpgqt0dq.bam bam100/1kyws27hoc.bam bam100/1ych8rmufr.bam bam100/4e56w6ezsx.bam bam100/51rwla2fps.bam
 
 # Test basevar caller by using synthetic data
+python synthetic/generate.py --output-dir synthetic_normal_test --skip-cram 2>&1
+../../bin/basevar caller -f synthetic_normal_test/ref/mini_ref.fa -o out2.vcf -G synthetic_normal_test/samples_group.info synthetic_normal_test/bam/*.bam
+python synthetic/evaluate.py --vcf out2.vcf --truth synthetic_normal_test/ground_truth_variants.tsv
+
 ../../bin/basevar caller -f synthetic/ref/mini_ref.fa -o out.vcf -G synthetic/samples_group.info synthetic/bam/*.bam
-../../bin/basevar caller -f synthetic/ref/mini_ref.fa -o out_c.vcf -G synthetic/samples_group.info synthetic/cram/*.cram
+#../../bin/basevar caller -f synthetic/ref/mini_ref.fa -o out_c.vcf -G synthetic/samples_group.info synthetic/cram/*.cram
 python synthetic/evaluate.py --vcf out.vcf --truth synthetic/ground_truth_variants.tsv
+
 
 
 
