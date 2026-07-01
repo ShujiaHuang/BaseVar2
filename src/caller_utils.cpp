@@ -180,7 +180,7 @@ VCFSampleAnnotation process_sample_variant(const std::string& ref_base,         
     size_t n_alleles = alts.size() + 1;  // Total number of alleles including REF
 
     if (af >= 0) {
-        // Bayesian mode: compute genotype posterior using population AF prior
+        // Population AF prior applied: compute genotype posterior
         GenotypePosterior gp = compute_genotype_posterior(sa.PL, af);
 
         size_t min_idx = gp.best_gt_idx;
@@ -246,8 +246,8 @@ std::string format_sample_string(const VCFSampleAnnotation& sa) {
     int dp = std::accumulate(sa.allele_depths.begin(), sa.allele_depths.end(), 0);
 
     // Format GQ: always output as integer (VCF spec: Type=Integer)
-    // Legacy mode: GQ = PL-gap (already integer-valued)
-    // Bayesian mode: GQ = -10*log10(1-P_best), rounded to nearest integer
+    // Without population prior: GQ = PL-gap (second-best minus best PL)
+    // With population prior: GQ = -10*log10(1-P_best), rounded to nearest integer
     std::string gq_str = std::to_string(static_cast<int>(std::round(sa.GQ)));
     std::string sample_info = ngslib::join(sa.gtcode, "/")        + ":" +  // GT, genotype
                               gq_str                              + ":" +  // GQ, Genotype Quality
@@ -267,24 +267,27 @@ std::string vcf_header_define(const std::string &ref_file_path, const std::vecto
         
         // FORMAT fields
         "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">",
-        "##FORMAT=<ID=GQ,Number=1,Type=Integer,Description=\"Genotype Quality: Phred-scaled confidence (posterior-based in Bayesian mode, PL-gap in legacy mode)\">",
+        "##FORMAT=<ID=GQ,Number=1,Type=Integer,Description=\"Genotype Quality: Phred-scaled confidence in the genotype call\">",
         "##FORMAT=<ID=PL,Number=G,Type=Integer,Description=\"List of Normalized, Phred-scaled genotype likelihoods rounded to the closest integer\">",
-        "##FORMAT=<ID=AD,Number=R,Type=String,Description=\"Allelic depths for the ref and alt alleles in the order listed\">",
+        "##FORMAT=<ID=AD,Number=R,Type=Integer,Description=\"Allelic depths for the ref and alt alleles in the order listed\">",
         "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Approximate read depth for specific sample (reads with bad mapped quality or with bad mates are filtered)\">",
         
         // INFO fields
-        "##INFO=<ID=AF,Number=A,Type=Float,Description=\"Allele frequency: dosage-based (AC/AN) in posterior mode (Recommend by BaseVar); LRT EM frequency in legacy mode\">",
-        "##INFO=<ID=AC,Number=A,Type=Integer,Description=\"Allele count: expected allele count derived from genotype posterior dosage in posterior mode (dosage-based); reads-based in legacy mode\">",
-        "##INFO=<ID=AN,Number=1,Type=Integer,Description=\"Total number of alleles: 2*N_samples in posterior mode (dosage-based count); reads-based in legacy mode\">",
+        "##INFO=<ID=AF,Number=A,Type=Float,Description=\"Allele frequency (recommended by BaseVar): expected from posterior probabilities over all possible genotypes (with population prior, distinct from GT), or EM-estimated from read likelihoods\">",
+        "##INFO=<ID=AC,Number=A,Type=Integer,Description=\"Allele count: expected from posterior probabilities over all possible genotypes (with population prior, distinct from GT), or read-based count\">",
+        "##INFO=<ID=AN,Number=1,Type=Integer,Description=\"Total number of alleles across all samples over all possible genotypes. It should be 2 times the number of samples\">",
         "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Approximate total read depth (high-quality); some reads may have been filtered\">",
-        "##INFO=<ID=DP4,Number=A,Type=Integer,Description=\"A list of number of high-quality ref-forward, ref-reverse, alt1-forward, alt1-reverse, alt2-forward, alt2-reverse, ... ,bases\">",
+        "##INFO=<ID=DP4,Number=.,Type=Integer,Description=\"A list of number of high-quality ref-forward, ref-reverse, alt1-forward, alt1-reverse, alt2-forward, alt2-reverse, ... ,bases\">",
         "##INFO=<ID=FS,Number=A,Type=Float,Description=\"Phred-scaled P-value using Fisher's exact test to detect strand bias\">",
         "##INFO=<ID=SOR,Number=A,Type=Float,Description=\"Symmetric Odds Ratio of 2x2 contingency table to detect strand bias\">",
-        "##INFO=<ID=AC_obs,Number=A,Type=Integer,Description=\"Observed allele count from hard genotype calls (GT-based), posterior mode only\">",
-        "##INFO=<ID=AN_obs,Number=1,Type=Integer,Description=\"Total number of observed alleles from called (non-missing) genotype calls, posterior mode only\">",
-        "##INFO=<ID=AF_obs,Number=A,Type=Float,Description=\"Observed allele frequency = AC_obs / AN_obs, posterior mode only\">",
+        "##INFO=<ID=AC_obs,Number=A,Type=Integer,Description=\"Observed allele count from argmin(PL) genotypes (most likely without population prior, distinct from GT)\">",
+        "##INFO=<ID=AN_obs,Number=1,Type=Integer,Description=\"Total number of alleles from non-missing argmin(PL) genotype calls (distinct from GT)\">",
+        "##INFO=<ID=AF_obs,Number=A,Type=Float,Description=\"Observed allele frequency = AC_obs / AN_obs\">",
+        "##INFO=<ID=AC_GT,Number=A,Type=Integer,Description=\"Allele count directly from the VCF GT column (discrete genotype calls with population prior)\">",
+        "##INFO=<ID=AN_GT,Number=1,Type=Integer,Description=\"Total number of alleles in non-missing VCF GT calls\">",
+        "##INFO=<ID=AF_GT,Number=A,Type=Float,Description=\"Allele frequency = AC_GT / AN_GT, directly from the VCF GT column\">",
         "##INFO=<ID=HWE,Number=1,Type=Float,Description=\"Hardy-Weinberg equilibrium chi-square p-value (dosage-based, suitable for low-coverage data)\">",
-        "##INFO=<ID=BaseQRankSum,Number=1,Type=Float,Description=\"Z-score from Wilcoxon rank sum test of Alt Vs. Ref base qualities\">",
+        "##INFO=<ID=BaseQRankSum,Number=1,Type=Float,Description=\"Z-score from Wilcoxon rank sum test of Alt vs. Ref base qualities\">",
         "##INFO=<ID=MQRankSum,Number=1,Type=Float,Description=\"Z-score from Wilcoxon rank sum test of Alt vs. Ref read mapping qualities\">",
         "##INFO=<ID=ReadPosRankSum,Number=1,Type=Float,Description=\"Z-score from Wilcoxon rank sum test of Alt vs. Ref read position bias\">"
     };  // initial by common information of header

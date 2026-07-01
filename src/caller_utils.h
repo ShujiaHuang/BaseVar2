@@ -106,13 +106,17 @@ struct AlleleInfo {
     std::map<std::string, StrandBiasInfo> strand_bias_info; // DP4, strand bias info for each allele
     int total_dp = 0;                                       // DP, total depth of all alleles, including REF and ALT
 
-    // Dosage-based counts (from genotype posteriors, posterior mode only)
+    // Dosage-based counts (expected from genotype posteriors)
     std::vector<double> dosage_counts;                      // Per-ALT expected AC: [dosage_ALT1, dosage_ALT2, ...]
     int dosage_total_alleles = 0;                           // = 2 * N_samples
+
+    // GT-based counts (from posterior GT, matches VCF GT column)
+    std::vector<int> gt_counts;                             // Per-ALT count from posterior GT: [GT_ALT1, GT_ALT2, ...]
+    int gt_total_alleles = 0;                               // Total alleles from non-missing posterior GT calls
 };
 
 struct VCFSampleAnnotation {
-    double GQ;                             // Genotype Quality (posterior-based when Bayesian mode)
+    double GQ;                             // Genotype Quality (posterior-based when population prior applied)
     std::vector<size_t> gtcode;            // Genotype
     std::vector<std::string> sample_alts;  
     std::vector<int> allele_depths;        // AD, depth

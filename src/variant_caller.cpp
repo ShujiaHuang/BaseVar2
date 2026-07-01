@@ -223,7 +223,7 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
 
     // Loading sample ID in BAM/CRMA files from RG tag.
     if (_args->filename_has_samplename)
-        std::cout << "[INFO] BaseVar'll load samples id from filename directly, becuase you set "
+        std::cout << "[INFO] BaseVar will load samples id from filename directly, becuase you set "
                      "--filename-has-samplename.\n";
 
     std::string samplename, filename;
@@ -231,9 +231,14 @@ void BaseTypeRunner::_get_sample_id_from_bam() {
     _samples_id.clear();
     for (size_t i(0); i < _args->input_bf.size(); ++i) {
 
-        if ((i+1) % 1000 == 0 || (i+1) == _args->input_bf.size())  // print every 1000 files
-            std::cout << "[INFO] loading "   << i+1 << "/" << _args->input_bf.size() 
+        if (!_args->filename_has_samplename && ((i+1) % 1000 == 0 || (i+1) == _args->input_bf.size())) { // print every 1000 files
+            // Time information
+            time_t now = time(0);
+            std::string ct(ctime(&now));
+            ct.pop_back();  // rm the trailing '\n' put by `asctime`
+            std::cout << "[INFO] " + ct + ". loading " << i+1 << "/" << _args->input_bf.size() 
                       << " alignment files." << std::endl;
+        }
         
         if (_args->filename_has_samplename) {
             filename = ngslib::remove_filename_extension(ngslib::basename(_args->input_bf[i]));
@@ -377,6 +382,23 @@ int BaseTypeRunner::run() {
 
     // 以区间为单位进行变异检测, 每个区间里调用多线程
     std::vector<std::string> batchfiles, vcffiles;
+
+    // Build group-specific INFO headers (available before region loop since _groups_idx is already populated)
+    std::vector<std::string> add_group_info, group_name;
+    for(std::map<std::string, std::vector<size_t>>::iterator it = _groups_idx.begin(); it != _groups_idx.end(); ++it) {
+        group_name.push_back(it->first);
+        add_group_info.push_back("##INFO=<ID=DP_" + it->first + ",Number=1,Type=Integer,Description="
+                                 "\"Total depth of all alleles in the " + it->first + " populations\">");
+    }
+    for(std::map<std::string, std::vector<size_t>>::iterator it = _groups_idx.begin(); it != _groups_idx.end(); ++it) {
+        // For population group AF, it is still emphasized that it is based on EM estimation, 
+        // because the prior of AF may be different for different populations. 
+        // Therefore, the overall prior is not combined here.
+        add_group_info.push_back("##INFO=<ID=AF_" + it->first + ",Number=A,Type=Float,Description="
+                                 "\"Allele frequency in the " + it->first + " populations (EM-estimated), in the range (0,1)\">");
+    }
+    std::string header = vcf_header_define(_args->reference, add_group_info, _samples_id, _cmdline_string);
+
     for (auto &gr: _calling_intervals) {
         clock_t cpu_start_time = clock();
         time_t real_start_time = time(0);
@@ -404,7 +426,7 @@ int BaseTypeRunner::run() {
         cpu_start_time  = clock();
 
         std::string sub_vcf_fn = prefix + ".vcf.gz";
-        bool is_empty = _variants_discovery(batchfiles, gr, sub_vcf_fn);
+        bool is_empty = _variants_discovery(batchfiles, gr, sub_vcf_fn, header);
         vcffiles.push_back(sub_vcf_fn);
 
         if (is_empty) {
@@ -430,22 +452,14 @@ int BaseTypeRunner::run() {
         batchfiles.clear(); 
     }
 
-    // Merge all VCF subfiles
-    std::vector<std::string> add_group_info, group_name;
-    for(std::map<std::string, std::vector<size_t>>::iterator it = _groups_idx.begin(); it != _groups_idx.end(); ++it) {
-        group_name.push_back(it->first);
-        add_group_info.push_back("##INFO=<ID=DP_" + it->first + ",Number=1,Type=Integer,Description="
-                                 "\"Total depth of all alleles in the " + it->first + " populations\">");
+    // Merge or rename VCF output
+    if (vcffiles.size() == 1) {
+        // Single region: rename temp file directly (avoid unnecessary read/write IO)
+        std::rename(vcffiles[0].c_str(), _args->output_vcf.c_str());
+    } else {
+        // Multiple regions: merge all subfiles (skip existing headers from temp files)
+        merge_file_by_line(vcffiles, _args->output_vcf, header, true);
     }
-    for(std::map<std::string, std::vector<size_t>>::iterator it = _groups_idx.begin(); it != _groups_idx.end(); ++it) {
-        add_group_info.push_back("##INFO=<ID=AF_" + it->first + ",Number=A,Type=Float,Description="
-                                 "\"Allele frequency in the " + it->first + " populations calculated "
-                                 "base on LRT, in the range (0,1)\">");
-    }
-
-    // Merge VCF
-    std::string header = vcf_header_define(_args->reference, add_group_info, _samples_id, _cmdline_string);
-    merge_file_by_line(vcffiles, _args->output_vcf, header, true);
 
     const tbx_conf_t bf_tbx_conf = {1, 1, 2, 0, '#', 0};  // {preset, seq col, beg col, end col, header-char, skip-line}
     if ((ngslib::suffix_name(_args->output_vcf) == ".gz") &&          // create index 
@@ -811,7 +825,8 @@ void BaseTypeRunner::_seek_position(const std::vector<ngslib::BamRecord> &sample
 
 bool BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfiles, 
                                          const ngslib::GenomeRegion gr,
-                                         const std::string out_vcf_fn) 
+                                         const std::string out_vcf_fn,
+                                         const std::string &vcf_header) 
 {
     // Split the region into multiple sub-regions for multiple-thread calling
     // Each sub-region is about 'STEP_LEN' bp length
@@ -866,8 +881,7 @@ bool BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     }
     call_variants_processes.clear();  // release the thread
   
-    std::string header = "## No need header here";
-    merge_file_by_line(subvcfs, out_vcf_fn, header, true);
+    merge_file_by_line(subvcfs, out_vcf_fn, vcf_header, true);
 
     return is_empty;
 }
@@ -1055,8 +1069,15 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
             if (cc) ++variant_count;
         }
 
-        if (++n % 10000 == 0) {
-            std::cout << "[INFO] Processed " << n << " positions.\n";
+        if (++n % 100000 == 0) {
+            // Time information
+            time_t now = time(0);
+            std::string ct(ctime(&now));
+            ct.pop_back();
+            std::cout << "[INFO] " + ct + ". Processed " << n << " positions, " << variant_count << " variants found. "
+                      << difftime(now, real_start_time) << " (CPU time: " << (double)(clock() - cpu_start_time) / CLOCKS_PER_SEC 
+                      << ") seconds elapsed.\n";
+
         }
     }
     VCF_OUT.close();
@@ -1274,24 +1295,24 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(
     vcf_record.format = "GT:GQ:PL:AD:DP";  // Genotype, Genotype Quality, Phred-scaled likelihoods of genotypes, Active allele depth, total coverage reads
 
     // =====================================================================
-    // First pass: original logic — collect PL and hard-count AC (backward compatible)
-    // Also collect GT-based AC_obs for posterior mode INFO output
+    // Per-sample likelihood-based genotype calling (argmin PL, no population prior)
+    // Collect PL for posterior update; also collect allele counts from most-likely GT
     // =====================================================================
     std::vector<std::vector<int>> sample_pls;  // For HWE test (D7)
     sample_pls.reserve(samples_batchinfo_vector.size());
     size_t n_alt_alleles = vcf_record.alt.size();
-    std::vector<int> ac_obs(n_alt_alleles, 0);  // GT-based ALT counts for AC_obs
-    int an_obs = 0;                             // GT-based total alleles for AN_obs
+    std::vector<int> ac_obs(n_alt_alleles, 0);  // ALT counts from argmin(PL) genotypes (distinct from VCF GT)
+    int an_obs = 0;                             // Total alleles from non-missing argmin(PL) calls (distinct from VCF GT)
     for (const auto &smp_bi : samples_batchinfo_vector) {
         auto sa = process_sample_variant(vcf_record.ref, vcf_record.alt, smp_bi, -1.0, _args->ref_bias);
 
-        // Update reads-based allele counts (legacy mode INFO)
+        // Update reads-based allele counts (used when no population prior is applied)
         for (const auto& alt : sa.sample_alts) {
             ai.allele_counts[alt]++;
             ai.total_alleles++;
         }
 
-        // Collect GT-based allele counts for AC_obs/AN_obs (skip missing/uncalled samples)
+        // Collect allele counts from argmin(PL) GT for AC_obs/AN_obs (skip zero-coverage samples)
         if (sa.gtcode.size() == 2 && !sa.sample_alts.empty()) {
             for (int allele_code : sa.gtcode) {
                 an_obs++;
@@ -1306,11 +1327,8 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(
     }
 
     // =====================================================================
-    // Second pass: Bayesian posterior update (supports multi-allelic)
-    // Uses LRT per-allele AF as HW prior to update GT/GQ/posterior/dosage
-    // Controlled by --gt-mode: 'posterior' (default) or 'legacy'
-    // In posterior mode: AC/AN/AF = dosage-based, AC_obs/AN_obs/AF_obs = GT-based
-    // Legacy mode: no changes (reads-based AC/AN/CAF remain)
+    // Posterior genotype update: incorporate population AF as HW prior
+    // AC/AN/AF = expected from posterior probabilities; AC_obs/AN_obs/AF_obs = from most-likely GT
     // =====================================================================
     if (_args->posterior_gt) {
         // Build per-allele frequency vector: [freq_REF, freq_ALT1, freq_ALT2, ...]
@@ -1327,6 +1345,9 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(
 
         std::vector<GenotypePosterior> sample_posteriors;
         sample_posteriors.reserve(samples_batchinfo_vector.size());
+
+        std::vector<int> ac_gt(n_alt_alleles, 0);  // ALT counts from posterior GT (matches VCF GT column)
+        int an_gt = 0;                             // Total alleles from non-missing posterior GT calls
 
         for (size_t i = 0; i < samples_batchinfo_vector.size(); ++i) {
             // Compute genotype posterior with per-allele frequencies (multi-allelic capable)
@@ -1355,6 +1376,16 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(
                     samples_batchinfo_vector[i], -1.0, _args->ref_bias);
                 sa.allele_depths = sa_orig.allele_depths;
                 sa.sample_alts = sa_orig.sample_alts;
+
+                // Count alleles from posterior GT for AC_GT/AN_GT (skip zero-coverage samples)
+                if (!sa_orig.sample_alts.empty()) {
+                    for (int allele_code : sa.gtcode) {
+                        an_gt++;
+                        if (allele_code > 0 && static_cast<size_t>(allele_code) <= n_alt_alleles) {
+                            ac_gt[allele_code - 1]++;
+                        }
+                    }
+                }
             }
 
             sample_posteriors.push_back(gp);
@@ -1367,6 +1398,8 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(
         auto [dosage_ac, dosage_an] = compute_dosage_ac(sample_posteriors);
         ai.dosage_counts = std::move(dosage_ac);
         ai.dosage_total_alleles = dosage_an;
+        ai.gt_counts = std::move(ac_gt);
+        ai.gt_total_alleles = an_gt;
     }
 
     // =====================================================================
@@ -1377,18 +1410,18 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(
     std::vector<double> fs, sor;
     std::vector<int> dp4({ai.strand_bias_info[ai.ref].fwd, ai.strand_bias_info[ai.ref].rev});
 
-    bool use_dosage = (ai.dosage_total_alleles > 0);  // posterior mode active
+    bool use_dosage = (ai.dosage_total_alleles > 0);  // using posterior genotype expectations
 
     for (size_t a = 0; a < n_alt_alleles; ++a) {
         const auto& alt = vcf_record.alt[a];
 
         if (use_dosage) {
-            // Posterior mode: AC/AN/AF from dosage
+            // AC/AN/AF from posterior genotype expectations
             double ac_d = (a < ai.dosage_counts.size()) ? ai.dosage_counts[a] : 0.0;
             ac.push_back(static_cast<int>(std::round(ac_d)));
             af.push_back(ac_d / ai.dosage_total_alleles);
         } else {
-            // Legacy mode: AC/AN from reads-based counts, AF from LRT EM
+            // Without population prior: AC/AN from reads-based counts, AF from EM-estimated frequency
             ac.push_back(ai.allele_counts[alt]);
             af.push_back(ai.allele_freqs[alt]);
         }
@@ -1411,7 +1444,7 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(
         "SOR=" + ngslib::join(sor, ",")
     };
 
-    // Posterior mode: add GT-based observation fields (AC_obs, AN_obs, AF_obs)
+    // Add observed allele count fields (AC_obs, AN_obs, AF_obs) when using posterior expectations
     if (use_dosage) {
         info.push_back("AC_obs=" + ngslib::join(ac_obs, ","));
         info.push_back("AN_obs=" + std::to_string(an_obs));
@@ -1420,6 +1453,16 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(
             af_obs[a] = (an_obs > 0) ? static_cast<double>(ac_obs[a]) / an_obs : 0.0;
         }
         info.push_back("AF_obs=" + ngslib::join(af_obs, ","));
+
+        // Add GT-based allele count fields (AC_GT, AN_GT, AF_GT) — directly from VCF GT column
+        info.push_back("AC_GT=" + ngslib::join(ai.gt_counts, ","));
+        info.push_back("AN_GT=" + std::to_string(ai.gt_total_alleles));
+        std::vector<double> af_gt(n_alt_alleles);
+        for (size_t a = 0; a < n_alt_alleles; ++a) {
+            af_gt[a] = (ai.gt_total_alleles > 0) ?
+                static_cast<double>(a < ai.gt_counts.size() ? ai.gt_counts[a] : 0) / ai.gt_total_alleles : 0.0;
+        }
+        info.push_back("AF_GT=" + ngslib::join(af_gt, ","));
     }
 
     // =====================================================================
@@ -1511,6 +1554,8 @@ VCFRecord BaseTypeRunner::_vcfrecord_in_pos(
             }
 
             if (!af.empty()) {
+                // 注意：这里关于不同群组的 AF，我还是保持了 EM 估计的 AF，没有进行任何的先验加权。
+                // 原因是因为不同群组的 AF 的先验可能不同，因此不能进行简单的加权。
                 group_af_info.push_back("AF_" + it->first + "=" + ngslib::join(af, ",")); // AF_group=xxx,xxx
             }
         }

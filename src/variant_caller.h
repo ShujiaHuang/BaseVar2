@@ -120,9 +120,10 @@ private:
                         PosMap &sample_posinfo_map);
 
     // Functions for calling variants
-    bool _variants_discovery(const std::vector<std::string> &batchfiles, 
+    bool _variants_discovery(const std::vector<std::string> &batchfiles,
                              const ngslib::GenomeRegion genome_region,
-                             const std::string sub_vcf_fn);
+                             const std::string sub_vcf_fn,
+                             const std::string &vcf_header);
 
     // A unit for calling variants and let it run in a thread.
     bool _variant_calling_unit(const std::vector<std::string> &batchfiles, 

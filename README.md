@@ -198,7 +198,7 @@ Optional options:
                                (e.g. SampleID.bam), set this flag to skip reading
                                the BAM header for sample names — saves significant time.
   --gt-mode=STRING             Genotype calling mode: 'posterior' (Bayesian
-                               posterior-based GT/GQ, dosage INFO) or
+                               posterior-based GT/GQ) or
                                'legacy' (pure likelihood argmin GT, PL-gap GQ).
                                [posterior]
   --ref-bias=FLOAT             Reference bias coefficient (β) for genotype likelihood.
@@ -286,8 +286,8 @@ See the [example `sample_group.info` file](https://github.com/ShujiaHuang/BaseVa
 
 Since v2.5.0, `basevar caller` uses a **two-pass Bayesian architecture** for genotype calling:
 
-1. **First pass** (unchanged): collect per-sample PL and hard-count AC/AN (backward compatible).
-2. **Second pass** (new): use the LRT-estimated population AF as a Hardy-Weinberg prior to compute per-sample genotype posteriors. GT is called as `argmax(posterior)`, GQ is `−10 log₁₀(1 − P(best GT))`, and dosage-based INFO fields (`AC_dosage`, `AN_dosage`, `CAF_dosage`) are emitted.
+1. **First pass** (unchanged): collect per-sample PL and hard-count AC_obs/AN_obs (backward compatible).
+2. **Second pass**: use the LRT-estimated population AF as a Hardy-Weinberg prior to compute per-sample genotype posteriors. GT is called as `argmax(posterior)`, GQ is `−10 log₁₀(1 − P(best GT))`.
 
 This is the **default** behavior. To revert to the previous pure-likelihood mode:
 
@@ -295,17 +295,15 @@ This is the **default** behavior. To revert to the previous pure-likelihood mode
 basevar caller --gt-mode legacy -f ref.fa -o out.vcf.gz -L bamfile.list
 ```
 
-**Backward compatibility**: all existing fields (INFO/AC, INFO/CAF, INFO/AF, FORMAT/PL, FORMAT/AD, FORMAT/DP) retain their original values. The new dosage fields are additive. Use `--gt-mode legacy` to produce output identical to pre-v2.5.0.
+**INFO field structure** (three complementary tiers):
 
-| Field | Source | Changed? |
-| ----- | ------ | -------- |
-| INFO/AF | LRT EM (pooled) | Unchanged |
-| FORMAT/PL | `calculatePL()` | Unchanged |
-| FORMAT/GT | `argmin(PL)` → `argmax(posterior)` | Changed (revert with `--gt-mode legacy`) |
-| FORMAT/GQ | PL gap → posterior Phred | Changed (revert with `--gt-mode legacy`) |
-| INFO/AC_dosage | Posterior expected ALT count | **New** |
-| INFO/AN_dosage | 2 × N_samples | **New** |
-| INFO/CAF_dosage | AC_dosage / AN_dosage | **New** |
+| Tier | Fields | Description |
+| ---- | ------ | ----------- |
+| Posterior (recommended) | `AF`, `AC`, `AN` | Expected values from posterior probabilities over all possible genotypes (with population prior). AF is the **recommended** allele frequency metric. |
+| Observed | `AC_obs`, `AN_obs`, `AF_obs` | Discrete counts from `argmin(PL)` genotypes (most likely without population prior). |
+| GT-based | `AC_GT`, `AN_GT`, `AF_GT` | Discrete counts directly from the VCF GT column (with population prior). |
+
+**Backward compatibility**: all existing fields (INFO/AC, INFO/AF, FORMAT/PL, FORMAT/AD, FORMAT/DP) retain their original values. The additional observed and GT-based fields are additive. Use `--gt-mode legacy` to produce output identical to pre-v2.5.0.
 
 **Resume an interrupted run:**
 
@@ -814,6 +812,7 @@ The file type is auto-detected from the extension (`.bbf` or `.bbi`). If the ext
 - **Sparse binary index (`.bbi`)**: The binary index skips positions where all samples have zero depth, reducing index size from ~GB to ~MB for typical cohorts. This also enables faster random access and reduces memory usage during variant calling.
 - **Shared index loading**: When using multiple threads, BBI indexes are loaded once and shared across all threads via `std::cref`, eliminating redundant I/O and significantly reducing startup time for large cohorts.
 - **Output compression**: Always use `.vcf.gz` as the output filename — BaseVar automatically writes bgzipped output when the extension is `.vcf.gz`.
+- **Single-region optimization**: When calling variants in a single region, BaseVar directly renames the temp VCF to the output file instead of merging, eliminating unnecessary I/O.
 
 ## Citation
 
