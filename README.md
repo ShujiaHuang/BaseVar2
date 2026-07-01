@@ -1,25 +1,28 @@
-<h3 align="center">
+<h4 align="center">
   <a href="https://github.com/ShujiaHuang/BaseVar2">
     <img height="180" src="docs/assets/images/basevar_logo.svg">
   </a>
   <br>A high-performance C++17 tool for variants calling from ultra low-depth WGS data<br>
-</h3>
-
+</h4>
 <p align="center">
   <a href="https://github.com/ShujiaHuang/BaseVar2/actions/workflows/build.yml"><img alt="GitHub Actions CI" src="https://github.com/ShujiaHuang/BaseVar2/actions/workflows/build.yml/badge.svg"></a> 
   <a href="https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg" alt="License: AGPL v3">
   </a>
+  <a href="https://img.shields.io/github/v/release/ShujiaHuang/BaseVar2"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/ShujiaHuang/BaseVar2?color=#21ed72">
+  </a> 
 </p>
 
+<!-- 
 <p align="center">
   <em>
     Download: <a href="https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static">Lastest stable version</a>
   </em>
-</p>
+</p> 
+-->
 
 **BaseVar** is a fast, memory-efficient variant caller for ultra-low-depth (<1×) sequencing data, designed for non-invasive prenatal testing (NIPT) and population-scale genomics. It simultaneously identifies genomic variants and estimates allele frequencies in cohorts of **tens to hundreds of thousands of samples**. And the first version publication in [*Cell Genomics*](https://doi.org/10.1016/j.xgen.2024.100669).
 
-Implemented entirely in **C++17**, BaseVar is **over 100× faster** than the [original Python implementation](https://github.com/ShujiaHuang/basevar/tree/python-version-0.6.1.1) and **5–10× faster** than BaseVar v1, while using substantially less memory. With `-B 200` and a single thread, it typically requires only **3–4 GB** of RAM, compared with **more than 20 GB** for the original Python implementation.
+Implemented entirely in **C++17**, BaseVar is **over 100× faster** than the [original Python implementation](https://github.com/ShujiaHuang/basevar/tree/v0.6.1.1) and **5–10× faster** than BaseVar [v1](https://github.com/ShujiaHuang/basevar/releases), while using substantially less memory. With `-B 200` and a single thread, it typically requires only **3–4 GB** of RAM, compared with **more than 20 GB** for the original Python implementation.
 
 ---
 
@@ -70,6 +73,9 @@ chmod +x basevar-macos-static
 mv basevar-macos-static basevar
 ./basevar --help
 ```
+
+> [!IMPORTANT]
+> **Rename the downloaded binary** to `basevar` for convenience. You may also move it to a directory in your `$PATH` (e.g. `/usr/local/bin`) for system-wide access.
 
 ---
 
