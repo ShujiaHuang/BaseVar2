@@ -139,7 +139,8 @@ def parse_ground_truth(truth_path):
     -------
     truth_variants : list of dict
         Each dict has keys: id, chrom, pos, ref, alt, type,
-        af_per_group: {group: af_value},
+        af_per_group: {group: af_value},           # target AF from TSV
+        obs_af_per_group: {group: af_value},       # observed AF from GTs
         gt_per_sample: {sample_id: genotype_string}
     groups : list of str
     samples : list of str
@@ -159,6 +160,9 @@ def parse_ground_truth(truth_path):
             elif part.endswith("_GT"):
                 samples.append(part[:-3])  # Remove "_GT" suffix
 
+        # Build sample-to-group mapping for observed AF computation
+        sample_to_group = _load_sample_group_map(truth_path)
+
         for line in fh:
             line = line.strip()
             if not line:
@@ -174,7 +178,7 @@ def parse_ground_truth(truth_path):
                 "type": parts[5],
             }
 
-            # Parse AF per group
+            # Parse AF per group (target AF from simulation config)
             af_per_group = {}
             idx = 6
             for group in groups:
@@ -193,9 +197,97 @@ def parse_ground_truth(truth_path):
                 idx += 1
             record["gt_per_sample"] = gt_per_sample
 
+            # Compute observed AF per group from actual GTs
+            record["obs_af_per_group"] = _compute_observed_af_per_group(
+                gt_per_sample, samples, sample_to_group, groups
+            )
+
             truth.append(record)
 
     return truth, groups, samples
+
+
+def _load_sample_group_map(truth_path):
+    """
+    Load sample-to-group mapping from samples_group.info alongside the truth file.
+
+    Falls back to deriving from SAMPLE_GROUPS in config if the file is not found.
+    """
+    import os
+    group_file = os.path.join(os.path.dirname(truth_path), "samples_group.info")
+    mapping = {}
+    try:
+        with open(group_file, "r") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                parts = line.split("\t")
+                if len(parts) >= 2:
+                    mapping[parts[0]] = parts[1]
+    except FileNotFoundError:
+        # Fallback: use config
+        try:
+            from config import SAMPLE_GROUPS
+            for group, samps in SAMPLE_GROUPS.items():
+                for s in samps:
+                    mapping[s] = group
+        except ImportError:
+            pass
+    return mapping
+
+
+def _compute_observed_af_per_group(gt_per_sample, samples, sample_to_group, groups):
+    """
+    Compute observed allele frequency per group from actual genotype assignments.
+
+    For biallelic: observed AF = count(alt alleles) / total alleles in the group.
+    For multi-allelic: returns a tuple of AFs for each alt allele (1, 2, ...).
+
+    Returns
+    -------
+    obs_af : dict
+        {group: float} for biallelic, {group: tuple} for multi-allelic.
+    """
+    obs_af = {}
+    for group in groups:
+        group_samples = [s for s in samples if sample_to_group.get(s) == group]
+        # Determine max allele index across all genotypes in this group
+        max_allele = 0
+        for s in group_samples:
+            gt = gt_per_sample.get(s, "0/0")
+            for a in gt.replace("/", "|").replace("|", "/").split("/"):
+                try:
+                    max_allele = max(max_allele, int(a))
+                except ValueError:
+                    pass
+
+        total_alleles = 0
+        allele_counts = {}  # {allele_index: count}
+        for s in group_samples:
+            gt = gt_per_sample.get(s, "0/0")
+            sep = "/" if "/" in gt else "|"
+            for a_str in gt.split(sep):
+                try:
+                    a = int(a_str)
+                except ValueError:
+                    continue
+                total_alleles += 1
+                allele_counts[a] = allele_counts.get(a, 0) + 1
+
+        if total_alleles == 0:
+            obs_af[group] = 0.0
+            continue
+
+        if max_allele <= 1:
+            # Biallelic: single AF value
+            obs_af[group] = allele_counts.get(1, 0) / total_alleles
+        else:
+            # Multi-allelic: tuple of AFs for alt alleles 1, 2, ...
+            af_tuple = tuple(allele_counts.get(i, 0) / total_alleles for i in range(1, max_allele + 1))
+            obs_af[group] = af_tuple
+
+    return obs_af
 
 
 # ---------------------------------------------------------------------------
@@ -406,19 +498,20 @@ def compute_metrics(matched, unmatched_called, truth_variants, groups, samples):
             except ValueError:
                 pass
 
-        # Per-group AF comparison
+        # Per-group AF comparison (use observed AF from GTs as ground truth)
         for group in groups:
-            truth_gaf = tv["af_per_group"].get(group)
+            obs_gaf = tv["obs_af_per_group"].get(group)
             called_gaf_str = cv["info"].get(f"AF_{group}", None)
-            if truth_gaf is not None and called_gaf_str is not None:
+            if obs_gaf is not None and called_gaf_str is not None:
                 try:
-                    # For multi-allelic, compare first AF only
-                    if isinstance(truth_gaf, tuple):
-                        truth_gaf_val = truth_gaf[0]
+                    # For multi-allelic, compare first alt allele AF only
+                    # (VCF typically reports one AF per alt allele)
+                    if isinstance(obs_gaf, tuple):
+                        obs_gaf_val = obs_gaf[0]
                     else:
-                        truth_gaf_val = truth_gaf
+                        obs_gaf_val = obs_gaf
                     called_gaf = float(called_gaf_str)
-                    per_group_af_errors[group].append((truth_gaf_val, called_gaf))
+                    per_group_af_errors[group].append((obs_gaf_val, called_gaf))
                 except ValueError:
                     pass
 
@@ -464,18 +557,24 @@ def compute_metrics(matched, unmatched_called, truth_variants, groups, samples):
 
 
 def _compute_overall_af(truth_record, groups):
-    """Compute the overall AF across all groups (weighted by group size)."""
+    """
+    Compute the overall observed AF across all groups (weighted by group size).
+
+    Uses observed AF from actual genotype assignments rather than the
+    target population AF, ensuring fair evaluation even with small samples.
+    """
     from config import SAMPLE_GROUPS
     total_alleles = 0
     total_alt = 0.0
     for group in groups:
         n = len(SAMPLE_GROUPS.get(group, []))
-        af = truth_record["af_per_group"].get(group)
-        if af is not None:
-            if isinstance(af, tuple):
-                af = sum(af)  # Sum of alt allele frequencies for multi-allelic
+        obs_af = truth_record["obs_af_per_group"].get(group)
+        if obs_af is not None:
+            if isinstance(obs_af, tuple):
+                # Multi-allelic: sum of all alt allele frequencies
+                obs_af = sum(obs_af)
             total_alleles += 2 * n
-            total_alt += af * 2 * n
+            total_alt += obs_af * 2 * n
     return total_alt / total_alleles if total_alleles > 0 else None
 
 

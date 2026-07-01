@@ -104,8 +104,15 @@ run_eval() {
 }
 
 collect_bams() {
-    # Return all BAM paths from samples.list
-    cat "$SAMPLES_LIST" | tr '\n' ' '
+    # Resolve relative BAM paths from samples.list against the script directory
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        if [[ "$line" = /* ]]; then
+            echo "$line"
+        else
+            echo "$SCRIPT_DIR/$line"
+        fi
+    done < "$SAMPLES_LIST" | tr '\n' ' '
 }
 
 # ---------------------------------------------------------------------------

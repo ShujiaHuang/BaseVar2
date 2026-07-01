@@ -24,6 +24,11 @@ GC_CONTENT = 0.45  # Target GC content ~45%
 # ---------------------------------------------------------------------------
 # Ground truth variants (11 variants)
 #
+# IMPORTANT: The REF/ALT values below are DESIGN-TIME placeholders.
+# During data generation, `adapt_variants_to_ref()` in reference.py
+# automatically adjusts REF/ALT to match the actual random reference
+# sequence. The adapted values are written to ground_truth_variants.tsv.
+#
 # For multi-allelic sites (v5), ALT is comma-separated.
 # AF values are per-group allele frequencies.
 # For multi-allelic v5: AF = (AF_alt1, AF_alt2) per group.

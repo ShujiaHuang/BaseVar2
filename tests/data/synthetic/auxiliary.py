@@ -20,6 +20,8 @@ def write_samples_list(bam_paths, output_path):
     """
     Write a samples.list file (one BAM path per line).
 
+    Uses relative paths (relative to the output file's directory) for portability.
+
     Parameters
     ----------
     bam_paths : dict
@@ -27,10 +29,13 @@ def write_samples_list(bam_paths, output_path):
     output_path : str
     """
     all_samples = get_all_samples()
+    output_dir = os.path.dirname(os.path.abspath(output_path))
     with open(output_path, "w") as fh:
         for sample_id in all_samples:
             if sample_id in bam_paths:
-                fh.write(bam_paths[sample_id] + "\n")
+                abs_path = os.path.abspath(bam_paths[sample_id])
+                rel_path = os.path.relpath(abs_path, output_dir)
+                fh.write(rel_path + "\n")
     print(f"  [auxiliary] Written {len(all_samples)} entries to {output_path}")
 
 
@@ -243,7 +248,7 @@ def write_readme(output_path, seed, bam_count, variants):
         w("## 6. Auxiliary Files\n\n")
         w("**`samples.list`**\n")
         w(f"One BAM path per line ({bam_count} lines). Used with `basevar -L`.\n")
-        w("Contains absolute paths; regenerate with `generate.py` if directory changes.\n\n")
+        w("Contains relative paths (relative to this directory); regenerate with `generate.py` if structure changes.\n\n")
         w("**`samples_group.info`**\n")
         w("Tab-separated: `<sample_id>\\t<group_name>`. Used with `basevar -G`.\n\n")
         w("```\n")
