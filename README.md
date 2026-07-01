@@ -183,7 +183,7 @@ Required arguments:
 Optional options:
   -L, --align-file-list=FILE   BAM/CRAM files list, one file per row.
   -r, --regions=REG[,...]      Restrict calling to these regions (comma-separated).
-                               Formats: chr  |  chr:start  |  chr:start-end
+                               Formats: chr | chr:start | chr:start-end
                                Example: chr1,chr2:1000000,chr3:5000000-10000000
   -G, --pop-group=FILE         Calculate allele frequency per population group.
 
@@ -230,6 +230,7 @@ basevar caller \
     -o output.vcf.gz \
     -Q 20 -q 30 -B 500 -t 24 \
     --filename-has-samplename \
+    --smart-rerun \
     -L bamfile.list
 ```
 
@@ -242,6 +243,7 @@ basevar caller \
     -Q 20 -q 30 -B 500 -t 24 \
     --filename-has-samplename \
     -r chr11:5246595-5248428 \
+    --smart-rerun \
     -L bamfile.list
 ```
 
@@ -253,6 +255,7 @@ basevar caller \
     -o multi_region.vcf.gz \
     -Q 20 -q 30 -B 500 -t 24 \
     --regions chr11:5246595-5248428,chr17:41197764-41276135 \
+    --smart-rerun \
     -L bamfile.list
 ```
 
@@ -265,6 +268,7 @@ basevar caller \
     -Q 20 -q 30 -B 500 \
     --filename-has-samplename \
     -L bamfile.list \
+    --smart-rerun \
     sample1.cram sample2.bam sample3.bam
 ```
 
@@ -277,6 +281,7 @@ basevar caller \
     -Q 20 -q 30 -B 500 -t 24 \
     --filename-has-samplename \
     --pop-group sample_group.info \
+    --smart-rerun \
     -L bamfile.list
 ```
 

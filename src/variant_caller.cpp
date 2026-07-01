@@ -32,10 +32,10 @@ const std::string BaseTypeRunner::usage() const {
         "                               represents the number of input BAM files min(" + std::to_string(_args->min_af) + ", 100/x). In most\n"
         "                               cases, users need not be overly concerned about this parameter, as it \n"
         "                               is generally handled automatically by the program.\n"
-        "  -Q, --min-BQ INT             Skip bases with base quality < INT [" + std::to_string(_args->min_baseq) + "]\n"
+        "  -Q, --min-BQ=INT             Skip bases with base quality < INT [" + std::to_string(_args->min_baseq) + "]\n"
         "  -q, --mapq=INT               Skip reads with mapping quality < INT [" + std::to_string(_args->min_mapq) + "]\n"
         "  -B, --batch-count=INT        INT simples per batchfile. [" + std::to_string(_args->batchcount) + "]\n" 
-        "  -t, --thread=INT             Number of threads. [" + std::to_string(_args->thread_num) + "]\n\n"
+        "  -t, --thread=INT             Number of threads. [auto]\n\n"
 
         "  --filename-has-samplename    If the prefix name of BAMfiles/CRAMfiles start with 'Sample ID', something like 'SampleID.bam', set this\n"
         "                               argrument could save a lot of time during get the sample id from BAMfiles.\n"
@@ -47,13 +47,14 @@ const std::string BaseTypeRunner::usage() const {
         "                               Typical empirical values: 0.45-0.48. [0.5]\n"
         "  --max-alleles=INT            Maximum number of active alleles allowed at a site.\n"
         "                               Sites exceeding this threshold will be skipped. [6]\n"
-        "  --smart-rerun                Rerun process by checking batchfiles.\n"
+        "  --smart-rerun                Skip completed batch files and resume an interrupted run.\n"
+        "                               Validates BBI index footer integrity to detect truncated files.\n"
         "  -h, --help                   Show this help message and exit.\n\n"
 
         "Example usage:\n"
-        "  [1]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 500 --filename-has-samplename -L bam.list\n"
-        "  [2]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 500 --filename-has-samplename -L bam.list sample1.bam sample2.bam\n"
-        "  [3]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 500 --filename-has-samplename -L bam.list -r chr1 sample1.bam sample2.bam\n"
+        "  [1]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 500 --filename-has-samplename --smart-rerun -L bam.list\n"
+        "  [2]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 500 --filename-has-samplename --smart-rerun -L bam.list sample1.bam sample2.bam\n"
+        "  [3]. basevar caller -f reference.fasta -o output.vcf.gz -Q 20 -q 30 -B 500 --filename-has-samplename --smart-rerun -L bam.list -r chr1 sample1.bam sample2.bam\n"
         ; 
         
     return BASETYPE_CALLER_USAGE;

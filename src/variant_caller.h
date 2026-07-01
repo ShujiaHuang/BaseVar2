@@ -69,7 +69,7 @@ private:
                         min_mapq(5), 
                         min_baseq(10), 
                         batchcount(500), 
-                        thread_num(std::thread::hardware_concurrency()), 
+                        thread_num(std::thread::hardware_concurrency()), // Auto detect the number of threads
                         smart_rerun(false), 
                         filename_has_samplename(false),
                         posterior_gt(true),
