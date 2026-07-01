@@ -20,6 +20,7 @@ build/
 CMakeFiles/
 src/version.h
 *.egg-info/
+__pycache__/
 
 handoff/*.md
 .cache/
@@ -35,4 +36,7 @@ tests/data/Homo_sapiens_assembly38.*
 tests/data/hg19.NC_012920.fasta
 tests/data/hg19.NC_012920.fasta.fai
 trash/
+tests/data/synthetic/.test_output.*/
 
+# Exceptions for synthetic test data
+!tests/data/synthetic/ref/*.fai
