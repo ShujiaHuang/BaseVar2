@@ -9,6 +9,7 @@
 #include "variant_caller.h"
 #include "io/batchfile_binary.h"
 #include "io/bgzf_concat.h"  // bgzf_raw_concat — BGZF block-level concatenation
+#include "io/tabix_utils.h"  // build_tabix_index — tabix index builder
 #include <cstdio>      // snprintf
 #include <stdexcept>
 #include <string>
@@ -489,11 +490,8 @@ int BaseTypeRunner::run() {
         merge_file_by_line(vcffiles, _args->output_vcf, header, /*is_remove_tempfile=*/true);
     }
 
-    const tbx_conf_t bf_tbx_conf = {1, 1, 2, 0, '#', 0};  // {preset, seq col, beg col, end col, header-char, skip-line}
-    if ((ngslib::suffix_name(_args->output_vcf) == ".gz") &&          // create index 
-        tbx_index_build(_args->output_vcf.c_str(), 0, &bf_tbx_conf))  // file suffix is ".tbi"
-        throw std::runtime_error("tbx_index_build failed: Is the file bgzip-compressed? "
-                                 "Check this file: " + _args->output_vcf + "\n");
+    // Build tabix index for output VCF
+    ngslib::build_tabix_index(_args->output_vcf);
 
     if (IS_DELETE_CACHE_BATCHFILE) {
         ngslib::safe_remove(cache_outdir);
