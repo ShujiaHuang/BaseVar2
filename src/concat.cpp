@@ -106,22 +106,20 @@ static void naive_concat_check_headers(const std::vector<std::string> &infiles) 
     ngslib::BGZFile ref(infiles[0], "r");
     std::vector<std::string> ref_header;
     std::vector<std::string> ref_samples;
-    {
-        std::string line;
-        while (ref.readline(line)) {
-            if (line[0] != '#') break;
-            ref_header.push_back(line);
-            // Extract sample names from #CHROM line
-            if (line.size() > 6 && line[1] == 'C' && line[2] == 'H' &&
-                line[3] == 'R' && line[4] == 'O' && line[5] == 'M') {
-                // Split by tab, samples start at column 9
-                size_t col = 0, start = 0;
-                for (size_t i = 0; i <= line.size(); ++i) {
-                    if (i == line.size() || line[i] == '\t') {
-                        if (col >= 9) ref_samples.push_back(line.substr(start, i - start));
-                        col++;
-                        start = i + 1;
-                    }
+    std::string line;
+    while (ref.readline(line)) {
+        if (line[0] != '#') break;
+        ref_header.push_back(line);
+        // Extract sample names from #CHROM line
+        if (line.size() > 6 && line[1] == 'C' && line[2] == 'H' &&
+            line[3] == 'R' && line[4] == 'O' && line[5] == 'M') {
+            // Split by tab, samples start at column 9
+            size_t col = 0, start = 0;
+            for (size_t i = 0; i <= line.size(); ++i) {
+                if (i == line.size() || line[i] == '\t') {
+                    if (col >= 9) ref_samples.push_back(line.substr(start, i - start));
+                    col++;
+                    start = i + 1;
                 }
             }
         }
@@ -315,17 +313,6 @@ int _concat_basevar_outfile(const std::vector<std::string> &infiles, const std::
 // ---------------------------------------------------------------------------
 //  CLI runner
 // ---------------------------------------------------------------------------
-static int concat_runner_impl(int argc, char *argv[]);
-
-int concat_runner(int argc, char *argv[]) {
-    try {
-        return concat_runner_impl(argc, argv);
-    } catch (const std::exception &e) {
-        std::cerr << e.what() << std::endl;
-        return 1;
-    }
-}
-
 static int concat_runner_impl(int argc, char *argv[]) {
     static const std::string CONCAT_USAGE = 
         "About: Concatenate or combine BaseVar's VCF files.\n"
@@ -407,4 +394,13 @@ static int concat_runner_impl(int argc, char *argv[]) {
     }
 
     return 0;
+}
+
+int concat_runner(int argc, char *argv[]) {
+    try {
+        return concat_runner_impl(argc, argv);
+    } catch (const std::exception &e) {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
 }
