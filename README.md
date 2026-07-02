@@ -192,7 +192,7 @@ Optional options:
   -Q, --min-BQ=INT             Minimum base quality [10]
   -q, --mapq=INT               Minimum mapping quality [5]
   -B, --batch-count=INT        Samples per batch file [500]
-  -t, --thread=INT             Number of threads [14]
+  -t, --thread=INT             Number of threads [auto]
 
   --filename-has-samplename    If BAM/CRAM filenames start with the sample ID
                                (e.g. SampleID.bam), set this flag to skip reading

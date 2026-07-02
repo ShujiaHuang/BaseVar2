@@ -26,6 +26,70 @@
 namespace ngslib {
 
 /**
+ * @brief Skip the VCF text header in a BGZF-compressed file.
+ *
+ * Reads BGZF blocks from @p in and optionally writes header lines to @p out.
+ * Stops when the first non-'#' byte is found.  Returns the byte offset within
+ * the current uncompressed block where data begins, or -1 on error.
+ *
+ * @param in            Source BGZFile, already opened; first block must be loaded.
+ * @param out           Destination BGZFile (may be used to write header).
+ * @param write_header  If true, write header lines to @p out.
+ * @return Offset past the header in the current block, or -1 on error.
+ */
+inline int skip_vcf_gz_header(BGZFile &in, BGZFile &out, bool write_header) {
+    const char *buffer = in.uncompressed_data();
+
+    if (buffer[0] != '#') {
+        std::cerr << "[bgzf_concat] Error: Could not parse VCF header, expected '#', found '"
+                  << buffer[0] << "'\n";
+        return -1;
+    }
+
+    int nskip = 1;
+    while (true) {
+        if (buffer[nskip] == '\n') {
+            nskip++;
+            if (nskip >= in.block_length()) {
+                // Need to read the next BGZF block
+                if (write_header) {
+                    if (out.write_raw(buffer, in.block_length()) != in.block_length()) {
+                        std::cerr << "[bgzf_concat] Error: failed to write header block\n";
+                        return -1;
+                    }
+                }
+                if (in.read_block() != 0) return -1;
+                if (!in.block_length()) break;
+                nskip = 0;
+            }
+            // Check if the next character starts a data line
+            if (buffer[nskip] != '#') {
+                if (write_header) {
+                    if (out.write_raw(buffer, nskip) != nskip) {
+                        std::cerr << "[bgzf_concat] Error: failed to write header tail\n";
+                        return -1;
+                    }
+                }
+                break;
+            }
+        }
+        nskip++;
+        if (nskip >= in.block_length()) {
+            if (write_header) {
+                if (out.write_raw(buffer, in.block_length()) != in.block_length()) {
+                    std::cerr << "[bgzf_concat] Error: failed to write header block\n";
+                    return -1;
+                }
+            }
+            if (in.read_block() != 0) return -1;
+            if (!in.block_length()) break;
+            nskip = 0;
+        }
+    }
+    return nskip;
+}
+
+/**
  * @brief Copy remaining raw BGZF blocks from an opened file to an output.
  *
  * Reads raw BGZF blocks from @p fin (from the current file position) and
@@ -114,6 +178,54 @@ inline void bgzf_raw_concat(const std::vector<std::string> &infiles, BGZFile &fo
 
         if (remove_inputs)
             safe_remove(infile);
+    }
+}
+
+/**
+ * @brief Naive concatenation of VCF files with header-aware block-level copy.
+ *
+ * Unlike bgzf_raw_concat(), this function handles VCF headers:
+ *   - First file: header is written to @p fout.
+ *   - Subsequent files: header is skipped (only data blocks are copied).
+ *
+ * All input files must have compatible headers (same samples, same order).
+ * Output is always BGZF-compressed.
+ *
+ * @param infiles        Vector of input BGZF-compressed VCF file paths.
+ * @param fout           Output BGZFile, already opened for writing.
+ * @param remove_inputs  If true, delete each input file after copying.
+ */
+inline void bgzf_naive_concat(const std::vector<std::string> &infiles, BGZFile &fout,
+                              bool remove_inputs = false)
+{
+    for (size_t i = 0; i < infiles.size(); ++i) {
+        BGZFile fin(infiles[i], "r");
+        if (!fin.is_open())
+            throw std::runtime_error("[bgzf_concat] Error: cannot open input file: " + infiles[i]);
+
+        // Read the first BGZF block (contains the header)
+        if (fin.read_block() != 0 || !fin.block_length())
+            throw std::runtime_error("[bgzf_concat] Error: failed to read first block of " + infiles[i]);
+
+        // Skip the VCF header region; write it only for the first file
+        int nskip = skip_vcf_gz_header(fin, fout, (i == 0));
+        if (nskip < 0)
+            throw std::runtime_error("[bgzf_concat] Error: failed to parse header of " + infiles[i]);
+
+        // Write any remaining data in the current uncompressed block (after header)
+        if (fin.block_length() - nskip > 0) {
+            if (fout.write_raw(fin.uncompressed_data() + nskip,
+                               fin.block_length() - nskip) < 0)
+                throw std::runtime_error("[bgzf_concat] Error: write failed for " + infiles[i]);
+        }
+        fout.flush();
+
+        // Stream the rest of the file as raw BGZF blocks
+        bgzf_copy_blocks_to(fin, fout, infiles[i]);
+        // fin is closed here by ~BGZFile (RAII)
+
+        if (remove_inputs)
+            safe_remove(infiles[i]);
     }
 }
 

@@ -38,8 +38,13 @@ static int usage() {
 
 // call variant
 int basetype(int argc, char *argv[]) {
-    BaseTypeRunner bt(argc, argv);
-    return bt.run();
+    try {
+        BaseTypeRunner bt(argc, argv);
+        return bt.run();
+    } catch (const std::exception &e) {
+        std::cerr << e.what() << std::endl;
+        return 1;
+    }
 }
 
 // Merge VCF/CVG files to a final big one

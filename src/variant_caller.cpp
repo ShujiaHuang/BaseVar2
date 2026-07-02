@@ -8,6 +8,7 @@
  */
 #include "variant_caller.h"
 #include "io/batchfile_binary.h"
+#include "io/bgzf_concat.h"  // bgzf_raw_concat — BGZF block-level concatenation
 #include <cstdio>      // snprintf
 #include <stdexcept>
 #include <string>
@@ -153,6 +154,26 @@ BaseTypeRunner::BaseTypeRunner(int cmd_argc, char *cmd_argv[]) {
         throw std::invalid_argument("[ERROR] Missing argument '-f/--reference'");
     if (_args->output_vcf.empty())
         throw std::invalid_argument("[ERROR] Missing argument '-o/--output-vcf'");
+
+    // Validate output file format: only .vcf.gz/.gz (BGZF) and .vcf (plain text) are supported
+    {
+        std::string suffix = ngslib::suffix_name(_args->output_vcf);
+        if (suffix == ".bcf") {
+            std::cerr << "[ERROR] BCF output format is not supported: " << _args->output_vcf
+                      << "\n  BaseVar caller only supports the following output formats:"
+                      << "\n    .vcf.gz / .gz   BGZF-compressed VCF (recommended)"
+                      << "\n    .vcf            Plain-text VCF"
+                      << "\n  To produce BCF, convert afterwards: bcftools view -Ob output.vcf.gz -o output.bcf"
+                      << std::endl;
+            exit(1);
+        }
+        if (suffix != ".gz" && suffix != ".vcf") {
+            std::cerr << "[ERROR] Unrecognised output file suffix '" << suffix << "': " << _args->output_vcf
+                      << "\n  Supported suffixes: .vcf.gz, .gz (BGZF-compressed), .vcf (plain text)."
+                      << std::endl;
+            exit(1);
+        }
+    }
     
     if (_args->min_af < 0)
         throw std::invalid_argument("[ERROR] '-m/--min-af' argument must be > 0");
@@ -458,9 +479,14 @@ int BaseTypeRunner::run() {
     if (vcffiles.size() == 1) {
         // Single region: rename temp file directly (avoid unnecessary read/write IO)
         std::rename(vcffiles[0].c_str(), _args->output_vcf.c_str());
+    } else if (ngslib::suffix_name(_args->output_vcf) == ".gz") {
+        // Multiple regions, BGZF output: block-level merge (no decompression/recompression)
+        // Region temp files have headers, so use header-aware bgzf_naive_concat.
+        ngslib::BGZFile bgzf_out(_args->output_vcf.c_str(), "w");
+        ngslib::bgzf_naive_concat(vcffiles, bgzf_out, /*remove_inputs=*/true);
     } else {
-        // Multiple regions: merge all subfiles (skip existing headers from temp files)
-        merge_file_by_line(vcffiles, _args->output_vcf, header, true);
+        // Multiple regions, plain-text output: line-by-line merge (must decompress)
+        merge_file_by_line(vcffiles, _args->output_vcf, header, /*is_remove_tempfile=*/true);
     }
 
     const tbx_conf_t bf_tbx_conf = {1, 1, 2, 0, '#', 0};  // {preset, seq col, beg col, end col, header-char, skip-line}
@@ -683,10 +709,11 @@ bool BaseTypeRunner::_fetch_base_in_region(const std::vector<std::string> &batch
     return is_empty;  // no cover reads in 'genome_region' if empty.
 }
 
-void BaseTypeRunner::_seek_position(const std::vector<ngslib::BamRecord> &sample_map_reads,
-                     const std::string &fa_seq,   // must be the whole chromosome sequence
-                     const ngslib::GenomeRegion gr,
-                     PosMap &sample_posinfo_map)
+void BaseTypeRunner::_seek_position(
+    const std::vector<ngslib::BamRecord> &sample_map_reads,
+    const std::string &fa_seq,   // must be the whole chromosome sequence
+    const ngslib::GenomeRegion gr,
+    PosMap &sample_posinfo_map)
 {
     if (!sample_posinfo_map.empty()){
         throw std::runtime_error("[basetype.cpp::__seek_position] 'sample_posinfo_map' must be empty.");
@@ -855,7 +882,7 @@ bool BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     std::vector<std::future<bool>> call_variants_processes;
     std::vector<std::string> subvcfs;
     for (uint32_t i(gr.start), j(1); i < gr.end + 1; i += STEP_LEN, ++j) {
-        std::string tmp_vcf_fn = out_vcf_fn + "." + std::to_string(j) + "_" + std::to_string(bn);
+        std::string tmp_vcf_fn = out_vcf_fn + ".part" + std::to_string(j) + ".vcf.gz";
         subvcfs.push_back(tmp_vcf_fn);
 
         uint32_t sub_gr_start = i; // 1-based
@@ -866,7 +893,7 @@ bool BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
         call_variants_processes.emplace_back(
             thread_pool.submit(std::bind(&BaseTypeRunner::_variant_calling_unit, this,
                                          std::cref(batchfiles), 
-                                         std::cref(_samples_id),  // 作为类变量，这个传参是多余的，之后再改吧，下同
+                                         std::cref(_samples_id),     // 作为类变量，这个传参是多余的，之后再改吧，下同
                                          std::cref(_groups_idx),
                                          std::cref(shared_indexes),  // shared indexes (const ref, no copy)
                                          gr_str,         // 局部变量必须拷贝，会变 
@@ -883,7 +910,15 @@ bool BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     }
     call_variants_processes.clear();  // release the thread
   
-    merge_file_by_line(subvcfs, out_vcf_fn, vcf_header, true);
+    // Block-level merge: write header then copy raw BGZF blocks from each temp file.
+    // Temp files are headerless VCF data streams (no '#'-lines to skip),
+    // so we can skip decompression/recompression entirely.
+    {
+        ngslib::BGZFile bgzf_out(out_vcf_fn.c_str(), "w");
+        bgzf_out << vcf_header << "\n";   // Write VCF header (BGZF-compressed)
+        bgzf_out.flush();                  // Ensure header block is flushed to disk
+        ngslib::bgzf_raw_concat(subvcfs, bgzf_out, true);  // Block-level copy + remove temp files
+    }
 
     return is_empty;
 }
@@ -915,14 +950,13 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
     // Parse region string (e.g., "chr1:1000-2000")
     std::string query_chrom;
     uint32_t query_start = 0, query_end = 0;
-    {
-        size_t colon_pos = region.find(':');
-        size_t dash_pos  = region.find('-');
-        query_chrom = region.substr(0, colon_pos);
-        query_start = std::stoul(region.substr(colon_pos + 1, dash_pos - colon_pos - 1));
-        query_end   = std::stoul(region.substr(dash_pos + 1));
-    }
+    size_t colon_pos = region.find(':');
+    size_t dash_pos  = region.find('-');
+    query_chrom = region.substr(0, colon_pos);
+    query_start = std::stoul(region.substr(colon_pos + 1, dash_pos - colon_pos - 1));
+    query_end   = std::stoul(region.substr(dash_pos + 1));
 
+    // 定义一个结构体作为操作数据的新类型，其他地方未使用
     // Open .bbf files and use shared indexes (loaded once in _variants_discovery)
     struct BinaryReader {
         std::unique_ptr<ngslib::BGZFile> bf;
@@ -958,7 +992,8 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
 
         // Binary search for query_start in shared index
         auto it = std::lower_bound(reader.index->begin(), reader.index->end(), query_start,
-            [](const BinaryIndexEntry &e, uint32_t pos) { return e.pos < pos; });
+            [](const BinaryIndexEntry &e, uint32_t pos) { return e.pos < pos; }
+        );
         reader.current_idx = (it != reader.index->end()) ? (it - reader.index->begin()) : reader.index->size();
 
         readers.push_back(std::move(reader));
@@ -1067,7 +1102,7 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
 
         if (!all_smps_bi.empty() && total_depth > 0) {
             bool cc = _basevar_caller_binary(all_smps_bi, ref_id, ref_pos, total_depth,
-                                              group_smp_idx, sample_ids.size(), VCF_OUT);
+                                             group_smp_idx, sample_ids.size(), VCF_OUT);
             if (cc) ++variant_count;
         }
 
@@ -1096,8 +1131,6 @@ bool BaseTypeRunner::_variant_calling_unit(const std::vector<std::string> &batch
     // Files will be automatically closed when destructors are called
     return variant_count > 0;
 }
-
-
 
 /**
  * @brief Binary batchfile variant caller. Same logic as _basevar_caller() but receives
