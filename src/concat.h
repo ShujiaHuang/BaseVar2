@@ -1,10 +1,14 @@
 /**
  * @file concat.h
- * @brief Concat the BaseVar VCF and CVG files.
- * 
+ * @brief Concatenate or combine BaseVar VCF files.
+ *
+ * Supports two modes:
+ *   - Default: line-by-line decompression/recompression.
+ *   - Naive (--naive): BGZF block-level raw concatenation (extremely fast).
+ *
  * @author Shujia Huang
  * @date 2018-09-14
- * 
+ *
  */
 
 #ifndef __INCLUDE_BASEVAR_CONCAT_H__

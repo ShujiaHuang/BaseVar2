@@ -82,9 +82,15 @@ BBF_BS_OBJ = $(BSSRC)/io/batchfile_binary.o $(BSSRC)/io/iobgzf.o \
 test_batchfile_binary: test_batchfile_binary.o $(BBF_BS_OBJ)
 	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)
 
+# BGZF block-level utilities unit test.
+# Header-only (iobgzf.h), only needs iobgzf.o for BGZFile class linkage.
+BGZF_BS_OBJ = $(BSSRC)/io/iobgzf.o $(BSSRC)/io/utils.o
+test_bgzf_utils: test_bgzf_utils.o $(BGZF_BS_OBJ)
+	$(CXX) $(FLAGS) -o $@ $^ $(LIBS)
+
 clean:
 	rm -f $(OBJ) test_fasta test_motif_counter test_motif_counter.tsv \
 	      test_fetal_fraction test_fetal_fraction.tsv test_fetal_fraction.bed \
-	      test_bayesian_caller test_batchfile_binary
+	      test_bayesian_caller test_batchfile_binary test_bgzf_utils
 
 
