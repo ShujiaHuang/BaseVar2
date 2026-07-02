@@ -189,7 +189,7 @@ Optional options:
 
   -m, --min-af=float           Prior MAF threshold; positions below this are skipped.
                                Default: min(0.001, 100/num_samples). Usually auto-set.
-  -Q, --min-BQ INT             Minimum base quality [10]
+  -Q, --min-BQ=INT             Minimum base quality [10]
   -q, --mapq=INT               Minimum mapping quality [5]
   -B, --batch-count=INT        Samples per batch file [500]
   -t, --thread=INT             Number of threads [14]
@@ -405,42 +405,57 @@ while IFS= read -r cmd; do
 done < basevar_wgs.sh
 ```
 
-After all sub-jobs finish, concatenate the per-region VCFs by using `basevar concat` or `bcftools concat `:
+After all sub-jobs finish, concatenate the per-region VCFs using `basevar concat --naive`:
 
 ```bash
 ls /path/to/outdir/*.vcf.gz | sort -V > vcf.list
-basevar concat -L vcf.list -o final_output.vcf.gz
+basevar concat -n -L vcf.list -o final_output.vcf.gz
 ```
-
 
 ---
 
 ## `basevar concat` — Concatenate VCF files
 
-Concatenate per-region VCF files produced by `basevar caller` into a single VCF. The files must be provided in the correct genomic order (the tool does not sort positions).
+Concatenate per-region VCF files into a single whole-genome VCF. The files must be provided in the correct genomic order (the tool does not sort positions).
+
+Two modes are available:
+
+| Mode | Flag | Description | Speed |
+|------|------|-------------|-------|
+| **Naive** (recommended) | `-n` / `--naive` | BGZF block-level raw concatenation without decompression/recompression | ~150× faster |
+| **Default** | *(none)* | Line-by-line decompression and recompression | Baseline |
+
+The naive mode is ideal when all input VCFs are produced by the same `basevar caller` run (same header, non-overlapping regions). It checks sample compatibility automatically. Use `--naive-force` to skip the header check when you are certain the files are compatible.
 
 ```bash
-Usage: basevar concat [options] <-o output.vcf.gz> [-L vcf.list] in1.vcf.gz [in2.vcf.gz ...]
+Usage: basevar concat [options] -o <output.vcf.gz> [-L vcf.list] in1.vcf.gz [in2.vcf.gz ...]
 
 Required:
-  -o, --output=FILE      Output VCF file.
+  -o, --output=FILE      Output VCF file. Format is determined by suffix:
+                         '.vcf.gz' for BGZF-compressed, '.vcf' for plain text.
+                         Note: --naive mode always produces BGZF-compressed output.
 
 Optional:
   -L, --file-list=FILE   List of input VCF files, one per line.
+  -n, --naive            Fast mode: BGZF block-level concat (no recompression, ~150× faster).
+      --naive-force      Same as --naive but skip header compatibility check.
 ```
 
 **Example:**
 
 ```bash
-# From a file list
-ls outdir/*.vcf.gz | sort -V > vcf.list
+# Naive mode (recommended, ~150× faster than default)
+basevar concat -n -L vcf.list -o merged.vcf.gz
+
+# Naive mode with inline files
+basevar concat -n chr1_1_2000000.vcf.gz chr1_2000001_4000000.vcf.gz -o chr1.vcf.gz
+
+# Skip header check (when files are known to be compatible)
+basevar concat --naive-force -L vcf.list -o merged.vcf.gz
+
+# Default mode (line-by-line, supports uncompressed .vcf output)
 basevar concat -L vcf.list -o merged.vcf.gz
-
-# From inline file arguments
-basevar concat chr1_1_2000000.vcf.gz chr1_2000001_4000000.vcf.gz -o chr1.vcf.gz
 ```
-
-> You may also use `bcftools concat --naive-force` as a drop-in alternative.
 
 ---
 
