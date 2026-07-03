@@ -310,22 +310,21 @@ std::string vcf_header_define(const std::string &ref_file_path, const std::vecto
     return ngslib::join(header, "\n");
 }
 
-std::string cvg_header_define(const std::vector<std::string> &group_info, const std::vector<std::string> &BASES) {
+// std::string cvg_header_define(const std::vector<std::string> &group_info, const std::vector<std::string> &BASES) {
 
-    std::string h = "#CHROM\tPOS\tREF\tDepth\t" + ngslib::join(BASES, "\t") + "\t" +
-                    "Indels\tFS\tSOR\tStrand_Coverage(REF_FWD,REF_REV,ALT_FWD,ALT_REV)";
-    // group cvg 的计算有 bug， 暂时不输出
-    // if (!group_info.empty())
-    //     h += "\t" + ngslib::join(group_info, "\t");
+//     std::string h = "#CHROM\tPOS\tREF\tDepth\t" + ngslib::join(BASES, "\t") + "\t" +
+//                     "Indels\tFS\tSOR\tStrand_Coverage(REF_FWD,REF_REV,ALT_FWD,ALT_REV)";
+//     // group cvg 的计算有 bug， 暂时不输出
+//     // if (!group_info.empty())
+//     //     h += "\t" + ngslib::join(group_info, "\t");
+//     std::vector<std::string> header = {
+//         "##fileformat=CVGv1.0",
+//         "##Group information is the depth of A:C:G:T:Indel", 
+//         h
+//     };
 
-    std::vector<std::string> header = {
-        "##fileformat=CVGv1.0",
-        "##Group information is the depth of A:C:G:T:Indel", 
-        h
-    };
-
-    return ngslib::join(header, "\n");
-}
+//     return ngslib::join(header, "\n");
+// }
 
 void merge_file_by_line(const std::vector<std::string> &infiles, const std::string &outfile, 
                         std::string header, bool is_remove_tempfile)
