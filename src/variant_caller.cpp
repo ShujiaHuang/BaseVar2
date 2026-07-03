@@ -485,6 +485,7 @@ int BaseTypeRunner::run() {
         // Region temp files have headers, so use header-aware bgzf_naive_concat.
         ngslib::BGZFile bgzf_out(_args->output_vcf.c_str(), "w");
         ngslib::bgzf_naive_concat(vcffiles, bgzf_out, /*remove_inputs=*/true);
+        bgzf_out.close();
     } else {
         // Multiple regions, plain-text output: line-by-line merge (must decompress)
         merge_file_by_line(vcffiles, _args->output_vcf, header, /*is_remove_tempfile=*/true);
@@ -911,12 +912,11 @@ bool BaseTypeRunner::_variants_discovery(const std::vector<std::string> &batchfi
     // Block-level merge: write header then copy raw BGZF blocks from each temp file.
     // Temp files are headerless VCF data streams (no '#'-lines to skip),
     // so we can skip decompression/recompression entirely.
-    {
-        ngslib::BGZFile bgzf_out(out_vcf_fn.c_str(), "w");
-        bgzf_out << vcf_header << "\n";   // Write VCF header (BGZF-compressed)
-        bgzf_out.flush();                  // Ensure header block is flushed to disk
-        ngslib::bgzf_raw_concat(subvcfs, bgzf_out, true);  // Block-level copy + remove temp files
-    }
+    ngslib::BGZFile bgzf_out(out_vcf_fn.c_str(), "w");
+    bgzf_out << vcf_header << "\n";   // Write VCF header (BGZF-compressed)
+    bgzf_out.flush();                  // Ensure header block is flushed to disk
+    ngslib::bgzf_raw_concat(subvcfs, bgzf_out, true);  // Block-level copy + remove temp files
+    bgzf_out.close();
 
     return is_empty;
 }
