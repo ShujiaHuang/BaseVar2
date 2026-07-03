@@ -185,10 +185,10 @@ static void naive_concat(const std::vector<std::string> &infiles,
  * Skips '#' header lines from all input files and writes the provided header.
  * Optionally removes input files after merging.
  */
-static void merge_file_by_line(const std::vector<std::string> &infiles, const std::string &outfile,
-                               std::string header, bool is_remove_tempfile)
+static int _merge_file_by_line(const std::vector<std::string> &infiles, const std::string &outfile,
+                                std::string header)
 {
-    if (infiles.empty()) return;
+    if (infiles.empty()) return 1;
 
     bool is_compress = (ngslib::suffix_name(outfile) == ".gz") ? true : false;
     ngslib::BGZFile OUT(outfile, is_compress ? "wb" : "uw");
@@ -203,15 +203,15 @@ static void merge_file_by_line(const std::vector<std::string> &infiles, const st
             OUT << line << "\n";
         }
         OUT.flush();
-
-        if (is_remove_tempfile) ngslib::safe_remove(fn);
     }
-
     OUT.close();
+
+    return 0;
 }
 
 int _concat_basevar_outfile(const std::vector<std::string> &infiles, const std::string outfile) {
     if (infiles.empty()) return 1;
+
     // Get header information from the first file would be enough.
     ngslib::BGZFile f(infiles[0], "r");
     std::vector<std::string> h;
@@ -221,9 +221,8 @@ int _concat_basevar_outfile(const std::vector<std::string> &infiles, const std::
         h.push_back(line);
     }
     f.close();
-    merge_file_by_line(infiles, outfile, ngslib::join(h, "\n"), false);
 
-    return 0;
+    return _merge_file_by_line(infiles, outfile, ngslib::join(h, "\n"));
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +232,7 @@ static int concat_runner_impl(int argc, char *argv[]) {
     static const std::string CONCAT_USAGE = 
         "About: Concatenate or combine BaseVar's VCF files.\n"
         "Usage: basevar concat [options] -o <output.vcf.gz> in1.vcf.gz [in2.vcf.gz ...]\n\n"
-        "CAUTION: This function does not sort the positions, user should take care the concat order by themself.\n\n"
+        "CAUTION: This function does not sort the positions, you should take care the concat order by yourself.\n\n"
         "  With --naive, files are concatenated at the BGZF block level without recompression,\n"
         "  which is extremely fast.  All input files must have the same header (same samples).\n\n"
          
@@ -242,7 +241,7 @@ static int concat_runner_impl(int argc, char *argv[]) {
         "                         suffix: '.vcf.gz' or '.gz' for BGZF-compressed VCF, '.vcf' for plain\n"
         "                         text VCF. Note: --naive mode always produces BGZF-compressed output.\n\n"
 
-        "Optional arguments:\n" 
+        "Optional arguments:\n"
         "  -L, --file-list=FILE   Input VCF files list, one file per row.\n"
         "  -n, --naive            Concatenate without recompression (BGZF block-level, very fast).\n"
         "      --naive-force      Same as --naive but skip header compatibility check.\n"
