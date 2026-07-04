@@ -16,7 +16,7 @@ Damage model
 ------------
 The probability of deamination at distance *d* from a fragment end is:
 
-    P(damage at d) = max_rate × (1 - decay) ^ d
+    P(damage at d) = max_rate x (1 - decay) ^ d
 
 This gives the characteristic U-shaped damage profile observed in
 real ancient DNA data (Briggs et al., 2007).
@@ -32,6 +32,7 @@ Can also be used standalone::
 
 import numpy as np
 import pysam
+import config as synthetic_config
 
 from config import (
     ANCIENT_DNA_FRAG_LENGTH_MEAN,
@@ -39,6 +40,9 @@ from config import (
     ANCIENT_DNA_DAMAGE_RATE,
     ANCIENT_DNA_DAMAGE_DECAY,
     ANCIENT_DNA_CONTAMINATION_RATE,
+    ANCIENT_DNA_STRICT_TAGS,
+    ANCIENT_DNA_Q_DECAY,
+    ANCIENT_DNA_SS_DNA,
 )
 
 
@@ -189,7 +193,7 @@ def _apply_pmd_damage(seq_array, frag_len, damage_rate, damage_decay, rng):
 
     The probability of damage at distance *d* from the nearest terminus is::
 
-        P(d) = damage_rate × (1 - damage_decay) ^ d
+        P(d) = damage_rate x (1 - damage_decay) ^ d
 
     Parameters
     ----------
@@ -206,16 +210,22 @@ def _apply_pmd_damage(seq_array, frag_len, damage_rate, damage_decay, rng):
     if frag_len == 0:
         return
 
+    # Apply damage symmetrically by default. The calling code must decide
+    # whether the read was aligned in reverse orientation and pass a flag
+    # (handled in the caller via applying substitutions appropriate for
+    # the read orientation). This helper performs substitutions on the
+    # provided seq_array in-place assuming substitutions are C->T.
+
     half = frag_len // 2
 
     for d in range(min(half, frag_len)):
         prob = damage_rate * ((1.0 - damage_decay) ** d)
         if rng.random() < prob:
-            # Left end: C → T
+            # Left end: substitution target at index d
             idx = d
             if seq_array[idx] == 'C':
                 seq_array[idx] = 'T'
-            # Right end: C → T (symmetric)
+            # Right end: symmetric position
             idx = frag_len - 1 - d
             if seq_array[idx] == 'C':
                 seq_array[idx] = 'T'
@@ -225,7 +235,89 @@ def _apply_pmd_damage(seq_array, frag_len, damage_rate, damage_decay, rng):
 # Main simulation
 # ---------------------------------------------------------------------------
 
-def simulate_ancient_dna(all_sample_reads, seed=42):
+def _revcomp(seq: str) -> str:
+    trans = str.maketrans('ACGTacgtNn', 'TGCAtgcaNn')
+    return seq.translate(trans)[::-1]
+
+
+def _compute_md_nm_and_set_tags(read, ref_seq_for_read):
+    """
+    Compute MD string and NM (edit distance) for an AlignedSegment and set tags.
+
+    Parameters
+    - read: pysam.AlignedSegment (must have reference_start/cigartuples/query_sequence)
+    - ref_seq_for_read: string of reference bases covering the alignment region
+    """
+    cigar = read.cigartuples or [(0, len(read.query_sequence))]
+    # Sequence as aligned to reference: if read.is_reverse, use reverse-complement
+    seq = read.query_sequence
+    is_rev = read.is_reverse
+    aligned_seq = _revcomp(seq) if is_rev else seq
+
+    ref_idx = 0
+    seq_idx = 0
+    md_parts = []
+    matches = 0
+    mismatches = 0
+    indel_bases = 0
+
+    for op, length in cigar:
+        if op in (0, 7, 8):  # M, =, X
+            for i in range(length):
+                ref_base = ref_seq_for_read[ref_idx].upper()
+                read_base = aligned_seq[seq_idx].upper()
+                if read_base == ref_base:
+                    matches += 1
+                else:
+                    if matches > 0:
+                        md_parts.append(str(matches))
+                        matches = 0
+                    md_parts.append(ref_base)
+                    mismatches += 1
+                ref_idx += 1
+                seq_idx += 1
+        elif op == 1:  # I
+            # Insertion w.r.t reference: consumes query only
+            seq_idx += length
+            indel_bases += length
+        elif op == 2:  # D
+            if matches > 0:
+                md_parts.append(str(matches))
+                matches = 0
+            deleted = ref_seq_for_read[ref_idx:ref_idx + length].upper()
+            md_parts.append('^' + deleted)
+            ref_idx += length
+            indel_bases += length
+        elif op == 3:  # N
+            # skipped region from the reference
+            ref_idx += length
+        elif op == 4:  # S
+            seq_idx += length
+        elif op == 5:  # H
+            # hard clip: nothing to advance in seq
+            continue
+        else:
+            # Unknown op: be conservative
+            for i in range(length):
+                ref_idx += 1
+                seq_idx += 1
+
+    if matches > 0:
+        md_parts.append(str(matches))
+
+    md_str = ''.join(md_parts) if md_parts else '0'
+    nm = mismatches + indel_bases
+    try:
+        read.set_tag('NM', int(nm), value_type='i')
+    except Exception:
+        pass
+    try:
+        read.set_tag('MD', md_str)
+    except Exception:
+        pass
+
+
+def simulate_ancient_dna(all_sample_reads, ref_seqs=None, seed=42):
     """
     Transform modern-style reads into ancient DNA-like reads.
 
@@ -255,6 +347,42 @@ def simulate_ancient_dna(all_sample_reads, seed=42):
     contam_rate = ANCIENT_DNA_CONTAMINATION_RATE
 
     ancient_reads = {}
+
+    # If a contaminant BAM is provided, preload a small reservoir of contaminant reads
+    contaminant_pool = None
+    try:
+        from config import ANCIENT_DNA_CONTAMINANT_BAM
+    except Exception:
+        ANCIENT_DNA_CONTAMINANT_BAM = None
+    if ANCIENT_DNA_CONTAMINANT_BAM:
+        try:
+            cbf = pysam.AlignmentFile(ANCIENT_DNA_CONTAMINANT_BAM, 'rb')
+            contaminant_pool = []
+            for i, r in enumerate(cbf.fetch(until_eof=True)):
+                if r.query_length is None:
+                    continue
+                contaminant_pool.append((r.reference_name, r))
+                if i >= 10000:
+                    break
+            cbf.close()
+        except Exception:
+            contaminant_pool = None
+
+    # If a microbial FASTA is provided, load sequences into a pool
+    microbe_pool = None
+    microbe_fasta = getattr(synthetic_config, 'ANCIENT_DNA_MICROBE_FASTA', None)
+    microbe_rate = getattr(synthetic_config, 'ANCIENT_DNA_MICROBE_RATE', 0.0)
+    if microbe_fasta:
+        try:
+            mfa = pysam.FastaFile(microbe_fasta)
+            microbe_pool = []
+            for name in mfa.references:
+                seq = mfa.fetch(name).upper()
+                if len(seq) > 0:
+                    microbe_pool.append((name, seq))
+            mfa.close()
+        except Exception:
+            microbe_pool = None
 
     for sample_id, reads in all_sample_reads.items():
         sample_ancient = []
@@ -312,16 +440,49 @@ def simulate_ancient_dna(all_sample_reads, seed=42):
             is_contaminated = rng.random() < contam_rate
 
             if not is_contaminated:
-                # Apply PMD damage
+                # Apply PMD damage: handle orientation-sensitive substitutions
                 seq_array = list(seq)
-                _apply_pmd_damage(
-                    seq_array, frag_len,
-                    damage_rate, damage_decay, rng
-                )
-                seq = "".join(seq_array)
+                if read.is_reverse:
+                    # On reverse-oriented reads, C->T damage on the reference
+                    # is observed as G->A on the read. Convert G->A instead.
+                    # Work on the reverse-complemented sequence so that
+                    # _apply_pmd_damage can operate on C->T positions.
+                    rc = _revcomp(seq)
+                    rc_array = list(rc)
+                    _apply_pmd_damage(rc_array, frag_len, damage_rate, damage_decay, rng)
+                    # Convert back to read orientation
+                    seq = _revcomp(''.join(rc_array))
+                else:
+                    _apply_pmd_damage(seq_array, frag_len, damage_rate, damage_decay, rng)
+                    seq = ''.join(seq_array)
+                # Optionally reduce base quality at damaged positions
+                # (simple model: subtract constant from damaged positions)
+                if ANCIENT_DNA_Q_DECAY > 0:
+                    # Naive approach: reduce all terminal bases by Q_DECAY
+                    for i in range(min(5, frag_len)):
+                        quals[i] = max(0, quals[i] - ANCIENT_DNA_Q_DECAY)
+                        quals[-1 - i] = max(0, quals[-1 - i] - ANCIENT_DNA_Q_DECAY)
                 n_damaged += 1
             else:
                 n_contaminated += 1
+                # If we have a contaminant pool, sample and use it
+                if contaminant_pool:
+                    chrom_c, r_c = rng.choice(contaminant_pool)
+                    new_read = pysam.AlignedSegment()
+                    new_read.query_name = r_c.query_name
+                    new_read.flag = r_c.flag
+                    new_read.reference_id = r_c.reference_id
+                    new_read.reference_start = r_c.reference_start
+                    new_read.mapping_quality = r_c.mapping_quality
+                    new_read.query_sequence = r_c.query_sequence
+                    new_read.query_qualities = list(r_c.query_qualities) if r_c.query_qualities is not None else None
+                    new_read.cigartuples = list(r_c.cigartuples) if r_c.cigartuples else None
+                    try:
+                        new_read.set_tag('CT', 1)
+                    except Exception:
+                        pass
+                    sample_ancient.append((chrom_c, new_read))
+                    continue
 
             # Build new AlignedSegment
             new_read = pysam.AlignedSegment()
@@ -331,9 +492,7 @@ def simulate_ancient_dna(all_sample_reads, seed=42):
             new_read.reference_start = read.reference_start + ref_offset
             new_read.mapping_quality = read.mapping_quality
             new_read.query_sequence = seq
-            new_read.query_qualities = np.array(
-                quals[:frag_len], dtype=np.uint8
-            )
+            new_read.query_qualities = quals[:frag_len]
 
             # Build CIGAR: hard-clip the removed bases (H removes
             # from both CIGAR and query sequence, matching our
@@ -352,6 +511,59 @@ def simulate_ancient_dna(all_sample_reads, seed=42):
                         pass
 
             sample_ancient.append((chrom, new_read))
+
+            # Recompute alignment tags if requested and reference is provided
+            if ANCIENT_DNA_STRICT_TAGS and ref_seqs is not None:
+                # Extract reference substring covering the alignment
+                ref_seq = ref_seqs.get(chrom)
+                if ref_seq is not None:
+                    ref_len_needed = _cigar_ref_bases(new_cigar)
+                    ref_start = new_read.reference_start
+                    ref_sub = ref_seq[ref_start:ref_start + ref_len_needed]
+                    _compute_md_nm_and_set_tags(new_read, ref_sub)
+
+        # Insert microbial background reads (sampled from provided FASTA)
+        if microbe_pool and ref_seqs is not None and microbe_rate > 0:
+            try:
+                n_microbe = int(round(len(sample_ancient) * microbe_rate))
+            except Exception:
+                n_microbe = 0
+            ref_chroms = list(ref_seqs.keys())
+            for mi in range(n_microbe):
+                mname, mseq = rng.choice(microbe_pool)
+                mlen = len(mseq)
+                frag_m = _sample_fragment_length(rng, frag_mean, frag_min)
+                if frag_m > mlen:
+                    continue
+                mstart = int(rng.integers(0, mlen - frag_m + 1))
+                subseq = mseq[mstart:mstart + frag_m]
+
+                host_chrom = rng.choice(ref_chroms)
+                host_len = len(ref_seqs[host_chrom])
+                if frag_m > host_len:
+                    continue
+                host_pos = int(rng.integers(0, host_len - frag_m + 1))
+
+                mread = pysam.AlignedSegment()
+                mread.query_name = f"{sample_id}_microbe_{mi}_{rng.integers(0,10**9)}"
+                mread.flag = 0
+                mread.reference_id = -1
+                mread.reference_start = host_pos
+                mread.mapping_quality = 0
+                mread.query_sequence = subseq
+                mread.query_qualities = [10] * frag_m
+                mread.cigartuples = [(0, frag_m)]
+                try:
+                    mread.set_tag('MB', 1)
+                except Exception:
+                    pass
+
+                # Compute strict tags if requested
+                if ANCIENT_DNA_STRICT_TAGS and ref_seqs is not None:
+                    ref_sub = ref_seqs[host_chrom][host_pos:host_pos + frag_m]
+                    _compute_md_nm_and_set_tags(mread, ref_sub)
+
+                sample_ancient.append((host_chrom, mread))
 
         ancient_reads[sample_id] = sample_ancient
         print(

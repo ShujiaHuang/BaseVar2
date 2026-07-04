@@ -12,6 +12,8 @@ from config import (
     CHROMOSOMES, SAMPLE_GROUPS, READ_LENGTH,
     get_target_coverage, get_sample_group, get_variant_af,
     BASEQ_MEAN, BASEQ_SD, BASEQ_CLIP, MAPQ_RANGE, FRAGMENT_WINDOW,
+    PAIRED_END_ENABLED, PAIRED_READ_LENGTH, PAIRED_INSERT_SIZE_MEAN,
+    PAIRED_INSERT_SIZE_SD,
 )
 from reference import apply_variants_to_ref
 
@@ -150,6 +152,25 @@ def _generate_base_qualities(read_length, rng):
     return quals
 
 
+def _revcomp_seq(seq):
+    """Reverse complement a DNA sequence."""
+    trans = str.maketrans('ACGTacgtNn', 'TGCAtgcaNn')
+    return seq.translate(trans)[::-1]
+
+
+def _reverse_cigar(cigar):
+    """Reverse a CIGAR list for reverse-strand reads."""
+    return list(reversed(cigar))
+
+
+def _reverse_read(seq, quals, cigar):
+    """Reverse-complement read sequence, reverse qualities and reverse CIGAR."""
+    seq_rc = _revcomp_seq(seq)
+    quals_rc = list(reversed(quals))
+    cigar_rc = _reverse_cigar(cigar)
+    return seq_rc, quals_rc, cigar_rc
+
+
 def _generate_read_sequence(ref_seq, chrom_len, start_0based, read_length, rng):
     """
     Extract a reference-matching read sequence from the reference.
@@ -267,7 +288,11 @@ def _inject_insertion(seq, ref_seq, read_start, variant_pos_0, inserted_bases, r
     return new_seq, cigar
 
 
-def generate_reads_for_sample(sample_id, ref_seqs, variant_map, sample_genotypes, seed=42):
+def generate_reads_for_sample(
+    sample_id, ref_seqs, variant_map, sample_genotypes, seed=42,
+    paired=None, paired_read_length=None,
+    insert_size_mean=None, insert_size_sd=None,
+):
     """
     Generate all reads for a single sample.
 
@@ -295,12 +320,28 @@ def generate_reads_for_sample(sample_id, ref_seqs, variant_map, sample_genotypes
     genotypes = sample_genotypes[sample_id]
     all_reads = []  # list of (chrom_name, read) tuples
 
+    if paired is None:
+        paired = PAIRED_END_ENABLED
+    if paired:
+        read_length = paired_read_length or PAIRED_READ_LENGTH
+        insert_size_mean = insert_size_mean or PAIRED_INSERT_SIZE_MEAN
+        insert_size_sd = insert_size_sd or PAIRED_INSERT_SIZE_SD
+    else:
+        read_length = READ_LENGTH
+
     for chrom, chrom_len in CHROMOSOMES.items():
         chrom_seq = ref_seqs[chrom]
-        n_reads = max(1, int(target_cov * chrom_len / READ_LENGTH))
+        if paired:
+            n_reads = max(1, int(target_cov * chrom_len / (2 * read_length)))
+        else:
+            n_reads = max(1, int(target_cov * chrom_len / READ_LENGTH))
 
         # Generate uniform start positions
-        max_start = max(0, chrom_len - READ_LENGTH)
+        if paired:
+            # Precompute a conservative maximum so both mates fit.
+            max_start = max(0, chrom_len - 2 * read_length)
+        else:
+            max_start = max(0, chrom_len - READ_LENGTH)
         if max_start == 0:
             starts = np.zeros(n_reads, dtype=int)
         else:
@@ -311,96 +352,136 @@ def generate_reads_for_sample(sample_id, ref_seqs, variant_map, sample_genotypes
         chrom_variants = variant_map.get(chrom, [])
 
         for start_pos in starts:
-            read = pysam.AlignedSegment()
-            read.query_name = f"{sample_id}_{chrom}_{start_pos}_{rng.integers(0, 10**9)}"
-            read.flag = 0
-            read.reference_id = -1  # Will be set by writer using header
-            read.reference_start = start_pos
-            read.mapping_quality = int(rng.integers(MAPQ_RANGE[0], MAPQ_RANGE[1]))
+            if paired:
+                template_len = max(2 * read_length, int(round(rng.normal(insert_size_mean, insert_size_sd))))
+                if template_len > chrom_len:
+                    continue
+                fragment_start = start_pos
+                mate_positions = [fragment_start, fragment_start + template_len - read_length]
+                query_name = f"{sample_id}_{chrom}_{fragment_start}_{rng.integers(0, 10**9)}"
+            else:
+                mate_positions = [start_pos]
+                query_name = f"{sample_id}_{chrom}_{start_pos}_{rng.integers(0, 10**9)}"
 
-            # Generate base qualities
-            quals = _generate_base_qualities(READ_LENGTH, rng)
+            fragment_reads = []
+            for mate_idx, read_start in enumerate(mate_positions, start=1):
+                read = pysam.AlignedSegment()
+                read.query_name = query_name
+                read.flag = 0
+                read.reference_id = -1
+                read.reference_start = read_start
+                read.mapping_quality = int(rng.integers(MAPQ_RANGE[0], MAPQ_RANGE[1]))
 
-            # Start with reference sequence
-            read_seq, actual_len = _generate_read_sequence(
-                chrom_seq, chrom_len, start_pos, READ_LENGTH, rng
-            )
-            if actual_len == 0:
-                continue
+                # Generate base qualities
+                quals = _generate_base_qualities(read_length, rng)
 
-            read_end = start_pos + actual_len
-            cigar = [(0, actual_len)]  # Default: all matches
-            has_indel = False
-
-            # Check each variant on this chromosome
-            for (vpos, vref, valt, vtype, vid) in chrom_variants:
-                gt = genotypes.get(vid, "0/0")
-
-                # Skip if read doesn't overlap variant
-                vref_len = len(vref)
-                if vtype == "SNP" or vtype == "multi-allelic":
-                    if not (start_pos <= vpos < read_end):
-                        continue
-                else:  # indel
-                    if not (start_pos <= vpos < read_end):
-                        continue
-
-                # Decide if this read carries the alt allele
-                carries_alt = _read_carries_alt(gt, rng, vtype)
-                if not carries_alt:
+                # Start with reference sequence
+                read_seq, actual_len = _generate_read_sequence(
+                    chrom_seq, chrom_len, read_start, read_length, rng
+                )
+                if actual_len == 0:
                     continue
 
-                # Apply variant to read
-                if vtype == "SNP":
-                    offset = vpos - start_pos
-                    alt_base = valt  # Single base
-                    read_seq = _inject_snp(read_seq, offset, alt_base)
+                read_end = read_start + actual_len
+                cigar = [(0, actual_len)]  # Default: all matches
+                has_indel = False
 
-                elif vtype == "multi-allelic":
-                    # Determine which alt allele this read carries
-                    alt_alleles = valt.split(",")
-                    alt_idx = _choose_alt_allele(gt, rng)
-                    if alt_idx is not None and alt_idx < len(alt_alleles):
-                        offset = vpos - start_pos
-                        alt_base = alt_alleles[alt_idx]
+                # Check each variant on this chromosome
+                for (vpos, vref, valt, vtype, vid) in chrom_variants:
+                    gt = genotypes.get(vid, "0/0")
+
+                    # Skip if read doesn't overlap variant
+                    if vtype == "SNP" or vtype == "multi-allelic":
+                        if not (read_start <= vpos < read_end):
+                            continue
+                    else:  # indel
+                        if not (read_start <= vpos < read_end):
+                            continue
+
+                    # Decide if this read carries the alt allele
+                    carries_alt = _read_carries_alt(gt, rng, vtype)
+                    if not carries_alt:
+                        continue
+
+                    # Apply variant to read
+                    if vtype == "SNP":
+                        offset = vpos - read_start
+                        alt_base = valt  # Single base
                         read_seq = _inject_snp(read_seq, offset, alt_base)
 
-                elif vtype == "del":
-                    del_len = len(vref) - len(valt)
-                    result = _inject_deletion(
-                        read_seq, chrom_seq, start_pos, vpos, del_len, READ_LENGTH
-                    )
-                    if result is not None:
-                        read_seq, cigar = result
-                        has_indel = True
-                        # Truncate quals to match new sequence length
-                        quals = quals[:len(read_seq)]
+                    elif vtype == "multi-allelic":
+                        alt_alleles = valt.split(",")
+                        alt_idx = _choose_alt_allele(gt, rng)
+                        if alt_idx is not None and alt_idx < len(alt_alleles):
+                            offset = vpos - read_start
+                            alt_base = alt_alleles[alt_idx]
+                            read_seq = _inject_snp(read_seq, offset, alt_base)
 
-                elif vtype == "ins":
-                    inserted = valt[len(vref):]  # Bases inserted after ref anchor
-                    result = _inject_insertion(
-                        read_seq, chrom_seq, start_pos, vpos, inserted, READ_LENGTH
-                    )
-                    if result is not None:
-                        read_seq, cigar = result
-                        has_indel = True
-                        # Extend quals for inserted bases
-                        extra_quals = _generate_base_qualities(len(inserted), rng)
-                        ins_offset = vpos - start_pos
-                        # CIGAR: anchor(M) + inserted(I) + after(M)
-                        # quals: anchor_qual + extra_quals + after_quals
-                        quals = np.concatenate([
-                            quals[:ins_offset + 1],
-                            extra_quals,
-                            quals[ins_offset + 1:]
-                        ])
+                    elif vtype == "del":
+                        del_len = len(vref) - len(valt)
+                        result = _inject_deletion(
+                            read_seq, chrom_seq, read_start, vpos, del_len, read_length
+                        )
+                        if result is not None:
+                            read_seq, cigar = result
+                            has_indel = True
+                            quals = quals[:len(read_seq)]
 
-            # Set read properties
-            read.query_sequence = read_seq
-            read.query_qualities = quals[:len(read_seq)]
-            read.cigartuples = cigar
+                    elif vtype == "ins":
+                        inserted = valt[len(vref):]
+                        result = _inject_insertion(
+                            read_seq, chrom_seq, read_start, vpos, inserted, read_length
+                        )
+                        if result is not None:
+                            read_seq, cigar = result
+                            has_indel = True
+                            extra_quals = _generate_base_qualities(len(inserted), rng)
+                            ins_offset = vpos - read_start
+                            quals = np.concatenate([
+                                quals[:ins_offset + 1],
+                                extra_quals,
+                                quals[ins_offset + 1:]
+                            ])
 
-            all_reads.append((chrom, read))
+                if read_seq == "" or len(read_seq) == 0:
+                    continue
+
+                if paired and mate_idx == 2:
+                    # second mate is reverse-oriented in standard paired-end data
+                    read_seq, quals, cigar = _reverse_read(read_seq, quals[:len(read_seq)], cigar)
+                    read.is_reverse = True
+                    read.is_read2 = True
+                    read.is_read1 = False
+                else:
+                    read.is_reverse = False
+                    read.is_read1 = True
+                    read.is_read2 = False
+
+                read.query_sequence = read_seq
+                read.query_qualities = quals[:len(read_seq)]
+                read.cigartuples = cigar
+                read.is_paired = paired
+                read.is_proper_pair = paired
+                read.mate_is_unmapped = False
+                read.next_reference_start = 0
+                fragment_reads.append((read_start, read_end, read))
+
+            if paired and len(fragment_reads) == 2:
+                r1_start, r1_end, r1 = fragment_reads[0]
+                r2_start, r2_end, r2 = fragment_reads[1]
+                r1.next_reference_start = r2.reference_start
+                r2.next_reference_start = r1.reference_start
+                r1.mate_is_reverse = r2.is_reverse
+                r2.mate_is_reverse = r1.is_reverse
+                left = min(r1.reference_start, r2.reference_start)
+                right = max(r1_end, r2_end)
+                tlen = right - left
+                r1.template_length = tlen if r1.reference_start == left else -tlen
+                r2.template_length = tlen if r2.reference_start == left else -tlen
+                all_reads.append((chrom, r1))
+                all_reads.append((chrom, r2))
+            elif not paired and fragment_reads:
+                all_reads.append((chrom, fragment_reads[0][2]))
 
     return all_reads
 

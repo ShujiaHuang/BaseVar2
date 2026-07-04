@@ -167,6 +167,10 @@ run_test "T03" "Multi-sample via -L + positional BAMs" \
     "$BASEVAR" caller -f "$REF" -o "$TMP_DIR/T03.vcf" \
     -L "$SAMPLES_LIST" --filename-has-samplename $ALL_BAMS
 
+# T08: Paired-end generation (writes paired BAMs)
+run_test "T08" "Paired-end generation -- paired-end BAMs" \
+    python3 "$SCRIPT_DIR/generate.py" --paired-end --skip-cram --output-dir "$TMP_DIR/paired" --seed 42
+
 # T04: CRAM input (single sample)
 FIRST_CRAM=$(ls "$CRAM_DIR"/*.cram | head -1)
 run_test "T04" "CRAM input (single sample)" \

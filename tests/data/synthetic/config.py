@@ -76,6 +76,12 @@ BASEQ_SD = 5             # Standard deviation for base quality
 BASEQ_CLIP = (10, 40)    # Clip base quality to this range
 FRAGMENT_WINDOW = 200    # Variant reads generated within +/- this many bp of variant
 
+# Paired-end simulation parameters
+PAIRED_END_ENABLED = False
+PAIRED_READ_LENGTH = 100
+PAIRED_INSERT_SIZE_MEAN = 300
+PAIRED_INSERT_SIZE_SD = 30
+
 # ---------------------------------------------------------------------------
 # Ancient DNA simulation parameters
 #
@@ -101,6 +107,19 @@ ANCIENT_DNA_DAMAGE_DECAY = 0.30     # Geometric decay probability per position
 
 # Modern DNA contamination
 ANCIENT_DNA_CONTAMINATION_RATE = 0.05  # Fraction of undamaged reads (0-1)
+
+# Advanced/operational parameters (strict-correctness / runtime options)
+# - GEOMETRIC convention: we use a geometric distribution with support {1,2,3,...}
+#   parameterised by p = 1/mean (i.e. mean = 1/p). Values below
+#   ANCIENT_DNA_FRAG_LENGTH_MIN are resampled.
+ANCIENT_DNA_STRICT_TAGS = True      # Recompute NM/MD tags after transformation
+ANCIENT_DNA_Q_DECAY = 5             # Reduce base quality by this at damaged sites (phred)
+ANCIENT_DNA_SS_DNA = False          # Simulate single-stranded library (only 5' damage)
+ANCIENT_DNA_CONTAMINANT_BAM = None  # Optional path to BAM/CRAM supplying contaminant reads
+ANCIENT_DNA_MICROBE_FASTA = None    # Optional FASTA of microbial genomes for background reads
+ANCIENT_DNA_STREAM_BATCH = 100000   # Number of reads to process per batch when streaming
+# Microbial background insertion
+ANCIENT_DNA_MICROBE_RATE = 0.001   # Fraction of ancient fragments to insert with microbial reads
 
 # ---------------------------------------------------------------------------
 # Derived helpers

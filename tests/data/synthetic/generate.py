@@ -25,7 +25,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config import (
     DEFAULT_SEED, VARIANTS, CHROMOSOMES, SAMPLE_GROUPS,
-    get_all_samples,
+    get_all_samples, PAIRED_END_ENABLED, PAIRED_READ_LENGTH,
+    PAIRED_INSERT_SIZE_MEAN, PAIRED_INSERT_SIZE_SD,
 )
 from reference import generate_reference, adapt_variants_to_ref, apply_variants_to_ref
 from reads_simulator import assign_all_genotypes, generate_reads_for_sample
@@ -55,6 +56,22 @@ def main():
     parser.add_argument(
         "--basevar", type=str, default=None,
         help="Path to basevar executable for automatic smoke test (e.g. ../../bin/basevar)"
+    )
+    parser.add_argument(
+        "--paired-end", action="store_true",
+        help="Generate paired-end reads instead of single-end"
+    )
+    parser.add_argument(
+        "--paired-read-length", type=int, default=None,
+        help="Read length for each paired-end mate (default: config value)"
+    )
+    parser.add_argument(
+        "--insert-size-mean", type=float, default=None,
+        help="Mean template length for paired-end fragments (bp)"
+    )
+    parser.add_argument(
+        "--insert-size-sd", type=float, default=None,
+        help="Standard deviation for template length in paired-end fragments"
     )
     parser.add_argument(
         "--evaluate", action="store_true",
@@ -143,7 +160,11 @@ def main():
     all_sample_reads = {}
     for sample_id in get_all_samples():
         reads = generate_reads_for_sample(
-            sample_id, ref_seqs, variant_map, sample_genotypes, seed=seed
+            sample_id, ref_seqs, variant_map, sample_genotypes, seed=seed,
+            paired=args.paired_end,
+            paired_read_length=args.paired_read_length,
+            insert_size_mean=args.insert_size_mean,
+            insert_size_sd=args.insert_size_sd,
         )
         all_sample_reads[sample_id] = reads
         print(f"    {sample_id}: {len(reads)} reads")
@@ -155,7 +176,8 @@ def main():
     if args.ancient_dna:
         print("[Step 4b] Applying ancient DNA simulation (fragmentation + PMD)...")
         from ancient_dna import simulate_ancient_dna
-        all_sample_reads = simulate_ancient_dna(all_sample_reads, seed=seed)
+        # Pass ref_seqs so the simulator can recompute NM/MD tags exactly
+        all_sample_reads = simulate_ancient_dna(all_sample_reads, ref_seqs, seed=seed)
         print()
 
     # ---------------------------------------------------------------

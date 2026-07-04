@@ -73,6 +73,8 @@ def write_bam(reads_with_chrom, sample_id, output_dir, chromosomes=CHROMOSOMES):
     with pysam.AlignmentFile(tmp_path, "wb", header=header) as outf:
         for chrom_name, read in reads_with_chrom:
             read.reference_id = chrom_to_tid[chrom_name]
+            if read.is_paired and not getattr(read, 'mate_is_unmapped', False):
+                read.next_reference_id = chrom_to_tid[chrom_name]
             read.set_tag("RG", sample_id)
             outf.write(read)
 
