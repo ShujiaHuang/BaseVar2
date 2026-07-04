@@ -3,7 +3,8 @@
  *
  * @brief Implementation of the `basevar pipeline` subcommand.
  *
- *  Functionally equivalent to scripts/create_pipeline.py.
+ *  Native C++ pipeline generator.  Splits the genome into sub-regions
+ *  and prints one `basevar caller` command per sub-region to stdout.
  *
  *  @author Shujia Huang
  *  @date   2026-05-19

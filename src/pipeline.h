@@ -4,8 +4,7 @@
  * @brief Pipeline generator for `basevar caller`.
  *
  *  Splits the genome into sub-regions and prints one `basevar caller`
- *  command per sub-region to stdout.  Replaces the older Python
- *  `scripts/create_pipeline.py` script with a native C++ subcommand.
+ *  command per sub-region to stdout.
  *
  *  This module reuses:
  *    - ngslib::GenomeRegion / ngslib::split / ngslib::is_readable (io/utils.h)
@@ -78,9 +77,7 @@ std::vector<ngslib::GenomeRegion> parse_regions(
 /**
  * @brief Build the per-sub-region `basevar caller` command string.
  *
- *  The returned string mirrors the format produced by
- *  scripts/create_pipeline.py so existing downstream scripts keep working:
- *
+ *  The returned command string follows the format:
  *   time <exe_prog> <passthrough_str> -r <reg> -o <outdir>/<prefix>.vcf.gz \
  *        > <outdir>/<prefix>.log && echo "** <prefix> done **"
  */

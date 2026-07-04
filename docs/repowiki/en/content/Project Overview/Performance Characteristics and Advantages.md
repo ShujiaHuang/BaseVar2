@@ -289,7 +289,7 @@ Below are recommended configurations derived from documented defaults and perfor
 - Pipeline-driven distribution:
   - Use the pipeline generator to split work by chromosome and delta, then run BaseVar per partition.
   - Example:
-    - python create_pipeline.py -f human_reference.fa --ref_fai human_reference.fa.fai -c chr1 --delta 5000000 -t 24 -L input_bamfile.list -o output_directory/ > run_chr1_basevar_shell.sh
+    - basevar pipeline -o output_directory/ --ref_fai human_reference.fa.fai -c chr1 -d 5000000 -f human_reference.fa -t 24 -L input_bamfile.list > run_chr1_basevar_shell.sh
 
 Notes:
 - Adjust -Q and -q to filter low-quality bases and reads according to data quality.

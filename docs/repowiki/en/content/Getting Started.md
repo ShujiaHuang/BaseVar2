@@ -8,7 +8,6 @@
 - [src/version.h.in](file://src/version.h.in)
 - [build/CMakeCache.txt](file://build/CMakeCache.txt)
 - [htslib/INSTALL](file://htslib/INSTALL)
-- [scripts/create_pipeline.py](file://scripts/create_pipeline.py)
 - [tests/data/sample_group.info](file://tests/data/sample_group.info)
 - [tests/io/make.sh](file://tests/io/make.sh)
 </cite>
@@ -406,7 +405,6 @@ basevar concat -L vcf.list -o final_output.vcf.gz
 
 **Section sources**
 - [README.md:326-391](file://README.md#L326-L391)
-- [scripts/create_pipeline.py:138-200](file://scripts/create_pipeline.py#L138-L200)
 
 ## System Requirements
 

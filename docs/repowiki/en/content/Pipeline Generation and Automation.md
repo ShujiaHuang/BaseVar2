@@ -11,7 +11,6 @@
 - [concat.cpp](file://src/concat.cpp)
 - [CMakeLists.txt](file://CMakeLists.txt)
 - [README.md](file://README.md)
-- [create_pipeline.py](file://scripts/create_pipeline.py)
 - [_example.sh](file://scripts/_example.sh)
 - [test_pipeline.cpp](file://tests/io/test_pipeline.cpp)
 </cite>
@@ -21,7 +20,6 @@
 - Complete removal of deprecated Python script reference (scripts/example.sh) - only _example.sh remains
 - Emphasis on zero-dependency C++ pipeline implementation as the primary execution method
 - Enhanced documentation of native C++ pipeline capabilities and performance benefits
-- Updated backward compatibility information for legacy Python script
 - Comprehensive testing framework documentation for pipeline functionality
 
 ## Table of Contents
@@ -52,7 +50,6 @@ BaseVar2 provides a C++ implementation of variant calling optimized for ultra-lo
 ## Project Structure
 The repository organizes automation around a robust native C++ pipeline generation system and a powerful C++ core:
 - src: native C++ pipeline implementation with comprehensive region parsing and validation
-- scripts: legacy Python pipeline script (deprecated) with backward compatibility examples
 - src: main executable and core variant-calling engine
 - top-level: build configuration and documentation
 
@@ -63,9 +60,6 @@ PIPE["src/pipeline.cpp<br/>Zero-dependency C++ Implementation"]
 PIPE_H["src/pipeline.h<br/>Header with Region Parsing"]
 MAIN["src/main.cpp<br/>Command Router"]
 end
-subgraph "Legacy Python Pipeline (Deprecated)"
-OLD["scripts/create_pipeline.py<br/>Legacy Python Script"]
-END
 subgraph "Core Executable"
 CORE["src/main.cpp"]
 VC_H["src/variant_caller.h"]
@@ -82,7 +76,6 @@ END
 PIPE --> CORE
 PIPE_H --> PIPE
 MAIN --> PIPE
-OLD --> PIPE
 CORE --> VC_CPP
 VC_CPP --> CAT_CPP
 CMAKE --> CORE
@@ -94,7 +87,6 @@ TESTS --> PIPE
 - [pipeline.cpp](file://src/pipeline.cpp)
 - [pipeline.h](file://src/pipeline.h)
 - [main.cpp](file://src/main.cpp)
-- [create_pipeline.py](file://scripts/create_pipeline.py)
 - [variant_caller.h](file://src/variant_caller.h)
 - [variant_caller.cpp](file://src/variant_caller.cpp)
 - [concat.h](file://src/concat.h)
@@ -811,13 +803,8 @@ basevar pipeline \
     -d 5000000
 ```
 
-### Legacy Python Pipeline Compatibility
-**Updated** The legacy Python pipeline script remains available for backward compatibility:
-- Full feature parity maintained with native C++ implementation
-- Same command-line interface and output format
-- Gradual migration path from Python to C++ implementation
-- Example usage preserved in documentation
+### Pipeline Script Examples
+Example pipeline configurations are provided in the example script:
 
 **Section sources**
-- [create_pipeline.py](file://scripts/create_pipeline.py)
 - [_example.sh](file://scripts/_example.sh)

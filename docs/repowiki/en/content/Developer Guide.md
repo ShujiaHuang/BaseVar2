@@ -12,7 +12,6 @@
 - [src/algorithm.h](file://src/algorithm.h)
 - [src/version.h.in](file://src/version.h.in)
 - [src/io/bam.h](file://src/io/bam.h)
-- [scripts/create_pipeline.py](file://scripts/create_pipeline.py)
 - [note.md](file://note.md)
 - [update_note.md](file://update_note.md)
 - [tests/io/test_bam.cpp](file://tests/io/test_bam.cpp)
@@ -73,7 +72,7 @@ B --> G["src/io/utils.h"]
 H["CMakeLists.txt"] --> A
 H --> I["src/version.h.in"]
 J[".github/workflows/build.yml"] --> H
-K["scripts/create_pipeline.py"] --> A
+K["src/pipeline.cpp"] --> A
 L[".gitmodules"] --> M["htslib/ (submodule)"]
 N["htslib/htslib/"] --> O["htslib headers"]
 N --> P["htslib sources"]
@@ -88,7 +87,7 @@ N --> P["htslib sources"]
 - [CMakeLists.txt:1-197](file://CMakeLists.txt#L1-L197)
 - [src/version.h.in:1-13](file://src/version.h.in#L1-L13)
 - [.github/workflows/build.yml:1-183](file://.github/workflows/build.yml#L1-L183)
-- [scripts/create_pipeline.py:1-247](file://scripts/create_pipeline.py#L1-L247)
+- [src/pipeline.cpp:1-479](file://src/pipeline.cpp#L1-L479)
 - [.gitmodules:1-4](file://.gitmodules#L1-L4)
 
 **Section sources**
@@ -305,12 +304,12 @@ class ngslib_Bam {
 **Section sources**
 - [src/io/bam.h:23-145](file://src/io/bam.h#L23-L145)
 
-### Pipeline Generation Script
+### Pipeline Generation
 - Generates distributed execution commands for BaseVar caller across genomic regions.
 
 ```mermaid
 flowchart TD
-Start(["create_pipeline.py"]) --> LoadFAI["Load reference .fai"]
+Start(["basevar pipeline"]) --> LoadFAI["Load reference .fai"]
 LoadFAI --> ParseRegions["Parse regions or single chromosome"]
 ParseRegions --> Split["Split into chunks by delta"]
 Split --> Emit["Emit shell commands for each chunk"]
@@ -318,10 +317,10 @@ Emit --> End(["Done"])
 ```
 
 **Diagram sources**
-- [scripts/create_pipeline.py:26-94](file://scripts/create_pipeline.py#L26-L94)
+- [pipeline.cpp](file://src/pipeline.cpp)
 
 **Section sources**
-- [scripts/create_pipeline.py:26-94](file://scripts/create_pipeline.py#L26-L94)
+- [pipeline.cpp](file://src/pipeline.cpp)
 
 ## Dependency Analysis
 - Build system: CMake enforces C++17, configures version header, builds htslib as a custom target, and links system libraries.

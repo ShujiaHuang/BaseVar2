@@ -201,8 +201,6 @@ The pipeline subcommand generates per-region `basevar caller` commands for whole
 - Targeted regions with custom window size
   - basevar pipeline -o /path/to/outdir --ref_fai reference.fasta.fai -d 1000000 -r chr11:5000000-7000000,chr17 -f reference.fasta -L bam.list -Q 20 -q 30 -B 500 -t 4 > basevar.targets.sh
 
-**Legacy Compatibility**: Full backward compatibility with `scripts/create_pipeline.py` output. Replace `basevar pipeline` with `basevar=./bin/basevar python scripts/create_pipeline.py` for legacy workflows.
-
 **Section sources**
 - [pipeline.h:1-125](file://src/pipeline.h#L1-L125)
 - [pipeline.cpp:218-251](file://src/pipeline.cpp#L218-L251)
@@ -550,7 +548,7 @@ F --> G["ngslib::Fasta<br/>Reference genome access"]
 - Smart rerun: Use --smart-rerun to reuse existing batchfiles and indexes, reducing repeated IO.
 - Regions: Limit analysis to targeted regions to reduce runtime and memory.
 - Output compression: Prefer .gz output for large files to reduce disk IO overhead.
-- Pipeline Performance: The native C++ implementation provides superior performance compared to the legacy Python script while maintaining full backward compatibility. Use `basevar pipeline` for optimal performance in whole-genome workflows.
+- Pipeline Performance: The native C++ `basevar pipeline` subcommand provides zero-dependency execution with optimal performance in whole-genome workflows.
 - Delta sizing: Choose appropriate sub-region size (-d/--delta) based on computational resources and desired parallelization level.
 - Memory estimation: Pipeline memory usage scales with number of sub-jobs and per-job memory requirements.
 - Motif Performance: File-level parallelism with one worker thread per input file; memory usage scales with number of files and motif complexity (4^k).
@@ -568,7 +566,6 @@ Common issues and resolutions:
 - Sample not found: subsam reports missing samples in the header; confirm names match exactly.
 - No variants in region: Caller warns when no variants are discovered in a given interval; adjust quality thresholds or regions.
 - Pipeline errors: Verify .fai file readability and chromosome names match reference; check output directory permissions; ensure pass-through options are valid for basevar caller.
-- Legacy compatibility: Use `scripts/create_pipeline.py` for exact byte-perfect compatibility with legacy workflows; `basevar pipeline` provides enhanced performance with identical output format.
 - Motif errors: Verify BAM/CRAM files are indexed; ensure reference FASTA has .fai index when using --from-reference; check that read lengths are sufficient for chosen motif length k.
 - Memory issues: Reduce -t for motif command or use fewer input files; consider --no-include-zero to reduce output size.
 - Fetalfrac errors: Verify BAM/CRAM files are indexed; ensure reference FASTA has .fai index when using CRAM; check that chrY and autosomal regions are present; validate BED files for PAR exclusion and mappability filtering.

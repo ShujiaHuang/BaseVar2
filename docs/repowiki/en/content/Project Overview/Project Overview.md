@@ -8,7 +8,6 @@
 - [src/variant_caller.h](file://src/variant_caller.h)
 - [src/basetype.h](file://src/basetype.h)
 - [src/algorithm.h](file://src/algorithm.h)
-- [scripts/create_pipeline.py](file://scripts/create_pipeline.py)
 - [update_note.md](file://update_note.md)
 - [.github/workflows/build.yml](file://.github/workflows/build.yml)
 - [tests/data/sample_group.info](file://tests/data/sample_group.info)
@@ -76,7 +75,7 @@ B --> D["Statistical Algorithms<br/>src/algorithm.h"]
 B --> E["I/O Adapters<br/>src/io/*"]
 B --> F["Population Grouping<br/>tests/data/sample_group.info"]
 A --> G["Concat/Subset Tools<br/>src/concat.h, src/vcf_subset_samples.h"]
-A --> H["Pipeline Generator<br/>scripts/create_pipeline.py"]
+A --> H["Pipeline Generator<br/>src/pipeline.cpp"]
 B --> I["HTSlib Integration<br/>htslib/*"]
 J[".github/workflows/build.yml"] --> K["Enhanced Build & Test Automation"]
 L["CMakeLists.txt<br/>Version 2.2.3"] --> M["Simplified Build System"]
@@ -90,7 +89,6 @@ R["Legacy SVG<br/>docs/assets/images/old_basevar_logo.svg"] --> S["Backward Comp
 - [src/variant_caller.h:1-180](file://src/variant_caller.h#L1-L180)
 - [src/basetype.h:1-146](file://src/basetype.h#L1-L146)
 - [src/algorithm.h:1-180](file://src/algorithm.h#L1-L180)
-- [scripts/create_pipeline.py:1-103](file://scripts/create_pipeline.py#L1-L103)
 - [.github/workflows/build.yml:1-183](file://.github/workflows/build.yml#L1-L183)
 - [CMakeLists.txt:1-197](file://CMakeLists.txt#L1-L197)
 - [docs/assets/images/basevar_logo.svg:1-100](file://docs/assets/images/basevar_logo.svg#L1-L100)
@@ -100,7 +98,6 @@ R["Legacy SVG<br/>docs/assets/images/old_basevar_logo.svg"] --> S["Backward Comp
 **Section sources**
 - [README.md:1-488](file://README.md#L1-L488)
 - [src/main.cpp:1-105](file://src/main.cpp#L1-L105)
-- [scripts/create_pipeline.py:1-103](file://scripts/create_pipeline.py#L1-L103)
 - [.github/workflows/build.yml:1-183](file://.github/workflows/build.yml#L1-L183)
 - [CMakeLists.txt:1-197](file://CMakeLists.txt#L1-L197)
 - [docs/assets/images/basevar_logo.svg:1-100](file://docs/assets/images/basevar_logo.svg#L1-L100)
@@ -143,7 +140,6 @@ Practical examples (usage patterns):
 - [src/version.h:1-13](file://src/version.h#L1-L13)
 - [src/variant_caller.h:41-174](file://src/variant_caller.h#L41-L174)
 - [src/algorithm.h:90-178](file://src/algorithm.h#L90-L178)
-- [scripts/create_pipeline.py:26-94](file://scripts/create_pipeline.py#L26-L94)
 - [tests/data/sample_group.info:1-44](file://tests/data/sample_group.info#L1-L44)
 - [docs/assets/images/basevar_logo.svg:1-100](file://docs/assets/images/basevar_logo.svg#L1-L100)
 
@@ -168,7 +164,7 @@ participant ENG as "Caller Engine (variant_caller.h)"
 participant MOD as "Model (basetype.h)"
 participant ALG as "Algorithms (algorithm.h)"
 participant IO as "I/O (FASTA/BAM/VCF)"
-participant PIPE as "Pipeline (create_pipeline.py)"
+participant PIPE as "Pipeline (basevar pipeline)"
 participant BRAND as "Visual Branding (300px Logo)"
 U->>CLI : "basevar caller ..."
 CLI->>ENG : "Parse args, init"
@@ -190,7 +186,6 @@ U->>BRAND : "Display enhanced branded output"
 - [src/variant_caller.h:120-137](file://src/variant_caller.h#L120-L137)
 - [src/basetype.h:95-143](file://src/basetype.h#L95-L143)
 - [src/algorithm.h:150-178](file://src/algorithm.h#L150-L178)
-- [scripts/create_pipeline.py:75-94](file://scripts/create_pipeline.py#L75-L94)
 - [docs/assets/images/basevar_logo.svg:1-100](file://docs/assets/images/basevar_logo.svg#L1-L100)
 
 ## Detailed Component Analysis
@@ -289,23 +284,23 @@ H --> I["Write VCF Record"]
 ```mermaid
 sequenceDiagram
 participant User as "User"
-participant Script as "create_pipeline.py"
+participant Pipe as "basevar pipeline"
 participant FS as "Filesystem"
 participant Exec as "basevar caller"
-User->>Script : "Provide ref.fai, delta, chrom, threads"
-Script->>FS : "Read ref.fai"
+User->>Pipe : "Provide ref.fai, delta, chrom, threads"
+Pipe->>FS : "Read ref.fai"
 loop For each chromosome and window
-Script->>Exec : "Generate caller command with -r region"
+Pipe->>Exec : "Generate caller command with -r region"
 Exec-->>FS : "Output VCF per window"
 end
-Script-->>User : "Shell script to execute"
+Pipe-->>User : "Shell script to execute"
 ```
 
 **Diagram sources**
-- [scripts/create_pipeline.py:26-94](file://scripts/create_pipeline.py#L26-L94)
+- [pipeline.cpp](file://src/pipeline.cpp)
 
 **Section sources**
-- [scripts/create_pipeline.py:26-94](file://scripts/create_pipeline.py#L26-L94)
+- [pipeline.cpp](file://src/pipeline.cpp)
 
 ### Enhanced Visual Identity System
 **Updated** The project now features a comprehensive visual branding system designed for modern bioinformatics applications with enhanced presentation:
@@ -367,7 +362,7 @@ CLI["CLI (main.cpp)"] --> CALLER["Caller (variant_caller.h)"]
 CALLER --> MODEL["Model (basetype.h)"]
 CALLER --> ALG["Algorithms (algorithm.h)"]
 CALLER --> IO["I/O (io/*)"]
-CALLER --> PIPE["Pipeline (create_pipeline.py)"]
+CALLER --> PIPE["Pipeline (basevar pipeline)"]
 CALLER --> HTS["HTSlib"]
 ALG --> HTS
 ASSETS["Visual Assets<br/>SVG/PNG/OLD_LOGOS"] --> BRANDING["Enhanced Brand Presentation (300px)"]

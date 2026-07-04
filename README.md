@@ -328,7 +328,7 @@ basevar caller \
 
 For whole-genome variant calling, the `pipeline` subcommand splits the genome into sub-regions and prints one `basevar caller` command per sub-region to stdout. The resulting shell script can be executed sequentially, in parallel with GNU `parallel`, or submitted to a job scheduler (SGE / SLURM / PBS).
 
-> Since **v2.2.0**, this functionality is built directly into the `basevar` binary as a native C++ subcommand. The older `scripts/create_pipeline.py` Python script is still shipped for backward compatibility and produces identical output.
+> Since **v2.2.0**, this functionality is built directly into the `basevar` binary as a native C++ subcommand.
 
 ### Pipeline-specific options
 
