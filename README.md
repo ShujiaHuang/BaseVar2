@@ -140,6 +140,11 @@ basevar caller \
     -f reference.fasta \
     -o output.vcf.gz \
     -L bamfile.list
+  
+basevar caller \
+    -f reference.fasta \
+    -o output.vcf.gz \
+    -L cramfile.list
 ```
 
 **Recommended call with quality filters, smart-rerun option and sample name optimization:**
@@ -175,11 +180,12 @@ basevar caller \
     -o multi_region.vcf.gz \
     -Q 20 -q 30 -B 500 -t 24 \
     --regions chr11:5246595-5248428,chr17:41197764-41276135 \
+    --filename-has-samplename \
     --smart-rerun \
     -L bamfile.list
 ```
 
-**Include BAM files directly on the command line:**
+**Include BAM/CRAM files directly on the command line:**
 
 ```bash
 basevar caller \
@@ -189,7 +195,7 @@ basevar caller \
     --filename-has-samplename \
     -L bamfile.list \
     --smart-rerun \
-    sample1.cram sample2.bam sample3.bam
+    sample1.cram sample2.cram sample3.cram
 ```
 
 **Per-population allele frequency calculation:**
@@ -200,18 +206,18 @@ basevar caller \
     -o output.vcf.gz \
     -Q 20 -q 30 -B 500 -t 24 \
     --filename-has-samplename \
-    --pop-group sample_group.info \
+    --pop-group sample_group.txt \
     --smart-rerun \
     -L bamfile.list
 ```
 
-See the [example `sample_group.info` file](https://github.com/ShujiaHuang/BaseVar2/blob/main/tests/data/sample_group.info) for the expected format.
+See the [example `sample_group.txt` file](https://github.com/ShujiaHuang/BaseVar2/blob/main/tests/data/sample_group.info) for the expected format (column 1: `sample ID`, column 2: `Group name`).
 
-### Bayesian genotype calling (v2.5.0+)
+### Bayesian genotype calling
 
 Since v2.5.0, `basevar caller` uses a **two-pass Bayesian architecture** for genotype calling:
 
-1. **First pass** (unchanged): collect per-sample PL and hard-count AC_obs/AN_obs (backward compatible).
+1. **First pass** : collect per-sample PL and hard-count AC_obs/AN_obs (backward compatible).
 2. **Second pass**: use the LRT-estimated population AF as a Hardy-Weinberg prior to compute per-sample genotype posteriors. GT is called as `argmax(posterior)`, GQ is `−10 log₁₀(1 − P(best GT))`.
 
 This is the **default** behavior. To revert to the previous pure-likelihood mode:
@@ -229,6 +235,9 @@ basevar caller --gt-mode legacy -f ref.fa -o out.vcf.gz -L bamfile.list
 | GT-based | `AC_GT`, `AN_GT`, `AF_GT` | Discrete counts directly from the VCF GT column (with population prior). |
 
 **Backward compatibility**: all existing fields (INFO/AC, INFO/AF, FORMAT/PL, FORMAT/AD, FORMAT/DP) retain their original values. The additional observed and GT-based fields are additive. Use `--gt-mode legacy` to produce output identical to pre-v2.5.0.
+
+> [!IMPORTANT]
+> In general, `AF` should differ only slightly from `AF_obs` for NIPT large-scale cohorts.
 
 **Resume an interrupted run:**
 
