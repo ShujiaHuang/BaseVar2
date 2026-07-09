@@ -22,11 +22,9 @@ The new implemention is **over 100× faster** than the [original Python implemen
 
 ---
 
-## Installation
+## Installation and quick start
 
-### Option 1 — Download pre-built binary (Recommended, no compilation needed)
-
-Pre-built static binaries are available on the [GitHub Releases page](https://github.com/ShujiaHuang/BaseVar2/releases).
+Pre-built static binaries are available on the [GitHub Releases page](https://github.com/ShujiaHuang/BaseVar2/releases) — **most users should simply download the binary and run**.
 
 | Platform | Download | Notes |
 | -------- | -------- | ----- |
@@ -50,7 +48,7 @@ A typical incompatibility error looks like:
 ./basevar-linux-static: /lib64/libc.so.6: version `GLIBC_2.35' not found (required by ./basevar-linux-static)
 ```
 
-If you see this — or you are on CentOS / RHEL / Rocky / AlmaLinux / older Ubuntu / older Debian — please use [Option 2: compile from source](#option-2--compile-from-source). The build is straightforward and takes only a few minutes.
+If you see this — or you are on CentOS / RHEL / Rocky / AlmaLinux / older Ubuntu / older Debian — you can compile from source instead (see below).
 
 ```bash
 # Linux
@@ -71,86 +69,8 @@ mv basevar-macos-static basevar
 > [!IMPORTANT]
 > **Rename the downloaded binary** to `basevar` for convenience. You may also move it to a directory in your `$PATH` (e.g. `/usr/local/bin`) for system-wide access.
 
----
-
-### Option 2 — Compile from source
-
-*Requires: C++17 compiler (GCC 7+ or Apple Clang 10+), CMake ≥ 3.12, and system libraries: zlib, bzip2, xz-utils, libcurl.*
-
-#### Step 1 — Clone the repository (including htslib submodule)
-
-```bash
-git clone --recursive https://github.com/ShujiaHuang/basevar2.git
-cd basevar2
-```
-
-> If you forgot `--recursive`, run: `git submodule update --init --recursive`
-
-#### Step 2 — Build with CMake (standard dynamic build)
-
-```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build
-```
-
-The executable `bin/basevar` will be produced. Verify with:
-
-```bash
-./bin/basevar --help
-```
-
-#### Step 3 (Optional) — Build a static binary locally
-
-**macOS** (requires Homebrew):
-
-```bash
-brew install zlib bzip2 xz
-cmake -B build-static -DSTATIC_BUILD=ON -DCMAKE_BUILD_TYPE=Release
-cmake --build build-static
-```
-
-**Linux** (portable static via Ubuntu/glibc — same approach used in CI):
-
-```bash
-sudo apt-get install -y build-essential cmake autoconf automake \
-    zlib1g-dev libbz2-dev liblzma-dev libssl-dev
-cmake -B build-static -DSTATIC_BUILD=ON -DCMAKE_BUILD_TYPE=Release
-cmake --build build-static
-```
-
-This bundles `libstdc++`, `libgcc`, `htslib`, and the compression libs statically; glibc remains dynamic. The resulting binary runs on the build host and on any other host with the same-or-newer glibc.
-
----
-
-### Option 3 — Manual g++ compilation (fallback)
-
-First, build htslib:
-
-```bash
-cd htslib && autoreconf -i && ./configure && make && cd ..
-```
-
-Then compile manually:
-
-**Linux:**
-
-```bash
-cd bin/
-g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a \
-    -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -lssl -lcrypto -o basevar
-```
-
-**macOS:**
-
-```bash
-cd bin/
-g++ -O3 -fPIC ../src/*.cpp ../src/io/*.cpp ../htslib/libhts.a \
-    -I ../htslib -lz -lbz2 -lm -llzma -lpthread -lcurl -o basevar
-```
-
-> **Note:** If you encounter a `test/test_khash.c` compilation error during `make` in htslib, you can safely ignore it — the required `libhts.a` archive is still produced correctly.
-
----
+> [!TIP]
+> **If the pre-built binary does not work on your system** (e.g. glibc < 2.35 on older Linux), you can compile from source instead. Detailed build instructions (CMake build, static build, and manual g++ fallback) are available in **[docs/INSTALL_FROM_SOURCE.md](docs/INSTALL_FROM_SOURCE.md)**.
 
 ## Commands overview
 
