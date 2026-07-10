@@ -21,6 +21,7 @@ configure_file(
 
 # Build options
 option(STATIC_BUILD "Build statically linked executable" OFF)
+option(USE_SYSTEM_HTSLIB "Use system-installed htslib instead of building from bundled submodule" OFF)
 
 # Set compiler flags
 # -O3: optimization level 3
@@ -74,42 +75,52 @@ if(STATIC_BUILD)
     endif()
 endif()
 
-# Ensure htslib is built before the main executable.
-# For static builds on Linux:
-#   * --disable-libcurl  : we only read local files, no remote URLs.
-#   * --without-libdeflate: htslib's ./configure auto-detects libdeflate
-#                          when it is present on the build host (e.g.
-#                          GitHub-hosted ubuntu-22.04 runners have it
-#                          preinstalled), and then emits libhts.a with
-#                          libdeflate_* references.  Since we do not
-#                          link -ldeflate (and want to keep the binary
-#                          dependency-light), we explicitly disable it.
-#                          htslib falls back to zlib transparently with
-#                          no functional loss.
-if(STATIC_BUILD AND NOT APPLE)
-    set(HTSLIB_CONFIGURE_FLAGS --disable-libcurl --without-libdeflate)
+if(USE_SYSTEM_HTSLIB)
+    # ---- Use system-installed htslib (e.g., from conda / package manager) ----
+    find_library(HTSLIB hts REQUIRED)
+    find_path(HTSLIB_INCLUDE_DIR "htslib/hts.h" REQUIRED)
+    include_directories(${HTSLIB_INCLUDE_DIR})
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+    message(STATUS "Using system htslib: ${HTSLIB}")
 else()
-    set(HTSLIB_CONFIGURE_FLAGS "")
+    # ---- Build htslib from bundled submodule ----
+    # Ensure htslib is built before the main executable.
+    # For static builds on Linux:
+    #   * --disable-libcurl  : we only read local files, no remote URLs.
+    #   * --without-libdeflate: htslib's ./configure auto-detects libdeflate
+    #                          when it is present on the build host (e.g.
+    #                          GitHub-hosted ubuntu-22.04 runners have it
+    #                          preinstalled), and then emits libhts.a with
+    #                          libdeflate_* references.  Since we do not
+    #                          link -ldeflate (and want to keep the binary
+    #                          dependency-light), we explicitly disable it.
+    #                          htslib falls back to zlib transparently with
+    #                          no functional loss.
+    if(STATIC_BUILD AND NOT APPLE)
+        set(HTSLIB_CONFIGURE_FLAGS --disable-libcurl --without-libdeflate)
+    else()
+        set(HTSLIB_CONFIGURE_FLAGS "")
+    endif()
+
+    add_custom_target(
+        Buildhts ALL
+        COMMAND autoreconf -i && ./configure ${HTSLIB_CONFIGURE_FLAGS} && make
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/htslib
+    )
+
+    # Include directories
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/htslib)  # include the header of htslib
+    include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+    # Define common system libraries
+    set(COMMON_SYS_LIB pthread z bz2 m lzma curl)
+    if(NOT APPLE)
+        list(APPEND COMMON_SYS_LIB ssl crypto)
+    endif()
+
+    # Define htslib library
+    set(HTSLIB ${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a)
 endif()
-
-add_custom_target(
-    Buildhts ALL
-    COMMAND autoreconf -i && ./configure ${HTSLIB_CONFIGURE_FLAGS} && make
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/htslib
-)
-
-# Include directories
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/htslib)  # include the header of htslib
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src) 
-
-# Define common system libraries
-set(COMMON_SYS_LIB pthread z bz2 m lzma curl)
-if(NOT APPLE)
-    list(APPEND COMMON_SYS_LIB ssl crypto)
-endif()
-
-# Define htslib library
-set(HTSLIB ${CMAKE_CURRENT_SOURCE_DIR}/htslib/libhts.a)
 
 # Find all source codes
 file(GLOB SRC_LIST 
@@ -120,7 +131,12 @@ file(GLOB SRC_LIST
 # create executable basevar
 set(EXECUTABLE_OUTPUT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/bin)
 add_executable(basevar ${SRC_LIST})
-add_dependencies(basevar Buildhts)  # Ensure htslib is built before basevar
+if(NOT USE_SYSTEM_HTSLIB)
+    add_dependencies(basevar Buildhts)  # Ensure bundled htslib is built before basevar
+endif()
+
+# Install target (for package managers like conda)
+install(TARGETS basevar RUNTIME DESTINATION bin)
 
 # Link libraries
 if(STATIC_BUILD AND APPLE)
