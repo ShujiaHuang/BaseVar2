@@ -81,6 +81,16 @@ if(USE_SYSTEM_HTSLIB)
     find_path(HTSLIB_INCLUDE_DIR "htslib/hts.h" REQUIRED)
     include_directories(${HTSLIB_INCLUDE_DIR})
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+    
+    # Find threading library (required for std::thread)
+    find_package(Threads REQUIRED)
+    
+    # Define system libraries for dynamic linking
+    set(COMMON_SYS_LIB Threads::Threads z bz2 m lzma curl)
+    if(NOT APPLE)
+        list(APPEND COMMON_SYS_LIB ssl crypto)
+    endif()
+    
     message(STATUS "Using system htslib: ${HTSLIB}")
 else()
     # ---- Build htslib from bundled submodule ----
