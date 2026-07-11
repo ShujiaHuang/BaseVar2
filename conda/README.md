@@ -1,36 +1,39 @@
 # Conda Packaging
 
-This directory contains the conda recipe for bioconda submission.
+This directory contains a **local copy** of the conda recipe for reference.
+
+> **Note**: The authoritative recipe is maintained at [bioconda-recipes/recipes/basevar](https://github.com/bioconda/bioconda-recipes/tree/main/recipes/basevar).
+> Version updates are handled automatically by the **bioconda autobump bot** when a new GitHub Release is published.
 
 ## Files
 
 - `basevar/meta.yaml` - Package metadata and dependencies
 - `basevar/build.sh` - Build script for conda
 
-## Updating to a new version
+## How updates work
 
-1. Update `basevar/meta.yaml`:
-   - Change `version` to new version
-   - Update `sha256` with new release tarball hash
+**For standard version updates** (no recipe changes needed):
+- Simply publish a new GitHub Release
+- The autobump bot will automatically detect it, update the recipe, and create a PR
+- No action needed in this directory
 
-2. Reset `build.number` to 0
-
-3. Copy to bioconda-recipes fork and submit PR:
+**For recipe changes** (adding dependencies, modifying build options, etc.):
+1. Edit files in this directory
+2. Copy to bioconda-recipes fork and submit PR:
    ```bash
    cd ~/Projects/bioconda-recipes
    git checkout master && git pull origin master
-   git checkout -b update-basevar-<version>
+   git checkout -b update-basevar-<description>
    
    cp <this-repo>/conda/basevar/meta.yaml recipes/basevar/
    cp <this-repo>/conda/basevar/build.sh recipes/basevar/
    chmod +x recipes/basevar/build.sh
    
    git add recipes/basevar/
-   git commit -m "Update basevar to v<version>"
-   git push origin update-basevar-<version>
+   git commit -m "<description>"
+   git push origin update-basevar-<description>
    ```
-
-4. Create PR at https://github.com/bioconda/bioconda-recipes/compare
+3. Create PR at https://github.com/bioconda/bioconda-recipes/compare
 
 ## References
 
