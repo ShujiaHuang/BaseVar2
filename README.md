@@ -6,13 +6,14 @@
 </h4>
 <p align="center">
   <a href="https://github.com/ShujiaHuang/BaseVar2/actions/workflows/build.yml"><img alt="GitHub Actions CI" src="https://github.com/ShujiaHuang/BaseVar2/actions/workflows/build.yml/badge.svg"></a> 
-  <a href="https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg" alt="License: AGPL v3"></a>
+  <a href="https://www.gnu.org/licenses/agpl-3.0"><img src="https://img.shields.io/badge/License-AGPL_v3-blue.svg" alt="License: AGPL v3 or later"></a>
+  <a href="https://bioconda.github.io/recipes/basevar/README.html"><img src="https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg" alt="Install with bioconda"></a>
   <!-- <a href="https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static"><img  src="https://img.shields.io/github/v/release/ShujiaHuang/BaseVar2?color=#21ed72" alt="GitHub Release"></a>  -->
 </p>
 
 <p align="center">
-  <em>
-    Download: <a href="https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static">Lastest version of linux-static-binary</a>
+  <em> 
+  Download: <a href="https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static">Lastest version of linux-static-binary</a>
   </em>
 </p> 
 
@@ -30,6 +31,31 @@ Pre-built static binaries are available on the [GitHub Releases page](https://gi
 | -------- | -------- | ----- |
 | Linux (x86_64) | [basevar-linux-static](https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-linux-static) | Requires **glibc ≥ 2.35** (see below) |
 | macOS (arm64 / Intel) | [basevar-macos-static](https://github.com/ShujiaHuang/BaseVar2/releases/latest/download/basevar-macos-static) | Requires **macOS 12+** |
+
+<!-- 
+### Install via Conda
+
+BaseVar is also available on [Bioconda](https://bioconda.github.io/recipes/basevar/README.html):
+
+```bash
+conda install -c bioconda basevar
+```
+
+Or create a dedicated environment:
+
+```bash
+conda create -n basevar -c bioconda basevar
+conda activate basevar
+```
+
+**Supported platforms:**
+
+| Platform | Status |
+| -------- | ------ |
+| Linux x86_64 | Supported |
+| macOS ARM (Apple Silicon) | Supported |
+| macOS x86_64 (Intel) | Not supported (requires macOS 10.15+) |
+ -->
 
 #### System requirements for `basevar-linux-static`
 
