@@ -1178,7 +1178,7 @@ bool BaseTypeRunner::_basevar_caller_binary(std::vector<BaseType::BatchInfo> &al
             }
         }
 
-        VCFRecord vcf_record = _vcfrecord_in_pos(all_smps_bi_vector, global_vi, popgroup_bt, ai);
+        VCFTextLine vcf_record = _vcfrecord_in_pos(all_smps_bi_vector, global_vi, popgroup_bt, ai);
         if (vcf_record.is_valid() && vcf_record.ref != "N") {
             vcf_hd << vcf_record.to_string() << "\n";
         } else {
@@ -1308,16 +1308,16 @@ VariantInfo BaseTypeRunner::_get_pos_variant_info(const BaseType &bt, const Base
     return vi;
 }
 
-VCFRecord BaseTypeRunner::_vcfrecord_in_pos(
+VCFTextLine BaseTypeRunner::_vcfrecord_in_pos(
     const std::vector<BaseType::BatchInfo> &samples_batchinfo_vector, // has been normalized with ref and alt bases by 'global_variant_info'
     const VariantInfo &global_variant_info,
     const std::map<std::string, BaseType> &group_bt, 
     AlleleInfo &ai)
 {
     // Return empty record if no variants
-    if (samples_batchinfo_vector.empty()) return VCFRecord();
+    if (samples_batchinfo_vector.empty()) return VCFTextLine();
 
-    VCFRecord vcf_record;
+    VCFTextLine vcf_record;
     vcf_record.chrom = global_variant_info.ref_id;  // all samples should have the same ref_id
     vcf_record.pos   = global_variant_info.ref_pos; // all samples should have the same ref_pos
     vcf_record.qual  = global_variant_info.qual;    // variant quality score, use the one from VariantInfo

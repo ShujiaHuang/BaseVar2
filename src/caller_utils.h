@@ -127,7 +127,7 @@ struct VCFSampleAnnotation {
     std::vector<double> per_allele_dosage; // Per-ALT expected allele count: [dosage_ALT1, dosage_ALT2, ...]
 };
 
-struct VCFRecord {
+struct VCFTextLine {
     // Required fields
     std::string chrom;     // CHROM: chromosome name
     uint32_t pos;          // POS: 1-based position
@@ -142,7 +142,7 @@ struct VCFRecord {
     std::vector<std::string> samples;  // Sample information.
 
     // Constructor
-    VCFRecord() : chrom(""), pos(0), id("."), ref(""), qual(0), filter("."), info(""), 
+    VCFTextLine() : chrom(""), pos(0), id("."), ref(""), qual(0), filter("."), info(""), 
                   format("") {}; 
     
     // Helper method to validate VCF record
