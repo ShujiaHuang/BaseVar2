@@ -191,9 +191,9 @@ struct VCFTextLine {
         const std::string qual_s = qual <= 0 ? "." : std::to_string(qual);
 
         // Pre-calculate total size for a single allocation
-        size_t est = chrom.size() + pos_s.size() + id.size() + ref.size() +
-                     alt_s.size() + qual_s.size() + filter.size() + info.size() +
-                     7 * sep.size();
+        size_t est = chrom.size() + pos_s.size() + id.size() + ref.size() + alt_s.size() + 
+                     qual_s.size() + filter.size() + info.size() + 7 * sep.size();
+
         if (!samples.empty()) {
             est += sep.size() + format.size();
             for (const auto& sample : samples)
@@ -244,7 +244,6 @@ StrandBiasInfo strand_bias(const std::string &ref_base,
                            const std::vector<std::string> &bases,
                            const std::vector<char> &strands);
 
-
 // Collect and normalized REF/ALT information
 AlleleInfo collect_and_normalized_allele_info(VariantInfo &variant, std::vector<BaseType::BatchInfo> &smps_bi_v);
 
@@ -262,6 +261,5 @@ std::string vcf_header_define(const std::string &ref_file_path, const std::vecto
                               const std::vector<std::string> &samples, const std::string other_comment);
 void merge_file_by_line(const std::vector<std::string> &infiles, const std::string &outfile, 
                         std::string header="#", bool is_remove_tempfile=false);
-// std::string cvg_header_define(const std::vector<std::string> &group_info, const std::vector<std::string> &BASES);
 
 #endif

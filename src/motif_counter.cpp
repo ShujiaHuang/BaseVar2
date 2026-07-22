@@ -75,7 +75,7 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
-#include <numeric>
+// #include <numeric>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_set>
@@ -101,7 +101,8 @@ char reverse_complement_base(char base) {
         case 'C': case 'c': return 'G';
         case 'G': case 'g': return 'C';
         case 'T': case 't': return 'A';
-        default:            return 'N';
+        default:            
+            return 'N';
     }
 }
 
