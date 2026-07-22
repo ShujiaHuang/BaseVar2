@@ -23,7 +23,6 @@ struct AlignBase {
     std::string read_base;  // read base
     char base_qual;         // read base quality, assign mean quality of seq if it's Indels 
     int rpr;                // read position rank, 1-based, the first base in read has rpr = 1, the second base has rpr = 2, etc.
-
     int mapq;               // mapping quality
     char map_strand;        // mapping reference strand, should be one of '*', '-', '+'  
 
@@ -91,8 +90,8 @@ struct VariantInfo {
         const std::string freq_s  = ngslib::join(freqs, ",");
 
         std::string s;
-        s.reserve(ref_id.size() + pos_s.size() + dp_s.size() + qual_s.size() +
-                  ref_s.size() + alt_s.size() + depth_s.size() + freq_s.size() + 7);
+        s.reserve(ref_id.size() + pos_s.size() + dp_s.size() + qual_s.size() + ref_s.size() + 
+                  alt_s.size() + depth_s.size() + freq_s.size() + 7);
         s.append(ref_id);   s.push_back('\t');
         s.append(pos_s);    s.push_back('\t');
         s.append(dp_s);     s.push_back('\t');
@@ -196,8 +195,9 @@ struct VCFTextLine {
 
         if (!samples.empty()) {
             est += sep.size() + format.size();
-            for (const auto& sample : samples)
+            for (const auto& sample : samples) {
                 est += sep.size() + sample.size();
+            }
         }
 
         std::string s;

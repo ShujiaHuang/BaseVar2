@@ -37,7 +37,10 @@ StrandBiasInfo strand_bias(const std::string &major_base,
             }
 
         } else {
-            throw std::runtime_error("[ERROR] in 'strand_bias' Get strange strand symbol: " + bases[i] + " " + std::to_string(strands[i]));
+            throw std::runtime_error(
+                "[ERROR] in 'strand_bias' Get strange strand symbol: " + 
+                bases[i] + " " + std::to_string(strands[i])
+            );
         }
     }
 

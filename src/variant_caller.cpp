@@ -762,7 +762,7 @@ void BaseTypeRunner::_seek_position(
                 // Build insertion bases: read_base (first) + multi_base (rest)
                 ab.read_base = std::string("+") + aligned_pairs[i].read_base + aligned_pairs[i].multi_base;
 
-                // Use upstream anchor base quality (D4 fix)
+                // Use upstream anchor base quality
                 if (i > 0) {
                     ab.base_qual = aligned_pairs[i-1].read_qual;
                 } else {
@@ -848,8 +848,8 @@ void BaseTypeRunner::_seek_position(
             sample_posinfo_map[leftmost_pos] = indel_info;
         }
 
-        // If there is still non-Indel information, we still need to keep the information
-        // at the original position.
+        // If there is still non-Indel information, we still need to keep the
+        // information at the original position.
         if (non_indel_info.align_bases.size() > 0) {
             sample_posinfo_map[pos] = non_indel_info;
         }
