@@ -28,10 +28,9 @@
 #include <thread>
 #include <cstdint>
 
-#include "io/bam.h"
-#include "io/bam_record.h"
-#include "io/bam_header.h"
-#include "io/fasta.h"
+#include "io/bam_record.h"  // ngslib::BamRecord
+#include "io/bam_header.h"  // ngslib::BamHeader
+#include "io/fasta.h"       // ngslib::Fasta
 
 namespace basevar {
 namespace motif {

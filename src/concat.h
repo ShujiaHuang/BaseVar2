@@ -14,7 +14,6 @@
 #ifndef __INCLUDE_BASEVAR_CONCAT_H__
 #define __INCLUDE_BASEVAR_CONCAT_H__
 
-#include <getopt.h>
 #include <string>
 #include <vector>
 

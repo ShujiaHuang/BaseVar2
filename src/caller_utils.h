@@ -14,9 +14,6 @@
 #include <vector>
 #include <iostream>
 
-#include <htslib/bgzf.h>
-#include <htslib/kstring.h>
-
 #include "io/utils.h"
 #include "basetype.h"
 #include "external/robin_hood.h"  // robin_hood::unordered_map, robin_hood::unordered_set

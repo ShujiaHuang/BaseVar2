@@ -7,9 +7,16 @@
  * 
  */
 #include "variant_caller.h"
+#include "algorithm.h"        // chi2_test, GenotypePosterior, compute_genotype_posterior, ...
+#include "io/bam.h"           // ngslib::Bam, ngslib::BamHeader, ngslib::BamRecord
 #include "io/batchfile_binary.h"
 #include "io/bgzf_concat.h"  // bgzf_raw_concat — BGZF block-level concatenation
 #include "io/tabix_utils.h"  // build_tabix_index — tabix index builder
+#include "external/thread_pool.h"  // ThreadPool
+#include <algorithm>   // std::min, std::max
+#include <fstream>     // std::ifstream
+#include <sstream>     // std::stringstream
+#include <memory>      // std::unique_ptr
 #include <cstdio>      // snprintf
 #include <stdexcept>
 #include <string>

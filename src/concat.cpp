@@ -19,6 +19,7 @@
 #include "io/bgzf_concat.h"  // bgzf_copy_blocks_to
 #include "io/utils.h"      // ngslib::get_firstcolumn_from_file
 
+#include <getopt.h>   // getopt_long, struct option
 #include <stdexcept>
 #include <vector>
 #include <string>

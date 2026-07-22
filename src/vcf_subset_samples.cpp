@@ -2,6 +2,13 @@
 // Author: Shujia Huang
 // Date: 2025-04-27
 #include "vcf_subset_samples.h"
+#include "io/utils.h"   // ngslib::get_firstcolumn_from_file, ngslib::suffix_name
+
+#include <getopt.h>    // getopt_long, struct option
+#include <iostream>    // std::cout, std::cerr
+#include <set>         // std::set
+#include <cmath>       // std::isnan, std::isinf
+#include <stdexcept>   // std::runtime_error
 
 // Function to print usage information for the 'subsam' command
 const std::string VCFSubsetSamples::usage() const {

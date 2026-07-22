@@ -82,6 +82,7 @@
 
 #include "external/thread_pool.h"
 #include "fprofile_data.h"
+#include "io/bam.h"         // ngslib::Bam (BAM/CRAM reader)
 #include "io/bam_header.h"
 #include "io/fasta.h"
 #include "io/utils.h"

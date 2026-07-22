@@ -4,18 +4,10 @@
 #ifndef __INCLUDE_VCF_SUBSET_SAMPLES_H__
 #define __INCLUDE_VCF_SUBSET_SAMPLES_H__
 
-#include <getopt.h> // For getopt_long
-#include <iostream>
 #include <vector>
 #include <string>
-#include <set>
-#include <cmath>     // For isnan, isinf
-#include <limits>    // For numeric_limits
-#include <stdexcept> // For std::runtime_error
 
-#include "version.h"  // For version info in usage
-#include "io/utils.h" // For get_firstcolumn_from_file, suffix_name
-#include "io/vcf.h"
+#include "io/vcf.h"  // ngslib::VCFFile, VCFHeader, VCFRecord (used in method signatures)
 
 /**
  * @brief Class to handle the logic for the 'subsam' command.

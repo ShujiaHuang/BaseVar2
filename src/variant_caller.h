@@ -12,26 +12,19 @@
 
 #include <getopt.h>
 #include <map>
-#include <fstream>
-#include <sstream>
 #include <ctime>      // clock
-#include <algorithm>  // std::min
-#include <memory>     // std::unique_ptr
+#include <thread>     // std::thread::hardware_concurrency
 
 #include <htslib/tbx.h>
 
 #include "io/fasta.h"
 #include "io/iobgzf.h"
-#include "io/bam.h"
+#include "io/bam_record.h"  // ngslib::BamRecord (used in _seek_position signature)
 #include "io/utils.h"
 
 #include "caller_utils.h"
 #include "basetype.h"
-#include "algorithm.h"
 #include "io/batchfile_binary.h"
-#include "version.h"
-
-#include "external/thread_pool.h"
 
 static const bool IS_DELETE_CACHE_BATCHFILE = true;
 static const char BASE_Q0_CHAR = '!'; // The ascii code of '!' character is 33
@@ -180,8 +173,5 @@ public:
     int run();
 
 };  // BaseTypeRunner class
-
-
-
 
 #endif
