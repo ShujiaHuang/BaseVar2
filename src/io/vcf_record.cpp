@@ -998,7 +998,32 @@ namespace ngslib {
                     if (sample_gt[j] < 0) {
                         curr_sample[j] = bcf_gt_missing;  // 标记缺失的基因型，输出为 ‘.’
                     } else {
-                        curr_sample[j] = bcf_gt_is_phased(sample_gt[j]) ? bcf_gt_phased(sample_gt[j]) : bcf_gt_unphased(sample_gt[j]);
+                        // 入参为已解码的等位基因索引（get_genotypes 通过 bcf_gt_allele
+                        // 去除了相位信息），不能对纯索引做 bcf_gt_is_phased 判断，
+                        // 否则奇数索引(1,3,...)的 bit0 会被误判为 phased 而错误输出 '|'。
+                        // 相位无法经由该接口往返，统一按 unphased 编码。
+                        /**
+                         * @brief 
+                         *  原本这句代码是错误的：curr_sample[j] = bcf_gt_is_phased(sample_gt[j]) ? bcf_gt_phased(sample_gt[j]) : bcf_gt_unphased(sample_gt[j]);
+                         *  但这句错误代码的影响范围不大 —— 只对 / | 的分隔符有影响，且只在奇数索引的等位基因上发生。
+                         *
+                         *   raw indices    | BUGGY out  | FIXED out  | differs?
+                         *   ---------------+------------+------------+---------
+                         *   0              | 0          | 0          | no
+                         *   1              | 1          | 1          | no
+                         *   0,1            | 0|1        | 0/1        | *** YES
+                         *   1,1            | 1|1        | 1/1        | *** YES
+                         *   0,2            | 0/2        | 0/2        | no
+                         *   0,1,2          | 0|1/2      | 0/1/2      | *** YES
+                         *   0,1,.          | 0|1/.      | 0/1/.      | *** YES
+                         *   0,.            | 0/.        | 0/.        | no
+                         *
+                         *   Note: bcf_gt_allele(buggy) == bcf_gt_allele(fixed) for every case,
+                         *   i.e. the numeric allele values are IDENTICAL; only the '/' vs '|'
+                         *   phase separator can differ (and only for odd-index alleles at pos >= 2).
+                         */
+                        // 统一按 unphased 编码
+                        curr_sample[j] = bcf_gt_unphased(sample_gt[j]);
                     }
                 } else {
                     // 对于倍性较低的样本，用向量结束标记填充
